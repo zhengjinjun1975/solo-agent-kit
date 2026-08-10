@@ -602,16 +602,34 @@ function dsSelectFile(path, evt){
 }
 function dsConfirm(){
   if(!dsSelectedSource)return;
-  // 清洗/分析/本体都支持多文件（分号分隔累积）
+  // 清洗/分析/本体：同类型(文件)可累积多选；数据库表是单一数据源(替换)
   const cur=dsSelected[dsModalTarget];
-  dsSelected[dsModalTarget] = cur ? cur+';'+dsSelectedSource : dsSelectedSource;
-  // 收缩卡片：简洁显示已选文件，主体让给执行区
+  const isRdbms = dsSelectedSource.startsWith('rdbms::') || dsSelectedSource.includes('::');
+  const curIsRdbms = (cur||'').startsWith('rdbms::') || (cur||'').includes('::');
+  if(isRdbms || curIsRdbms){
+    // 数据库源：单一替换
+    dsSelected[dsModalTarget] = dsSelectedSource;
+  } else {
+    // 文件：分号累积多选
+    dsSelected[dsModalTarget] = cur ? cur+';'+dsSelectedSource : dsSelectedSource;
+  }
+  // 收缩卡片：简洁显示已选数据源，主体让给执行区
   const box=document.getElementById('browse-'+dsModalTarget);
-  const files=(dsSelected[dsModalTarget]||'').split(';').filter(Boolean);
-  const fnames=files.map(p=>esc(p.split(/[\\\\\\/]/).pop()));
-  box.innerHTML=files.length>1
-    ? `<span class="ds-pill">📄 ${fnames[0]}</span><span class="ds-pill">+${files.length-1}</span>`
-    : `<span class="ds-pill">📄 ${fnames[0]}</span>`;
+  const sel=dsSelected[dsModalTarget];
+  let label;
+  if(sel.startsWith('rdbms::')){
+    const parts=sel.split('::');
+    label=`<span class="ds-pill">🗄️ ${parts[6]||parts[1]}</span>`;  // 表名
+  } else if(sel.includes('::')){
+    label=`<span class="ds-pill">🗄️ ${sel.split('::')[1]}</span>`;  // sqlite表
+  } else {
+    const files=sel.split(';').filter(Boolean);
+    const fnames=files.map(p=>esc(p.split(/[\\\\\\/]/).pop()));
+    label=files.length>1
+      ? `<span class="ds-pill">📄 ${fnames[0]}</span><span class="ds-pill">+${files.length-1}</span>`
+      : `<span class="ds-pill">📄 ${fnames[0]}</span>`;
+  }
+  box.innerHTML=label;
   // 收缩 ds-card（隐藏图标/箭头/标题，只留简洁状态行）
   const card=box.closest('.ds-card');
   if(card){
