@@ -321,7 +321,7 @@ async function send(){
     loading.remove();
     if(res.intent==='chat'&&res.suggestion){addMsg(res.suggestion,'ai','chat');}
     else{
-      const brief={};
+      let brief={};
       if(res.intent==='clean')brief.summary=res.summary,brief.report=res.report;
       else if(res.intent==='stats')brief.column=res.column,brief.describe=res.describe,brief.anomalies=res.anomalies,brief.control_chart=res.control_chart;
       else if(res.intent==='ontology')brief.entities=res.entities,brief.triples=res.triples;
