@@ -29,6 +29,7 @@ from solo import memory as memory_mod
 from solo import skill as skill_mod
 from solo.factory import stats as stats_mod
 from solo.factory import clean as clean_mod
+from solo import web_api as api  # 业务逻辑层（拆自本文件的辅助函数/端点处理）
 
 PORT = 8743
 
@@ -153,7 +154,7 @@ class SoloHandler(BaseHTTPRequestHandler):
             self._json({"query": q, "results": results})
         elif path == "/api/code-overview":
             from solo import code as code_mod
-            d = _safe_path(qs.get("dir", [""])[0])
+            d = api.safe_path(qs.get("dir", [""])[0])
             cg = code_mod.CodeGraph()
             n = cg.index(d or "solo")
             self._json({"indexed": n, "symbols": len(cg.symbols), "overview": cg.overview()})
@@ -161,10 +162,10 @@ class SoloHandler(BaseHTTPRequestHandler):
             # GET: csv+col 兼容；POST: 数据源对象
             if self.command == "POST":
                 body = self._read_body()
-                rows = _load_rows(body)
+                rows = api.load_rows(body)
                 col = body.get("col")
             else:
-                csv_path = _safe_path(qs.get("csv", [""])[0])
+                csv_path = api.safe_path(qs.get("csv", [""])[0])
                 col = qs.get("col", [None])[0]
                 if not csv_path or not os.path.exists(csv_path):
                     self._json({"error": "csv not found or outside project"}, 400)
@@ -177,7 +178,7 @@ class SoloHandler(BaseHTTPRequestHandler):
             if not col:
                 for r in rows:
                     for k in r:
-                        if r.get(k, "").strip() and _num(r.get(k)):
+                        if r.get(k, "").strip() and api.num(r.get(k)):
                             col = k
                             break
                     if col:
@@ -185,7 +186,7 @@ class SoloHandler(BaseHTTPRequestHandler):
             if not col:
                 self._json({"error": "未找到数值列，用 --col 指定"}, 400)
                 return
-            vals = [float(r[col]) for r in rows if col and r.get(col, "").strip() and _num(r.get(col))]
+            vals = [float(r[col]) for r in rows if col and r.get(col, "").strip() and api.num(r.get(col))]
             if not vals:
                 self._json({"error": "column not found or no numeric data"}, 400)
                 return
@@ -200,7 +201,7 @@ class SoloHandler(BaseHTTPRequestHandler):
             from solo.task import Task
             self._json({"issues": Task().list_issues()})
         elif path == "/api/deploy":
-            self._json(_deploy())
+            self._json(api.deploy())
         elif path == "/api/monitor":
             # 环境监控（FDE 现场资源看板）
             from solo.factory import monitor as mon_mod
@@ -242,9 +243,9 @@ class SoloHandler(BaseHTTPRequestHandler):
             result = {"sources": []}
             if db_path:
                 result["sources"].append({"type": "sqlite", "path": db_path,
-                                          "tables": dc.list_tables(_safe_path(db_path))})
+                                          "tables": dc.list_tables(api.safe_path(db_path))})
             if csv_path:
-                sp = _safe_path(csv_path)
+                sp = api.safe_path(csv_path)
                 import os as _os
                 result["sources"].append({"type": "csv", "path": sp,
                                           "exists": bool(sp and _os.path.exists(sp))})
@@ -289,7 +290,7 @@ class SoloHandler(BaseHTTPRequestHandler):
             # 数据库对接：连接→测试→列出表
             from solo import data_connector as dc
             body = self._read_body()
-            db = _safe_path(body.get("db", ""))
+            db = api.safe_path(body.get("db", ""))
             if not db or not os.path.exists(db):
                 self._json({"ok": False, "error": "数据库文件不存在"}, 400)
                 return
@@ -302,7 +303,7 @@ class SoloHandler(BaseHTTPRequestHandler):
             # 数据库表预览（前几行）
             from solo import data_connector as dc
             body = self._read_body()
-            db = _safe_path(body.get("db", ""))
+            db = api.safe_path(body.get("db", ""))
             table = body.get("table", "")
             rows = dc.connect({"type": "sqlite", "path": db, "table": table})[:5]
             self._json({"rows": rows})
@@ -312,12 +313,12 @@ class SoloHandler(BaseHTTPRequestHandler):
     def _handle_api_post(self, path):
         if path == "/api/config":
             body = self._read_body()
-            ok = _write_config(body.get("config", {}))
+            ok = api.write_config(body.get("config", {}))
             self._json({"saved": ok})
         elif path == "/api/stats":
             # POST 数据分析（数据源对象：csv 或 db+table）
             body = self._read_body()
-            rows = _load_rows(body)
+            rows = api.load_rows(body)
             col = body.get("col")
             if not rows:
                 self._json({"error": "数据源无效或为空"}, 400)
@@ -325,22 +326,22 @@ class SoloHandler(BaseHTTPRequestHandler):
             if not col:
                 for r in rows:
                     for k in r:
-                        if r.get(k, "").strip() and _num(r.get(k)):
+                        if r.get(k, "").strip() and api.num(r.get(k)):
                             col = k
                             break
                     if col:
                         break
-            vals = [float(r[col]) for r in rows if col and r.get(col, "").strip() and _num(r.get(col))]
+            vals = [float(r[col]) for r in rows if col and r.get(col, "").strip() and api.num(r.get(col))]
             # 若指定列无数值，自动回退找第一个数值列（避免 400）
             if not vals and col:
                 for r in rows:
                     for k in r:
-                        if k != col and r.get(k, "").strip() and _num(r.get(k)):
+                        if k != col and r.get(k, "").strip() and api.num(r.get(k)):
                             col = k
                             break
-                    if col and any(_num(r.get(col, "")) for r in rows[:5]):
+                    if col and any(api.num(r.get(col, "")) for r in rows[:5]):
                         break
-                vals = [float(r[col]) for r in rows if col and r.get(col, "").strip() and _num(r.get(col))]
+                vals = [float(r[col]) for r in rows if col and r.get(col, "").strip() and api.num(r.get(col))]
             if not vals:
                 self._json({"error": "column not found or no numeric data"}, 400)
                 return
@@ -360,7 +361,7 @@ class SoloHandler(BaseHTTPRequestHandler):
                 if act == "test":
                     self._json(remote_mod.test_connection(host, user, port))
                 elif act == "deploy":
-                    self._json(remote_mod.remote_deploy(host, user, port, body.get("cmd", "")))
+                    self._json(remote_mod.remoteapi.deploy(host, user, port, body.get("cmd", "")))
                 elif act == "logs":
                     self._json(remote_mod.remote_logs(host, user, port, body.get("cmd", "")))
                 else:
@@ -449,7 +450,7 @@ class SoloHandler(BaseHTTPRequestHandler):
         elif path == "/api/clean":
             body = self._read_body()
             from solo import data_connector as dc
-            rows = _load_rows(body)
+            rows = api.load_rows(body)
             if not rows:
                 self._json({"error": "数据源无效或为空（CSV路径或数据库表）"}, 400)
                 return
@@ -461,17 +462,17 @@ class SoloHandler(BaseHTTPRequestHandler):
         elif path == "/api/report":
             # P0-5: 生成数据概览 HTML 报告（对标 pandas-profiling）
             body = self._read_body()
-            rows = _load_rows(body)
+            rows = api.load_rows(body)
             if not rows:
                 self._json({"error": "数据源无效或为空"}, 400)
                 return
             cols = list(rows[0].keys()) if rows else []
-            report = _build_report(rows, cols)
+            report = api.build_report(rows, cols)
             self._json(report)
         elif path == "/api/export":
             # P0-5: 导出 CSV（清洗后数据 / 原始数据）
             body = self._read_body()
-            rows = _load_rows(body)
+            rows = api.load_rows(body)
             if not rows:
                 self._json({"error": "数据源无效或为空"}, 400)
                 return
@@ -489,7 +490,7 @@ class SoloHandler(BaseHTTPRequestHandler):
             if body.get("csvs"):
                 all_rows = []
                 for cp in body["csvs"][:10]:
-                    p = _data_path(cp) or _safe_path(cp)
+                    p = api.data_path(cp) or api.safe_path(cp)
                     if p:
                         from solo import data_connector as dc
                         try:
@@ -500,7 +501,7 @@ class SoloHandler(BaseHTTPRequestHandler):
                             pass
                 rows = all_rows
             else:
-                rows = _load_rows(body)
+                rows = api.load_rows(body)
             if not rows:
                 self._json({"error": "数据源无效或为空"}, 400)
                 return
@@ -508,7 +509,7 @@ class SoloHandler(BaseHTTPRequestHandler):
             types = {}
             for c in cols:
                 vals = [r.get(c, "") for r in rows[:50] if r.get(c, "") != ""]
-                types[c] = _guess_col_type(vals)
+                types[c] = api.guess_col_type(vals)
             self._json({"columns": cols, "types": types, "total_rows": len(rows),
                         "preview": rows[:3]})
         elif path == "/api/ontology":
@@ -517,13 +518,13 @@ class SoloHandler(BaseHTTPRequestHandler):
             o = onto_mod.Ontology()
             relations = None
             # 数据源：csv 或 db+table
-            rows = _load_rows(body)
+            rows = api.load_rows(body)
             if not rows:
                 self._json({"error": "数据源无效或为空（CSV路径或数据库表）"}, 400)
                 return
             if body.get("relations"):
                 import json as _json
-                rel_path = _safe_path(body["relations"])
+                rel_path = api.safe_path(body["relations"])
                 if not rel_path:
                     self._json({"error": "relations outside project"}, 400)
                     return
@@ -552,7 +553,7 @@ class SoloHandler(BaseHTTPRequestHandler):
                 # 支持 csvs 数组 → 读多表
                 csvs = body.get("csvs") or []
                 for cp in csvs[:10]:
-                    p = _data_path(cp) or _safe_path(cp)
+                    p = api.data_path(cp) or api.safe_path(cp)
                     if p:
                         import csv as _csv
                         from solo import data_connector as dc
@@ -601,7 +602,7 @@ class SoloHandler(BaseHTTPRequestHandler):
             if not data:
                 csvs = body.get("csvs") or []
                 for cp in csvs[:10]:
-                    p = _data_path(cp) or _safe_path(cp)
+                    p = api.data_path(cp) or api.safe_path(cp)
                     if p:
                         from solo import data_connector as dc
                         try:
@@ -662,234 +663,6 @@ class SoloHandler(BaseHTTPRequestHandler):
         # P0-2: 记录请求日志（不再静默 pass）
         from solo.base import get_logger
         get_logger("solo.web").info("%s - %s", self.address_string(), fmt % args)
-
-
-def _setup_checks() -> dict:
-    """部署检查：Python / Ollama / config / 记忆库。"""
-    import sys
-    checks = {}
-    checks["python"] = {"ok": sys.version_info >= (3, 9),
-                        "version": f"{sys.version_info.major}.{sys.version_info.minor}"}
-    try:
-        import urllib.request
-        with urllib.request.urlopen("http://127.0.0.1:11434/api/tags", timeout=3) as r:
-            models = [m.get("name", "") for m in json.load(r).get("models", [])]
-        checks["ollama"] = {"ok": True, "models": models[:5]}
-    except Exception:
-        checks["ollama"] = {"ok": False, "error": "本地 Ollama 未运行"}
-    cfg = provider_mod.load_config()
-    checks["config"] = {"ok": bool(cfg), "has_provider_yaml": bool(cfg)}
-    m = memory_mod.Memory()
-    checks["memory"] = {"ok": True, "dir": m.dir,
-                        "facts": len(m._load(m._facts_path, []))}
-    return {"checks": checks,
-            "all_ok": all(c.get("ok", True) for c in checks.values())}
-
-
-def _deploy() -> dict:
-    """真实部署：检查环境 → 启动 Ollama（若未运行）→ 验证模型可用。
-
-    返回部署结果与动作日志。
-    """
-    import sys
-    import subprocess
-    log = []
-    result = {"ok": False, "steps": [], "logs": log}
-
-    # 1. Python 检查
-    log.append(f"[1/4] Python {sys.version_info.major}.{sys.version_info.minor} {'✅' if sys.version_info >= (3, 9) else '❌'}")
-
-    # 2. 检查/启动 Ollama
-    try:
-        import urllib.request
-        with urllib.request.urlopen("http://127.0.0.1:11434/api/tags", timeout=3) as r:
-            models = [m.get("name", "") for m in json.load(r).get("models", [])]
-        log.append(f"[2/4] Ollama 已在运行 ✅ 模型: {', '.join(models[:5]) or '无'}")
-    except Exception:
-        log.append("[2/4] Ollama 未运行，尝试启动…")
-        # Windows 下找 ollama.exe 启动
-        ollama_path = None
-        for cand in [os.path.expandvars(r"%LOCALAPPDATA%\Programs\Ollama\ollama.exe"),
-                     r"C:\Program Files\Ollama\ollama.exe"]:
-            if os.path.exists(cand):
-                ollama_path = cand
-                break
-        if ollama_path:
-            try:
-                subprocess.Popen([ollama_path, "serve"], creationflags=0x00000008)  # DETACHED
-                log.append("    → 已尝试启动 ollama.exe")
-                import time
-                time.sleep(3)
-                try:
-                    with urllib.request.urlopen("http://127.0.0.1:11434/api/tags", timeout=3) as r:
-                        models = [m.get("name", "") for m in json.load(r).get("models", [])]
-                    log.append(f"    ✅ Ollama 启动成功 模型: {', '.join(models[:5]) or '无'}")
-                except Exception:
-                    log.append("    ⚠️ Ollama 已启动但未就绪（稍后重试）")
-            except Exception as e:
-                log.append(f"    ❌ 启动失败: {e}")
-        else:
-            log.append("    ⚠️ 未找到 ollama.exe，请手动安装并启动 Ollama")
-
-    # 3. 配置检查
-    cfg = provider_mod.load_config()
-    log.append(f"[3/4] 配置文件 {'✅ 存在' if cfg else '⚠️ 缺失（运行配置功能创建）'}")
-
-    # 4. 记忆库
-    m = memory_mod.Memory()
-    facts = len(m._load(m._facts_path, []))
-    log.append(f"[4/4] 记忆库 ✅ ({facts} 条事实)")
-
-    result["ok"] = all("❌" not in s.split("]", 1)[-1] or "未找到 ollama" in s for s in log)
-    result["steps"] = log
-    return result
-
-
-def _safe_path(p: str) -> str:
-    """路径参数白名单：只允许项目内路径（默认本地部署，防任意文件读）。
-
-    项目根 = web_server.py 所在仓库根。绝对路径或超出项目根 → 返回 ""（调用方报错）。
-    """
-    if not p:
-        return ""
-    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # 仓库根
-    p = p.replace("\\", "/")
-    if os.path.isabs(p):
-        full = p
-    else:
-        full = os.path.join(root, p)
-    full = os.path.normpath(full)
-    if full.startswith(os.path.normpath(root)):
-        return full
-    return ""
-
-
-def _data_path(p: str) -> str:
-    """数据文件路径白名单：放开到硬盘，但只允许数据文件扩展名。
-
-    供硬盘级浏览后的数据读取（csv/db/sqlite/xlsx/json），拒绝任意文件读取。
-    """
-    if not p:
-        return ""
-    ALLOWED = (".csv", ".db", ".sqlite", ".xlsx")  # JSON 是配置非数据表，排除
-    p = os.path.normpath(p.replace("\\", "/"))
-    if os.path.isabs(p) and os.path.exists(p) and p.lower().endswith(ALLOWED):
-        return p
-    return ""
-
-
-def _load_rows(body: dict) -> list:
-    """从请求体解析数据源并读取为行列表。
-
-    body 支持:
-      {"csv": "路径"}                      CSV 文件
-      {"db": "路径", "table": "表名"}       SQLite 表
-      {"db": "路径", "query": "SQL"}        SQL 查询
-      {"source": {...}}                     data_connector.connect 格式
-    """
-    from solo import data_connector as dc
-    if "source" in body:
-        src = dict(body["source"])
-        if "path" in src:
-            src["path"] = _data_path(src["path"]) or _safe_path(src["path"])
-        return dc.connect(src)
-    if body.get("csvs"):
-        # 多文件合并为行列表（清洗/分析/建模多选）
-        merged = []
-        for cp in body["csvs"][:10]:
-            p = _data_path(cp) or _safe_path(cp)
-            if not p:
-                continue
-            stype = "xlsx" if p.lower().endswith(".xlsx") else "csv"
-            try:
-                merged.extend(dc.connect({"type": stype, "path": p}))
-            except DataSourceError:
-                continue
-        return merged
-    if body.get("csv"):
-        p = _data_path(body["csv"]) or _safe_path(body["csv"])
-        stype = "xlsx" if p.lower().endswith(".xlsx") else "csv"
-        return dc.connect({"type": stype, "path": p}) if p else []
-    if body.get("db"):
-        p = _data_path(body["db"]) or _safe_path(body["db"])
-        if body.get("table"):
-            return dc.connect({"type": "sqlite", "path": p, "table": body["table"]}) if p else []
-        if body.get("query"):
-            return dc.connect({"type": "sql", "path": p, "query": body["query"]}) if p else []
-    return []
-
-
-def _guess_col_type(vals: list) -> str:
-    """推断列类型（复用 clean 的逻辑）。"""
-    from solo.factory.clean import guess_type
-    if not vals:
-        return "empty"
-    return guess_type(str(vals[0]))
-
-
-def _build_report(rows: list, cols: list) -> dict:
-    """P0-5: 构建数据概览报告（对标 pandas-profiling 的结构）。"""
-    from solo.factory import stats as st
-    total = len(rows)
-    # 缺失值统计
-    missing = {}
-    types = {}
-    col_stats = {}
-    for c in cols:
-        vals = [r.get(c, "") for r in rows]
-        non_empty = [v for v in vals if str(v).strip() != ""]
-        missing[c] = total - len(non_empty)
-        types[c] = _guess_col_type(non_empty[:1])
-        # 数值列统计
-        if types[c] in ("float", "integer"):
-            nums = [float(v) for v in non_empty if _num(v)]
-            if nums:
-                col_stats[c] = st.describe(nums)
-    # 重复行
-    seen = set()
-    dups = 0
-    for r in rows:
-        key = tuple(str(r.get(c, "")) for c in cols)
-        if key in seen:
-            dups += 1
-        else:
-            seen.add(key)
-    return {
-        "total_rows": total,
-        "total_cols": len(cols),
-        "columns": cols,
-        "types": types,
-        "missing": missing,
-        "missing_total": sum(missing.values()),
-        "duplicates": dups,
-        "col_stats": col_stats,
-        "preview": rows[:5],
-    }
-
-
-def _write_config(config: dict) -> bool:
-    """写 provider.yaml（极简 YAML 序列化）。"""
-    path = os.path.join(os.path.expanduser("~"), ".solo", "provider.yaml")
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    try:
-        lines = ["# solo-agent-kit 模型配置", "provider:"]
-        for tier, meta in config.get("provider", {}).items():
-            lines.append(f"  {tier}:")
-            for k, v in meta.items():
-                lines.append(f"    {k}: {v}")
-        with open(path, "w", encoding="utf-8") as f:
-            f.write("\n".join(lines) + "\n")
-        return True
-    except Exception:
-        return False
-
-
-def _num(v):
-    try:
-        float(v)
-        return True
-    except (ValueError, TypeError):
-        return False
 
 
 def main():
