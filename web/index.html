@@ -15,7 +15,7 @@
   --border:rgba(45,55,85,0.14); --text:#111827; --dim:#4b5563; --mute:#6b7280;
   --blue:#2f5ef0; --blue-soft:#5b7cf5; --orange:#d97706; --green:#15803d; --red:#dc2626;
   --blue-bg:#e6edff; --blue-border:#c3d4ff; --orange-bg:#fef0dc;
-  --nav-bg:#1e293b; --nav-text:#cbd5e1; --nav-active:#3b6ef6; --nav-hover:#334155;
+  --nav-bg:#2b3a52; --nav-text:#cbd5e1; --nav-active:#3b6ef6; --nav-hover:#334155;
   --glass:blur(20px) saturate(150%); --r:16px; --shadow:0 4px 20px rgba(30,40,70,0.06);
   --shadow-hover:0 8px 30px rgba(30,40,70,0.12);
   --ease:cubic-bezier(.4,0,.2,1);
@@ -32,7 +32,7 @@ body{font-family:-apple-system,"Segoe UI","Microsoft YaHei",system-ui,sans-serif
 .glass{background:var(--panel);border:1px solid var(--border);border-radius:var(--r);backdrop-filter:var(--glass);-webkit-backdrop-filter:var(--glass);box-shadow:var(--shadow);transition:box-shadow .3s var(--ease),transform .3s var(--ease)}
 
 /* 左导航 */
-.sidebar{padding:18px 14px;display:flex;flex-direction:column;gap:16px;overflow-y:auto;background:linear-gradient(180deg,#1e293b,#24344d);border-right:1px solid rgba(255,255,255,0.06)}
+.sidebar{padding:18px 14px;display:flex;flex-direction:column;gap:16px;overflow-y:auto;background:linear-gradient(180deg,#2b3a52,#33465f);border-right:1px solid rgba(255,255,255,0.06)}
 .logo{display:flex;align-items:center;gap:10px}
 .logo-icon{width:38px;height:38px;border-radius:12px;background:linear-gradient(135deg,var(--blue),var(--blue-soft),#7a5bf0);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(47,94,240,.35);flex-shrink:0;transition:transform .3s var(--ease)}
 .logo-icon:hover{transform:rotate(-6deg) scale(1.05)}
@@ -191,25 +191,32 @@ body{font-family:-apple-system,"Segoe UI","Microsoft YaHei",system-ui,sans-serif
 
     <!-- 数据分析工作区 -->
     <div id="ws-stats" style="display:none">
-      <div class="lbl">数据分析 — 选数据源→分析→可视化</div>
-      <input type="text" id="ds-stats-path" placeholder="CSV路径或数据库路径" value="examples/data/factory_sensor.csv">
-      <div style="margin-top:6px"><button class="btn" onclick="listDSClean()" style="margin-right:4px">浏览</button><button class="btn pri" onclick="runStatsDS()">分析</button></div>
+      <div class="lbl">数据分析 — 浏览文件→选择→分析</div>
+      <button class="btn" onclick="browseFile('stats')">📂 浏览数据文件</button>
+      <div id="browse-stats" style="font-size:11px;margin-top:6px"></div>
+      <input type="text" id="ds-stats-path" placeholder="已选文件" readonly>
+      <div style="margin-top:6px"><button class="btn pri" onclick="runStatsDS()">分析</button></div>
       <div id="stats-result" style="font-size:11px;margin-top:8px"></div>
       <div id="stats-chart" style="margin-top:6px"></div>
     </div>
 
     <!-- 数据清洗工作区 -->
     <div id="ws-clean" style="display:none">
-      <div class="lbl">数据清洗 — 选数据源→清洗→预览</div>
-      <input type="text" id="ds-clean-path" placeholder="CSV路径或数据库路径" value="examples/data/factory_sensor.csv">
+      <div class="lbl">数据清洗 — 浏览文件→选择→清洗</div>
+      <button class="btn" onclick="browseFile('clean')">📂 浏览数据文件</button>
+      <div id="browse-clean" style="font-size:11px;margin-top:6px"></div>
+      <input type="text" id="ds-clean-path" placeholder="已选文件" readonly>
       <div style="margin-top:6px"><button class="btn pri" onclick="runCleanDS()">清洗</button></div>
       <div id="clean-result" style="font-size:11px;margin-top:8px"></div>
+      <div id="clean-preview" style="font-size:11px;margin-top:6px"></div>
     </div>
 
     <!-- 本体建模工作区 -->
     <div id="ws-ontology" style="display:none">
-      <div class="lbl">本体建模 — 选数据源→建本体→关系图</div>
-      <input type="text" id="ds-onto-path" placeholder="CSV路径或数据库路径" value="examples/data/factory_equipment.csv">
+      <div class="lbl">本体建模 — 浏览文件→选择→建本体</div>
+      <button class="btn" onclick="browseFile('ontology')">📂 浏览数据文件</button>
+      <div id="browse-ontology" style="font-size:11px;margin-top:6px"></div>
+      <input type="text" id="ds-onto-path" placeholder="已选文件" readonly>
       <div style="margin-top:6px"><button class="btn pri" onclick="runOntoDS()">建本体</button></div>
       <div id="onto-result" style="font-size:11px;margin-top:8px"></div>
       <div id="onto-graph" style="margin-top:6px"></div>
@@ -468,28 +475,52 @@ document.querySelectorAll('.ni').forEach(n=>n.addEventListener('click',()=>{
   input.placeholder='输入任务…';
 }));
 
-// ===== 数据清洗工作区 =====
-async function runCleanDS(){
-  const out=document.getElementById('clean-result');
-  out.innerHTML='⏳ 清洗中…';
-  const csv=document.getElementById('ds-clean-path').value.trim();
-  const res=await api('/api/clean',{method:'POST',body:JSON.stringify({csv:csv||'examples/data/factory_sensor.csv'})});
-  const r=res.report||{};
-  out.innerHTML=`<b>清洗 ${res.input}→${res.output} 行</b><br>
-    · 去重 ${r.dropped_dup||0} · 剔异常 ${r.dropped_outlier||0} · 补缺失 ${r.filled_missing||0}<br>
-    <span style="color:var(--mute)">类型：${Object.entries(r.types||{}).map(([k,v])=>`${k}=${v}`).join(', ')}</span>`;
+// ===== 文件浏览→选择→确认 流程 =====
+async function browseFile(mod){
+  const box=document.getElementById('browse-'+mod);
+  box.innerHTML='⏳ 加载文件列表…';
+  const res=await api('/api/browse');
+  const files=res.files||[];
+  box.innerHTML='<div style="color:var(--mute);margin-bottom:4px">选择数据文件：</div>'
+    + files.map(f=>`<div onclick="selectFile('${mod}','${f.path}')" style="padding:4px 8px;cursor:pointer;border-radius:6px;background:rgba(59,110,246,.06);margin-bottom:3px">📄 ${f.name} <span style="color:var(--mute)">(${f.path})</span></div>`).join('')
+    || '<div style="color:var(--mute)">项目内暂无数据文件</div>';
+}
+function selectFile(mod, path){
+  document.getElementById('ds-'+mod+'-path').value=path;
+  document.getElementById('browse-'+mod).innerHTML=`✅ 已选择：${path}`;
 }
 
-// ===== 数据分析工作区（含 SVG 控制图）=====
+// ===== 数据清洗工作区（含预览）=====
+async function runCleanDS(){
+  const out=document.getElementById('clean-result');
+  const prev=document.getElementById('clean-preview');
+  out.innerHTML='⏳ 清洗中…'; prev.innerHTML='';
+  const csv=document.getElementById('ds-clean-path').value.trim();
+  if(!csv){out.innerHTML='⚠️ 请先浏览选择数据文件';return;}
+  const res=await api('/api/clean',{method:'POST',body:JSON.stringify({csv:csv})});
+  const r=res.report||{};
+  out.innerHTML=`<b>清洗完成 ${res.input}→${res.output} 行</b><br>
+    · 去重 ${r.dropped_dup||0} · 剔异常 ${r.dropped_outlier||0} · 补缺失 ${r.filled_missing||0}<br>
+    <span style="color:var(--mute)">类型：${Object.entries(r.types||{}).map(([k,v])=>`${k}=${v}`).join(', ')}</span>`;
+  // 清洗后数据预览(前5行)
+  if(res.sample){
+    prev.innerHTML='<b>清洗后数据预览（前5行）：</b><br>'+renderTable(res.sample);
+  }
+}
+
+// ===== 数据分析工作区（含完整报告）=====
 async function runStatsDS(){
   const out=document.getElementById('stats-result');
   const chart=document.getElementById('stats-chart');
   out.innerHTML='⏳ 分析中…'; chart.innerHTML='';
   const csv=document.getElementById('ds-stats-path').value.trim();
-  const res=await api('/api/stats?csv='+encodeURIComponent(csv||'examples/data/factory_sensor.csv')+'&col=temp_c');
+  if(!csv){out.innerHTML='⚠️ 请先浏览选择数据文件';return;}
+  const res=await api('/api/stats?csv='+encodeURIComponent(csv)+'&col=temp_c');
   const d=res.describe||{}, cc=res.control_chart||{};
-  out.innerHTML=`<b>列「${res.column}」</b>：均值 ${d.mean} · 中位数 ${d.median} · 标准差 ${d.std}<br>
-    ${(res.anomalies||[]).length} 异常点 · ${(cc.out_of_control||[]).length} 控制图越限`;
+  out.innerHTML=`<b>分析报告 — 列「${res.column}」</b><br>
+    · 均值 ${d.mean} · 中位数 ${d.median} · 标准差 ${d.std}<br>
+    · min ${d.min} · max ${d.max}<br>
+    · ${(res.anomalies||[]).length} 异常点 · ${(cc.out_of_control||[]).length} 控制图越限`;
   chart.innerHTML=drawControlChart(res.column, cc);
 }
 
@@ -528,6 +559,14 @@ function drawOntoGraph(entities){
     ${entities.map((e,i)=>{const x=(i%cols)*cw+5,y=Math.floor(i/cols)*ch+5;
       return `<rect x="${x}" y="${y}" width="${cw-10}" height="${ch-10}" rx="8" fill="#e6edff" stroke="#3b6ef6" stroke-width="1"/><text x="${x+(cw-10)/2}" y="${y+(ch-10)/2+3}" text-anchor="middle" fill="#2f5ef0" font-size="9">${e}</text>`;}).join('')}
   </svg>`;
+}
+// 渲染数据表格(清洗预览)
+function renderTable(rows){
+  if(!rows||!rows.length)return'';
+  const cols=Object.keys(rows[0]).slice(0,6);
+  const head=cols.map(c=>`<th style="padding:2px 6px;text-align:left;border-bottom:1px solid var(--border);color:var(--mute)">${esc(c)}</th>`).join('');
+  const body=rows.map(r=>`<tr>${cols.map(c=>`<td style="padding:2px 6px">${esc(r[c]??'')}</td>`).join('')}</tr>`).join('');
+  return `<table style="border-collapse:collapse;width:100%;font-size:10px"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
 }
 
 // ===== 写作工作区 =====

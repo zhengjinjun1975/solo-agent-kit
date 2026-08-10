@@ -194,6 +194,18 @@ class SoloHandler(BaseHTTPRequestHandler):
                 result["sources"].append({"type": "csv", "path": sp,
                                           "exists": bool(sp and _os.path.exists(sp))})
             self._json(result)
+        elif path == "/api/browse":
+            # 浏览可选数据文件（项目内 CSV/DB，供选择确认）
+            import os as _os
+            root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            files = []
+            for dp, dirs, fn in _os.walk(root):
+                dirs[:] = [d for d in dirs if d not in (".git", "__pycache__", "node_modules", ".venv")]
+                for f in fn:
+                    if f.endswith((".csv", ".db", ".sqlite", ".xlsx")):
+                        rel = _os.path.relpath(_os.path.join(dp, f), root).replace("\\", "/")
+                        files.append({"path": rel, "name": f})
+            self._json({"files": sorted(files, key=lambda x: x["name"])[:30]})
         else:
             self._json({"error": "unknown api"}, 404)
 
@@ -238,7 +250,8 @@ class SoloHandler(BaseHTTPRequestHandler):
             cl = clean_mod.DataCleaner()
             out = cl.clean(rows, fill_missing=body.get("method", "drop"),
                            outlier_method=body.get("outlier", "iqr"))
-            self._json({"input": len(rows), "output": len(out), "report": cl.report})
+            self._json({"input": len(rows), "output": len(out), "report": cl.report,
+                        "sample": out[:5]})
         elif path == "/api/ontology":
             from solo.factory import ontology as onto_mod
             body = self._read_body()
