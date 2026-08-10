@@ -358,13 +358,14 @@ function drawOntoGraph(model){
   const colorOf=et=>ONTO_COLORS[entityList.indexOf(et)%ONTO_COLORS.length];
   // ECharts 节点/边
   const data=Object.values(nodes).map(n=>({
-    id:n.id, name:String(n.id).split(':').pop().slice(0,10),
+    id:n.entity+':'+n.id,  // 完整标识，与 edges 的 from/to 一致
+    name:String(n.id).split(':').pop().slice(0,10),
     category:entityList.indexOf(n.entity),
     symbolSize:n.entity==='Category'?16:12,
     itemStyle:{color:colorOf(n.entity)},
     tooltip:{formatter:`<b>${n.entity}</b> ${n.id}<br/>${Object.entries(n.data||{}).slice(0,3).map(([k,v])=>`${k}: ${v}`).join('<br/>')}`}
   }));
-  const idSet=new Set(Object.values(nodes).map(n=>n.id));
+  const idSet=new Set(Object.values(nodes).map(n=>n.entity+':'+n.id));
   const links=edges.map(e=>({source:e.from,target:e.to}))
     .filter(l=>idSet.has(l.source)&&idSet.has(l.target));
   // 企业 hub → 各实体类代表节点（企业拥有/运营所有业务对象，体现关联度）
