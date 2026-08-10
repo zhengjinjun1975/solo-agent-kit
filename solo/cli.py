@@ -199,9 +199,18 @@ def _factory_onto(args):
     if args.relations:
         with open(args.relations, encoding="utf-8") as f:
             relations = json.load(f)
-        # 兼容：relations 文件可能含 {实体名:{object_properties:...}}
-        if isinstance(relations, dict) and "object_properties" in relations:
-            relations = relations["object_properties"]
+        # 兼容多种结构：
+        #   {列: {rel,target_class,label}}                          直接对象属性
+        #   {实体名: {object_properties: {...}}}                   多实体关系配置
+        #   {object_properties: {...}}                             单实体配置
+        if isinstance(relations, dict):
+            if "object_properties" in relations:
+                relations = relations["object_properties"]
+            elif relations and all(isinstance(v, dict) and "object_properties" in v
+                                   for v in relations.values() if isinstance(v, dict)):
+                # 取匹配实体名的那份；若 args.entity 不在 relations 键里则用第一个
+                ent = args.entity if (args.entity and args.entity in relations) else next(iter(relations))
+                relations = relations[ent].get("object_properties", relations[ent])
     o.from_csv(args.csv, entity_name=args.entity, id_col=args.id_col, relations=relations)
     o.build()
     return {"entities": list(o.entities.keys()), "triples": len(o.triples),
