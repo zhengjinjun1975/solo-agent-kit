@@ -2,6 +2,36 @@
 
 所有显著变更记录在此。格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [0.7.2] - 2026-08-10
+
+### 变更(端到端测试套件 + 数据入库)
+- tests/test_e2e.py: 19项端到端测试(对话/写作/代码/决策/清洗/分析/本体/技能/部署/配置/FDE监控日志浏览)
+- 修复CI根因: examples/data数据文件入仓库(.gitignore的data/误忽略)
+- 37项测试全绿(18单测+19e2e), CI绿
+
+## [0.7.1] - 2026-08-10
+
+### 变更(FDE现场能力)
+- 工厂数据工作区UI卡片化(ds-card/全宽渐变主按钮)
+- FDE-3远程运维: remote.py系统OpenSSH零依赖(连接/执行/部署/日志)
+- FDE-4工单闭环: task.new_issue(triage自动分类)/diagnose/resolve_issue
+
+## [0.7.0] - 2026-08-10
+
+### 变更(FDE能力深化, 对标三体+FDE现场)
+- 写作深化: 4风格模板(tweet/report/wechat/paper)+rewrite
+- 代码深化: review代码审查(裸except/TODO)
+- 决策深化: forecast/price_compare/supplier_score指标(8类决策)
+- FDE-1环境监控: /api/monitor(psutil CPU/内存/磁盘/进程)
+- FDE-2日志诊断: /api/logs(内存缓冲日志查看器)
+
+## [0.6.0] - 2026-08-10
+
+### 变更(CodeAgent审查P0+P1+P2修复)
+- P0: 原子写+并发锁/日志系统/错误契约/SQL白名单/数据报告导出/多轮对话
+- P1: 接口dataclass/解反向依赖/能力注册表/并发/记忆向量检索/LLM意图
+- P2: 文档工程化/诚实化/备份恢复/xlsx/大数据流式/前端拆模块
+
 ## [0.5.5] - 2026-08-10
 
 ### 变更(UI美观度优化, 2026设计趋势)
