@@ -26,88 +26,17 @@ STYLES = {
     "paper": {"name": "论文", "hint": "严谨客观，术语准确，逻辑链完整，论证有层次",
               "max_len": 8000, "rules": ["避免口语化", "观点有出处"]},
 }
+
 def list_styles() -> dict:
     """返回可用风格模板清单。"""
     return {k: {"name": v["name"], "hint": v["hint"]} for k, v in STYLES.items()}
-
-
-# ═══════════ 吸收 qu-ai-wei 方法论：语体识别 + 门检 ═══════════
-# 不同语体的"AI 腔"标准完全不同。先识别语体，再选规则，否则会把
-# 学术"进行了深入分析"误改口语、把公文"依法予以处理"误改白话。
-
-# 语体指纹（关键字 + 特征正则）→ 语体名
-_REGISTER_FINGERPRINTS = {
-    "学术/科技": ["论文", "综述", "研究表明", "综上所述", "分析认为", "本研究", "方法论", "机制", "阈值", "显著性"],
-    "公文/法律": ["依照", "予以", "兹", "特此", "本办法", "规定", "责令", "行政许可", "依法"],
-    "叙事/特稿": ["那时", "我坐在", "他说", "推开门", "记得", "黄昏", "巷子", "她转身"],
-    "品牌/广告": ["限时", "即刻", "仅此一次", "秒杀", "爆款", "上新", "为你", "专属"],
-    "高考/应试": ["由此可见", "总而言之", "诚然", "不可否认", "值得称道", "排比递进"],
-    "社交/口语": ["哈哈", "咱", "贼", "咋", "老铁", "哈喽", "诶", "嘛", "呗", "啦", "啊哈哈"],
-    "内容/自媒体": ["家人们", "宝子", "宝们", "姐妹们", "种草", "打卡", "冲鸭", "集美"],
-    "商务/职场": ["汇报", "方案", "截止", "跟进", "对接", "本周", "进度", "同步", "请知悉"],
-}
-
-# 语体规则：命中多个则取命中数最多的
-def _detect_register(text: str) -> str:
-    """识别文本语体（9 种）。返回语体名，默认'书面/一般'。"""
-    if not text:
-        return "书面/一般"
-    scores = {}
-    for reg, words in _REGISTER_FINGERPRINTS.items():
-        scores[reg] = sum(text.count(w) for w in words)
-    # 口语 + 方言强信号
-    dk = 0
-    for w in ["内", "那啥", "咋", "嘛", "呗", "咱"]:
-        dk += text.count(w)
-    if dk >= 3:
-        scores["社交/口语"] = scores.get("社交/口语", 0) + dk
-    best = max(scores, key=scores.get) if scores else "书面/一般"
-    return best if scores.get(best, 0) >= 2 else "书面/一般"
-
-
-# 门检：改写前判断是否真人文本（吸收 qu-ai-wei "第负一步"）
-# 真人文本的强信号——命中任一条，改写应停手，只清格式不动语言。
-_HUMAN_SIGNALS = [
-    # 自纠/犹疑/填充语气词
-    r"我忘了|我猜啊|不定扯|三十秒还是一分钟|记不清",
-    # 地域方言/口语词
-    r"咋|贼|那啥|咱|唠嗑|整|老铁|儿化音",
-    # meta-irony / 自嘲
-    r"用比较酸的话说|听着就不正经|我知道这话|装一把",
-    # 具体到只有本人的细节（人名/书名/引用原话）
-    r"有人跟我说|那年我|我记得那|我妈说",
-]
-
-def _gate_check(text: str) -> dict:
-    """门检：判断输入是不是真人写的。
-
-    返回 {"human": bool, "signal": str, "reason": str}
-    - human=True: 真人文本（自纠/方言/自嘲/具体细节），改写应停手
-    - human=False: AI 生成文本，可继续改写
-    """
-    for pat in _HUMAN_SIGNALS:
-        m = re.search(pat, text)
-        if m:
-            return {"human": True, "signal": m.group(0),
-                    "reason": "命中真人文本强信号（自纠/方言/自嘲/具体细节），停手不改声口"}
-    return {"human": False, "signal": "", "reason": "未命中真人信号，可继续改写"}
-
 
 def rewrite(text: str, style: str = "tweet", provider=None) -> dict:
     """按风格模板改写文本（对标 OpenClaw 写作）。
 
     style: tweet/report/wechat/paper
     provider: 可选 LLM provider；无则用规则提示（返回风格指导）。
-
-    改写前先门检：若是真人文本，停手返回提示，不改声口。
     """
-    # 门检：真人文本停手
-    gate = _gate_check(text)
-    if gate["human"]:
-        return {"style": style, "rewritten": "", "gate": gate,
-                "note": "检测到真人文本，不改（避免误改声口）。如需改写请明确说明意图。"}
-    # 语体识别（供 style 兜底与提示）
-    register = _detect_register(text)
     s = STYLES.get(style, STYLES["tweet"])
     if provider:
         prompt = (f"请把下面文本改写成{s['name']}风格。\n"
@@ -123,49 +52,6 @@ def rewrite(text: str, style: str = "tweet", provider=None) -> dict:
             "hint": s["hint"], "rules": s["rules"],
             "original_len": len(text), "max_len": s["max_len"],
             "note": "未配置 LLM，返回风格指导；配置 provider 后可自动改写"}
-
-
-def optimize(text: str, style: str = "report", provider=None) -> dict:
-    """检测 → 改写 → 复检 闭环（优化器核心入口）。
-
-    流程：
-      1. 门检：真人文本停手（不改声口）
-      2. 检测：六维 scan 定位 AI 味与质量问题
-      3. 改写：按风格模板改写（有 provider 则 LLM 改写，无则返回风格指导）
-      4. 复检：对改写结果重新 scan，确认 AI 味/问题是否减少
-
-    返回完整闭环报告。
-    """
-    # 1. 门检
-    gate = _gate_check(text)
-    if gate["human"]:
-        return {"ok": True, "phase": "gate", "gate": gate,
-                "detect": scan(text), "rewrite": None, "recheck": None,
-                "note": "检测到真人文本，停手不改声口。"}
-
-    # 2. 检测
-    detect = scan(text)
-
-    # 3. 改写
-    rw = rewrite(text, style=style, provider=provider)
-    rewritten = rw.get("rewritten", "")
-
-    # 4. 复检（仅当改写成功）
-    recheck = scan(rewritten) if rewritten else None
-    improvement = None
-    if recheck and detect.get("fail_count", 0) > 0:
-        improvement = detect["fail_count"] - recheck["fail_count"]
-
-    return {"ok": True, "phase": "done", "gate": gate,
-            "register": _detect_register(text),
-            "detect": detect, "rewrite": rw, "recheck": recheck,
-            "improvement": improvement,
-            "summary": {
-                "before_fail": detect.get("fail_count", 0),
-                "after_fail": recheck.get("fail_count", 0) if recheck else None,
-                "before_issues": detect.get("total_issues", 0),
-                "after_issues": recheck.get("total_issues", 0) if recheck else None,
-            }}
 
 # ═══════════════════════ 检测规则（合并 zh-writing-checker v3.0）═══════════════════════
 
