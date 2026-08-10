@@ -193,6 +193,8 @@ async function send(){
       else if(res.intent==='memory_search')brief.results=res.results;
       else if(res.intent==='writing')brief=res;
       else if(res.intent==='code_overview')brief.indexed=res.indexed,brief.overview=res.overview;
+      else if(res.intent==='setup'){brief.checks=res.checks,brief.all_ok=res.all_ok;}
+      else if(res.intent==='config'){if(res.configured){brief.configured=res.configured;for(const k of ['local','remote','embed'])if(res[k])brief[k]=res[k];}else brief.hint=res.hint;}
       else brief=res;
       addData('完成', 'ai', brief, res.intent);
     }
@@ -204,10 +206,28 @@ input.addEventListener('keydown',e=>{if(e.key==='Enter')send();});
 document.getElementById('btn-clear').addEventListener('click',()=>{scroll.innerHTML='';});
 document.querySelectorAll('.qc').forEach(q=>q.addEventListener('click',()=>{input.value=q.dataset.q;send();}));
 
-// 导航（跳转到对话 + 暗示能力）
+// 导航（所有项点击即调用对应模块, 走 agent 路由真实执行）
+const NAV_TASK = {
+  chat:'',
+  clean:'清洗 examples/data/factory_sensor.csv',
+  stats:'分析 temp_c 趋势和异常',
+  ontology:'用 examples/data/factory_equipment.csv 建本体',
+  memory:'查记忆：最近的事',
+  skill:'技能清单',
+  writing:'写作检查：这是测试文本，检查文风',
+  code:'代码库概览',
+  gen:'写一个 README 给这个工具',
+  setup:'部署检查',
+  config:'查看配置',
+  capabilities:'能力清单'
+};
 document.querySelectorAll('.ni').forEach(n=>n.addEventListener('click',()=>{
   document.querySelectorAll('.ni').forEach(x=>x.classList.remove('on'));n.classList.add('on');
-  input.placeholder='输入任务… 如：'+({clean:'清洗 examples/data/factory_sensor.csv',stats:'分析 temp_c 趋势',ontology:'建设备本体',memory:'查记忆：本体',skill:'沉淀技能：X',writing:'检查文风：文本',code:'代码库概览',gen:'写一个 README',setup:'部署检查',config:'查看配置'}[n.dataset.cap]||'自然语言任务');
+  const cap=n.dataset.cap;
+  const task=NAV_TASK[cap];
+  if(cap==='chat'){ document.getElementById('chat-input').focus(); return; }
+  if(task){ input.value=task; send(); }
+  else input.placeholder='输入任务…';
 }));
 
 // ===== 能力面板 =====

@@ -31,6 +31,8 @@ INTENTS = {
     "gen": ["生成", "写一段", "generate", "写代码", "写文档", "写 readme", "写 readme", "写指南", "readme", "README"],
     "code_overview": ["代码库", "项目概览", "代码结构", "理解代码"],
     "setup": ["部署检查", "环境检查", "setup", "体检"],
+    "config": ["查看配置", "看配置", "配置情况", "当前配置", "模型配置"],
+    "capabilities": ["能力清单", "有哪些能力", "能力"],
 }
 
 
@@ -117,6 +119,28 @@ def run(task: str, mem_dir: str = None, skill_dir: str = None, tier: str = "auto
         t.predict(task["id"], f"任务「{task['goal']}」将被推进")
         return {"intent": "task", "id": task["id"], "goal": task["goal"],
                 "state": task["state"], "prediction": task["id"]}
+    if intent == "config":
+        from solo import provider as p_mod
+        cfg = p_mod.load_config()
+        if not cfg:
+            return {"intent": "config", "configured": False,
+                    "hint": "未配置 provider.yaml。运行 `solo setup` 检查环境，复制 provider.yaml.example 为 provider.yaml 并填写。",
+                    "memory_dir": m.dir}
+        p = cfg.get("provider", {})
+        out = {"intent": "config", "configured": True}
+        for k in ("local", "remote", "embed"):
+            item = p.get(k, {})
+            clean = dict(item)
+            if "api_key_env" in clean:
+                clean["api_key_env"] = clean["api_key_env"] + " (从环境变量读, 不落盘)"
+            out[k] = clean
+        return out
+    if intent == "skill":
+        sk = skill_mod.Skill(skill_dir or skill_mod.DEFAULT_DIR)
+        return {"intent": "skill", "skills": sk.list(), "memory_dir": m.dir}
+    if intent == "capabilities":
+        from solo.web_server import CAPABILITIES
+        return {"intent": "capabilities", "capabilities": CAPABILITIES, "memory_dir": m.dir}
 
     # ---- 兜底：对话（记忆装载 → 推理 → 记忆提交）----
     profile = m.profile_text()
