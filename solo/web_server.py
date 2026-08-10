@@ -232,16 +232,16 @@ class SoloHandler(BaseHTTPRequestHandler):
         elif path == "/api/browse":
             # 硬盘级文件遍历：盘符/目录导航（数据文件过滤）
             import os as _os
-            # 允许浏览的根：Windows 盘符或当前项目
             root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            # 默认根 = examples/data（示例数据直接可见），盘符/上级可导航到任意硬盘
+            default_root = os.path.join(root, "examples", "data")
             dir_arg = qs.get("dir", [""])[0]
             if dir_arg:
                 cur = dir_arg
-                # 只允许访问本地路径（盘符或绝对路径）
                 if not _os.path.isdir(cur):
-                    cur = root
+                    cur = default_root
             else:
-                cur = root
+                cur = default_root
             dirs, files = [], []
             try:
                 for name in sorted(_os.listdir(cur)):
@@ -256,16 +256,13 @@ class SoloHandler(BaseHTTPRequestHandler):
                             files.append({"path": full, "name": name, "dir": False})
             except Exception:
                 pass
-            # 盘符列表（Windows 根）
+            # 盘符列表（Windows 根）——任何目录都返回，方便随时切硬盘
             parent = ""
             if _os.path.dirname(cur) != cur:
                 parent = _os.path.dirname(cur)
-            drives = []
-            if cur == root or cur == _os.path.dirname(cur):
-                import string
-                for d in string.ascii_uppercase:
-                    if _os.path.exists(f"{d}:\\"):
-                        drives.append({"path": f"{d}:\\", "name": f"{d}:", "dir": True})
+            import string
+            drives = [{"path": f"{d}:\\", "name": f"{d}:", "dir": True}
+                      for d in string.ascii_uppercase if _os.path.exists(f"{d}:\\")]
             self._json({"dir": cur, "parent": parent, "dirs": dirs, "files": files, "drives": drives})
         elif path == "/api/db-connect":
             # 数据库对接：连接→测试→列出表
