@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# 虚拟环境
+.venv/
+venv/
+
+# 环境与密钥
+.env
+.env.*
+
+# 运行时数据（数据留在本地，不入仓库）
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# 模型缓存
+.cache/
+*.vec_cache*
+
+# 系统/编辑器
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# 临时
+*.bak
+*~
+tmp/

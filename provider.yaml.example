@@ -1,0 +1,23 @@
+# solo-agent-kit 模型配置模板
+# 复制为 provider.yaml 后填写。所有 key 从环境变量读，不入仓库。
+
+provider:
+  # 轻量推理（记忆/写作/压缩/标题）→ 本地 Ollama，快/免费/私有
+  local:
+    type: ollama
+    base_url: http://127.0.0.1:11434
+    model: ornith:latest
+
+  # 复杂推理（本体建模/复杂代码/长文）→ 远端 DeepSeek
+  # api_key 从环境变量读，不写死
+  remote:
+    type: openai-compatible
+    base_url: https://api.deepseek.com
+    model: deepseek-chat
+    api_key_env: DEEPSEEK_API_KEY
+
+  # 语义嵌入（记忆检索）→ 本地，记忆不泄露
+  embed:
+    type: ollama
+    base_url: http://127.0.0.1:11434
+    model: nomic-embed-text:latest

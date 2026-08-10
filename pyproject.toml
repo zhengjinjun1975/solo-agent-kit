@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "solo-agent-kit"
+version = "0.1.0"
+description = "本体优先、方法论驱动、轻量独立的一人公司 Agent —— 记忆/写作/代码/开源，一个人干完整活。"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "Apache-2.0" }
+keywords = ["agent", "memory", "ontology", "one-person-company", "lightweight"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+# 零第三方依赖：纯标准库
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/zhengjinjun1975/solo-agent-kit"
+Source = "https://github.com/zhengjinjun1975/solo-agent-kit"
+Documentation = "https://github.com/zhengjinjun1975/solo-agent-kit"
+
+[project.scripts]
+solo = "solo.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["solo*"]
