@@ -288,7 +288,24 @@
      <div id="ds-file-list" style="max-height:280px;overflow:auto;border:1px solid var(--border);border-radius:10px;padding:8px"></div>
    </div>
    <div id="ds-tab-db" style="display:none">
-     <input type="text" id="ds-db-path" placeholder="输入 .db/.sqlite 数据库文件路径" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px">
+     <div style="font-size:12px;color:var(--mute);margin-bottom:6px">数据库类型</div>
+     <div style="display:flex;gap:6px;margin-bottom:10px">
+       <button class="btn dbtab" data-t="sqlite" onclick="dsDbType('sqlite')">🗄️ SQLite</button>
+       <button class="btn dbtab" data-t="mysql" onclick="dsDbType('mysql')">🐬 MySQL</button>
+       <button class="btn dbtab" data-t="postgres" onclick="dsDbType('postgres')">🐘 Postgres</button>
+     </div>
+     <!-- SQLite -->
+     <div id="db-f-sqlite">
+       <input type="text" id="ds-db-path" placeholder="输入 .db/.sqlite 数据库文件路径" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px">
+     </div>
+     <!-- MySQL/Postgres（企业数据库） -->
+     <div id="db-f-mysql" style="display:none">
+       <input type="text" id="rmdb-host" placeholder="主机（如 192.168.1.100）" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px">
+       <input type="text" id="rmdb-port" placeholder="端口（MySQL 3306 / PG 5432）" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px">
+       <input type="text" id="rmdb-user" placeholder="用户名" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px">
+       <input type="password" id="rmdb-pass" placeholder="密码" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px">
+       <input type="text" id="rmdb-db" placeholder="数据库名" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px">
+     </div>
      <button class="btn pri" onclick="dsConnectDb()">连接并列出表</button>
      <div id="ds-db-result" style="font-size:12px;margin-top:8px"></div>
    </div>

@@ -189,6 +189,29 @@ function showWorkspace(ws){
     if(el) el.style.display = (id===ws)?'block':'none';
   });
 }
+
+// ===== 导航折叠（点击展开/收起，手风琴）=====
+function initNavCollapse(){
+  const groups=document.querySelectorAll('.ng');
+  groups.forEach((g,i)=>{
+    const lbl=g.querySelector('.lbl');
+    if(!lbl) return;
+    // 标题加箭头
+    if(!lbl.querySelector('.arrow')) lbl.insertAdjacentHTML('beforeend','<span class="arrow">▶</span>');
+    // 默认：第一组展开，其余收起
+    if(i===0) g.classList.add('open');
+    else g.classList.add('closed');
+    // 点击切换
+    lbl.addEventListener('click',(e)=>{
+      e.stopPropagation();
+      const isOpen=g.classList.contains('open');
+      // 手风琴：收起所有
+      groups.forEach(x=>{x.classList.remove('open');x.classList.add('closed');});
+      if(!isOpen){ g.classList.remove('closed'); g.classList.add('open'); }
+    });
+  });
+}
+initNavCollapse();
 // 导航点击：工作台=对话区; 数据模块=数据工作区面板; 其余=右侧面板
 document.querySelectorAll('.ni').forEach(n=>n.addEventListener('click',()=>{
   document.querySelectorAll('.ni').forEach(x=>x.classList.remove('on'));n.classList.add('on');
@@ -635,15 +658,45 @@ async function loadColumns(mod, source){
   // 默认列自动触发分析（仅 stats 且已选文件）
   if(mod==='stats' && dsSelected['stats']) runStatsDS();
 }
+let _dsDbType='sqlite';
+function dsDbType(t){
+  _dsDbType=t;
+  document.querySelectorAll('.dbtab').forEach(b=>b.classList.remove('pri'));
+  const btn=document.querySelector(`.dbtab[data-t="${t}"]`); if(btn) btn.classList.add('pri');
+  document.getElementById('db-f-sqlite').style.display = t==='sqlite'?'block':'none';
+  document.getElementById('db-f-mysql').style.display = t==='sqlite'?'none':'block';
+  document.getElementById('ds-db-result').innerHTML='';
+}
 async function dsConnectDb(){
   const out=document.getElementById('ds-db-result');
   out.innerHTML='⏳ 连接测试中…';
-  const db=document.getElementById('ds-db-path').value.trim();
-  if(!db){out.innerHTML='⚠️ 请输入数据库文件路径';return;}
-  const res=await api('/api/db-connect',{method:'POST',body:JSON.stringify({db})});
-  if(!res.ok){out.innerHTML='❌ '+res.error;return;}
-  out.innerHTML='✅ 连接成功，表：<br>'+(res.tables||[]).map(t=>
-    `<div class="ds-item file" onclick="dsSelectTable('${db}','${t}')">🗄️ ${t}</div>`).join('');
+  if(_dsDbType==='sqlite'){
+    const db=document.getElementById('ds-db-path').value.trim();
+    if(!db){out.innerHTML='⚠️ 请输入数据库文件路径';return;}
+    const res=await api('/api/db-connect',{method:'POST',body:JSON.stringify({db})});
+    if(!res.ok){out.innerHTML='❌ '+res.error;return;}
+    out.innerHTML='✅ 连接成功，表：<br>'+(res.tables||[]).map(t=>
+      `<div class="ds-item file" onclick="dsSelectTable('${db}','${t}')">🗄️ ${t}</div>`).join('');
+  } else {
+    // MySQL/Postgres 企业数据库
+    const host=document.getElementById('rmdb-host').value.trim();
+    const user=document.getElementById('rmdb-user').value.trim();
+    const dbn=document.getElementById('rmdb-db').value.trim();
+    if(!host||!user||!dbn){out.innerHTML='⚠️ 请填写主机/用户名/数据库名';return;}
+    const port=document.getElementById('rmdb-port').value.trim();
+    const pass=document.getElementById('rmdb-pass').value;
+    const res=await api('/api/rdbms-connect',{method:'POST',body:JSON.stringify({
+      type:_dsDbType,host,user,password:pass,db:dbn,port:port||undefined})});
+    if(!res.ok){out.innerHTML='❌ '+res.error;return;}
+    out.innerHTML='✅ 连接成功，表：<br>'+(res.tables||[]).map(t=>
+      `<div class="ds-item file" onclick="dsSelectRdbmsTable('${_dsDbType}','${host}','${user}','${encodeURIComponent(pass)}','${dbn}','${t}')">🗄️ ${t}</div>`).join('');
+  }
+}
+function dsSelectRdbmsTable(type,host,user,pass,db,table){
+  // 存为企业数据库数据源（供清洗/分析/本体用）
+  dsSelectedSource='rdbms::'+type+'::'+host+'::'+user+'::'+pass+'::'+db+'::'+table;
+  document.getElementById('ds-selected-info').textContent=`✅ 已选 ${type} 表：${table}`;
+  document.getElementById('ds-confirm').disabled=false;
 }
 function dsSelectTable(db,table){
   dsSelectedSource=db+'::'+table;
