@@ -9,7 +9,7 @@
     <img src="https://img.shields.io/badge/License-Apache--2.0-blue.svg" alt="License">
   </a>
   <a href="https://github.com/zhengjinjun1975/solo-agent-kit/blob/main/CHANGELOG.md">
-    <img src="https://img.shields.io/badge/version-0.8.4-blue.svg" alt="Version">
+    <img src="https://img.shields.io/badge/version-0.8.5-blue.svg" alt="Version">
   </a>
   <a href="https://www.python.org/">
     <img src="https://img.shields.io/badge/Python-3.9%2B-blue.svg" alt="Python">
