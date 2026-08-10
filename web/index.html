@@ -625,9 +625,17 @@ async function loadSkillPanel(){
   const res=await api('/api/skills');
   const el=document.getElementById('skill-list');
   const sk=res.skills||[];
-  el.innerHTML = sk.length
-    ? sk.map(s=>`<div class="stat">🎯 ${s}</div>`).join('')
-    : '<div class="stat" style="color:var(--mute)">暂无技能，添加一个可复用经验</div>';
+  if(!sk.length){el.innerHTML='<div class="stat" style="color:var(--mute)">暂无技能，添加一个可复用经验</div>';return;}
+  // 列表式展示每个技能
+  el.innerHTML=sk.map(s=>`
+    <div style="border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:8px;background:#fff">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <b style="font-size:13px;color:var(--blue)">🎯 ${esc(s.name)}</b>
+        <span style="font-size:10px;color:var(--mute)">v${s.version||1} · ${(s.ts||'').slice(0,10)}</span>
+      </div>
+      ${s.trigger&&s.trigger.length?`<div style="font-size:11px;color:var(--mute);margin-top:5px">触发词：${s.trigger.map(esc).join(' · ')}</div>`:''}
+      ${s.steps&&s.steps.length?`<div style="font-size:11px;margin-top:4px"><span style="color:var(--mute)">步骤：</span><br>${s.steps.map((st,i)=>`<span style="color:var(--dim)">${i+1}. ${esc(st)}</span>`).join('<br>')}</div>`:''}
+    </div>`).join('');
 }
 async function addSkill(){
   const name=document.getElementById('sk-name').value.trim();

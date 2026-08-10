@@ -45,6 +45,11 @@ class Skill:
     def list(self) -> list:
         return sorted(self._load_index().keys())
 
+    def all_details(self) -> list:
+        """返回全部技能的完整信息（供列表式展示）。"""
+        idx = self._load_index()
+        return [idx[name] for name in sorted(idx.keys())]
+
     def match(self, text: str) -> list:
         """按触发词匹配当前任务的适用 skill（按触发词命中排序）。"""
         idx = self._load_index()

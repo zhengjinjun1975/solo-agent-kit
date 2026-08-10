@@ -129,8 +129,8 @@ class SoloHandler(BaseHTTPRequestHandler):
             facts = m._load(m._facts_path, [])
             self._json({"facts": len(facts), "profile": m.profile_text()})
         elif path == "/api/skills":
-            s = skill_mod.Skill()
-            self._json({"skills": s.list()})
+            sk = skill_mod.Skill()
+            self._json({"skills": sk.all_details()})
         elif path == "/api/memory-search":
             m = memory_mod.Memory()
             q = qs.get("q", [""])[0]
