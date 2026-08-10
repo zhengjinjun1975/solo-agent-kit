@@ -41,6 +41,9 @@
         <div class="ni p" data-cap="skill">
           <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.9 6.3 6.9.8-5.1 4.7 1.4 6.8L12 17.8 5.9 20.6l1.4-6.8L2.2 9.1l6.9-.8z"/></svg>
           技能</div>
+        <div class="ni p" data-cap="decisions">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 6l-5-4-5 4M5 8H3v8h2M19 8h2v8h-2M5 18h14"/><circle cx="12" cy="12" r="3"/></svg>
+          决策</div>
       </div>
       <div class="ng"><div class="lbl">系统</div>
         <div class="ni s" data-cap="setup">
@@ -125,6 +128,15 @@
       <div style="margin-top:6px"><button class="btn pri" onclick="runOntoDS()">建企业级本体</button></div>
       <div id="onto-result" style="font-size:11px;margin-top:8px"></div>
       <div id="onto-graph" style="margin-top:6px"></div>
+    </div>
+
+    <!-- 决策工作区（企业决策：规则引擎→行动清单） -->
+    <div id="ws-decisions" style="display:none">
+      <div class="lbl">企业决策 — 选数据文件，跑确定性决策规则</div>
+      <div class="ds-picker" onclick="openDsModal('decisions')">＋ 选择数据文件</div>
+      <div id="browse-decisions" style="font-size:11px;margin-top:6px"></div>
+      <div style="margin-top:6px"><button class="btn pri" onclick="runDecisionsDS()">生成决策建议</button></div>
+      <div id="decisions-result" style="font-size:11px;margin-top:8px"></div>
     </div>
 
     <!-- 写作工作区 -->

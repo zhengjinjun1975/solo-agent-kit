@@ -181,7 +181,7 @@ async function selectDataSource(cap, ex){
 
 // ===== 工作区切换：导航点击在右侧渲染对应工作区 =====
 function showWorkspace(ws){
-  ['status','clean','stats','ontology','writing','code','skill','config','setup'].forEach(id=>{
+  ['status','clean','stats','ontology','decisions','writing','code','skill','config','setup'].forEach(id=>{
     const el=document.getElementById('ws-'+id);
     if(el) el.style.display = (id===ws)?'block':'none';
   });
@@ -192,15 +192,15 @@ document.querySelectorAll('.ni').forEach(n=>n.addEventListener('click',()=>{
   const cap=n.dataset.cap;
   if(cap==='chat'){ showWorkspace('status'); input.placeholder='自然语言指挥，AI路由全部套件'; input.focus(); return; }
   // 数据模块 + 工作区 → 右侧面板
-  if(['clean','stats','ontology','writing','code','skill','config','setup'].includes(cap)){
+  if(['clean','stats','ontology','decisions','writing','code','skill','config','setup'].includes(cap)){
     showWorkspace(cap);
     // 数据工作区：恢复已选文件显示（不自动执行）
-    if(['clean','stats','ontology'].includes(cap)){
+    if(['clean','stats','ontology','decisions'].includes(cap)){
       const sel=dsSelected[cap];
       const box=document.getElementById('browse-'+cap);
       if(sel&&box){
         const files=sel.split(';').filter(Boolean);
-        const fnames=files.map(p=>esc(p.split(/[\\\\\\/]/).pop()));
+        const fnames=files.map(p=>esc(p.split(/[\\\\\\\\\\\\/]/).pop()));
         box.innerHTML=files.length>1
           ? `<div class="ds-file">📄 ${fnames[0]}</div><div style="font-size:10px;color:var(--mute);margin-top:4px">+${files.length-1} 个文件</div>`
           : `<div class="ds-file">📄 ${fnames[0]}</div>`;
@@ -340,6 +340,23 @@ async function runOntoDS(){
     out.innerHTML=`<b>${res.entities.length} 实体 · ${res.triples} 关系</b><br>${(res.entities||[]).join(' · ')}`;
     drawOntoGraph(res.model||res.entities);
   }
+}
+// ===== 企业决策工作区（规则引擎→行动清单）=====
+async function runDecisionsDS(){
+  const out=document.getElementById('decisions-result');
+  out.innerHTML='⏳ 生成决策中…';
+  const sources=dsSelected['decisions']||'';
+  if(!sources){out.innerHTML='⚠️ 请先选择数据文件';return;}
+  const csvs=sources.split(';').map(s=>s.trim()).filter(Boolean);
+  const res=await api('/api/decisions',{method:'POST',body:JSON.stringify({csvs:csvs})});
+  if(res.error){out.innerHTML='❌ '+res.error;return;}
+  const ds=res.decisions||[];
+  const levelColor={告急:'#e74c3c',预警:'#e8890c',建议:'#3b6ef6'};
+  out.innerHTML=`<div style="margin-bottom:8px"><b style="font-size:13px">🧭 企业决策建议</b><span style="font-size:11px;color:var(--mute);margin-left:8px">${res.total} 条 · 确定性规则 · 可解释</span></div>
+    ${ds.length?ds.map(d=>`<div style="border-left:3px solid ${levelColor[d.level]||'#3b6ef6'};background:#f8fafc;border-radius:6px;padding:8px;margin-bottom:6px">
+      <div style="font-size:12px"><b>[${d.level}] ${d.action}</b> <span style="color:var(--mute)">${d.module}·${d.name} · ${d.entity}</span></div>
+      <div style="font-size:11px;color:var(--mute);margin-top:3px">${esc(d.reason)}</div>
+    </div>`).join(''):'<div style="color:var(--green);font-size:12px">✅ 未触发任何决策规则，运营正常</div>'}`;
 }
 // 企业级本体可视化（ECharts 力导向网络图，融合 SME 方式）
 const ONTO_COLORS = ['#2f6bff','#27ae60','#f39c12','#e74c3c','#8e44ad','#16a085','#e67e22','#1abc9c','#c0392b','#7f8c8d'];
@@ -515,7 +532,7 @@ loadOverview();
 // ===== 数据源选择 Modal（文件浏览 + 数据库对接）=====
 let dsModalTarget='', dsCurrentDir='', dsSelectedSource='';
 let dsMulti=[];  // 多选文件数组（Ctrl/Shift）
-let dsSelected={clean:'',stats:'',ontology:''};  // 每工作区独立选中文件
+let dsSelected={clean:'',stats:'',ontology:'',decisions:''};  // 每工作区独立选中文件
 function openDsModal(mod){
   dsModalTarget=mod; dsSelectedSource=''; dsMulti=[];
   document.getElementById('ds-modal').style.display='flex';

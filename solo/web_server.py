@@ -487,6 +487,29 @@ class SoloHandler(BaseHTTPRequestHandler):
                         "edges": len(model["graph"]["edges"]),
                         "link_types": [lt["id"] for lt in model["link_types"]],
                         "model": model})
+        elif path == "/api/decisions":
+            # 企业决策：多表数据源 → 声明式规则引擎 → 可解释行动清单
+            from solo.factory import decisions as dec_mod
+            body = self._read_body()
+            data = body.get("data") or {}
+            if not data:
+                csvs = body.get("csvs") or []
+                for cp in csvs[:10]:
+                    p = _data_path(cp) or _safe_path(cp)
+                    if p:
+                        from solo import data_connector as dc
+                        try:
+                            rows = dc.connect({"type": "csv", "path": p})
+                            tbl = os.path.splitext(os.path.basename(p))[0]
+                            data[tbl] = rows
+                        except Exception:
+                            pass
+            if not data:
+                self._json({"error": "无数据源"}, 400)
+                return
+            res = dec_mod.run_decisions(data)
+            res["tables"] = list(data.keys())
+            self._json(res)
         elif path == "/api/memory-add":
             body = self._read_body()
             m = memory_mod.Memory()
