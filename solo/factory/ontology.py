@@ -38,8 +38,10 @@ def guess_type(value: str) -> str:
 
 
 def local_name(col: str) -> str:
-    """列名 → 本体局部名。"""
-    return re.sub(r"[^A-Za-z0-9_]", "_", col.strip())
+    """列名 → 本体局部名。None 容错。"""
+    if col is None:
+        return "_"
+    return re.sub(r"[^A-Za-z0-9_]", "_", str(col).strip())
 
 
 class Ontology:

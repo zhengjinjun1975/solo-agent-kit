@@ -252,7 +252,8 @@ class SoloHandler(BaseHTTPRequestHandler):
                                         "Windows", ".git", "__pycache__", "node_modules", ".venv", ".solo"):
                             dirs.append({"path": full, "name": name, "dir": True})
                     else:
-                        if name.endswith((".csv", ".db", ".sqlite", ".xlsx", ".json")):
+                        # 只列数据文件（JSON 是关系配置，不是数据表，排除）
+                        if name.endswith((".csv", ".db", ".sqlite", ".xlsx")):
                             files.append({"path": full, "name": name, "dir": False})
             except Exception:
                 pass
@@ -576,7 +577,7 @@ def _data_path(p: str) -> str:
     """
     if not p:
         return ""
-    ALLOWED = (".csv", ".db", ".sqlite", ".xlsx", ".json")
+    ALLOWED = (".csv", ".db", ".sqlite", ".xlsx")  # JSON 是配置非数据表，排除
     p = os.path.normpath(p.replace("\\", "/"))
     if os.path.isabs(p) and os.path.exists(p) and p.lower().endswith(ALLOWED):
         return p
