@@ -11,15 +11,14 @@
    对话是主入口：自然语言 → AI 路由到全部套件能力
    ============================================================ */
 :root{
-  --bg:#0a0e1a; --panel:rgba(255,255,255,0.04); --panel-h:rgba(255,255,255,0.07);
-  --border:rgba(255,255,255,0.08); --text:#e4e7f0; --dim:#8b93a7; --mute:#5c6375;
-  --blue:#6c8cff; --orange:#ffb86c; --green:#27ae60; --red:#e74c3c;
+  --bg:#f4f6fa; --panel:rgba(255,255,255,0.7); --panel-h:rgba(255,255,255,0.9);
+  --border:rgba(60,70,100,0.12); --text:#1c2333; --dim:#5c6478; --mute:#8a90a0;
+  --blue:#3b6ef6; --orange:#e8890c; --green:#1f9d55; --red:#d64541;
   --glass:blur(16px) saturate(140%); --r:14px;
 }
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
-  background:radial-gradient(1200px 800px at 20% -10%,rgba(108,140,255,0.12),transparent 60%),
-    radial-gradient(1000px 600px at 90% 110%,rgba(255,184,108,0.08),transparent 60%),var(--bg);
+  background:linear-gradient(135deg,#eef2fb 0%,#f8fafc 50%,#f3f6fa 100%);
   color:var(--text);height:100vh;overflow:hidden}
 .app{display:grid;grid-template-columns:200px 1fr 240px;gap:12px;padding:12px;height:100vh}
 .glass{background:var(--panel);border:1px solid var(--border);border-radius:var(--r);backdrop-filter:var(--glass);-webkit-backdrop-filter:var(--glass)}
@@ -34,7 +33,7 @@ body{font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
 .ng .lbl{font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:var(--mute);margin-bottom:5px;padding:0 8px}
 .ni{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:8px;font-size:12px;color:var(--dim);cursor:pointer;transition:.15s}
 .ni:hover{background:var(--panel-h);color:var(--text)}
-.ni.on{background:rgba(108,140,255,.12);color:var(--blue);border-left:2px solid var(--blue)}
+.ni.on{background:#e3ecff;color:var(--blue);border-left:2px solid var(--blue)}
 .ni .ic{width:12px;height:12px;border-radius:3px;flex-shrink:0}
 .ni.f .ic{background:rgba(108,140,255,.3)}.ni.p .ic{background:rgba(255,184,108,.3)}.ni.s .ic{background:rgba(140,150,180,.3)}
 
@@ -51,12 +50,12 @@ body{font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
 .chat{flex:1;display:flex;flex-direction:column;overflow:hidden}
 .chat-scroll{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:14px}
 .msg{max-width:76%;padding:12px 16px;border-radius:14px;font-size:13px;line-height:1.7}
-.msg.user{align-self:flex-end;background:rgba(108,140,255,.16);border:1px solid rgba(108,140,255,.25)}
-.msg.ai{align-self:flex-start;background:var(--panel);border:1px solid var(--border)}
+.msg.user{align-self:flex-end;background:#dbe6ff;border:1px solid #b8ccff}
+.msg.ai{align-self:flex-start;background:#fff;border:1px solid var(--border)}
 .msg .intent{font-size:10px;color:var(--mute);margin-bottom:6px;letter-spacing:.05em}
 .msg .intent b{color:var(--blue)}
-.msg .data{font-family:Consolas,monospace;font-size:11px;background:rgba(0,0,0,.25);border:1px solid var(--border);border-radius:8px;padding:8px;margin-top:8px;max-height:220px;overflow:auto;white-space:pre-wrap}
-.chat-input{padding:12px;background:var(--panel);border-top:1px solid var(--border);display:flex;gap:10px;align-items:center;flex-shrink:0}
+.msg .data{font-family:Consolas,monospace;font-size:11px;background:#f1f3f8;border:1px solid var(--border);border-radius:8px;padding:8px;margin-top:8px;max-height:220px;overflow:auto;white-space:pre-wrap}
+.chat-input{padding:12px;background:#fff;border-top:1px solid var(--border);display:flex;gap:10px;align-items:center;flex-shrink:0}
 .chat-input input{flex:1;background:transparent;border:none;outline:none;color:var(--text);font-size:14px}
 .chat-input input::placeholder{color:var(--mute)}
 .chat-input .hint{font-size:10px;color:var(--mute)}
