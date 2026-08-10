@@ -190,24 +190,22 @@ function showWorkspace(ws){
   });
 }
 
-// ===== 导航折叠（点击展开/收起，手风琴）=====
+// ===== 导航折叠（点击展开/收起，多组可同时展开）=====
 function initNavCollapse(){
   const groups=document.querySelectorAll('.ng');
-  groups.forEach((g,i)=>{
+  groups.forEach((g)=>{
     const lbl=g.querySelector('.lbl');
     if(!lbl) return;
     // 标题加箭头
     if(!lbl.querySelector('.arrow')) lbl.insertAdjacentHTML('beforeend','<span class="arrow">▶</span>');
-    // 默认：第一组展开，其余收起
-    if(i===0) g.classList.add('open');
-    else g.classList.add('closed');
-    // 点击切换
+    // 默认全部展开（多级能力可见）
+    g.classList.add('open');
+    // 点击独立切换（不收起其他组）
     lbl.addEventListener('click',(e)=>{
       e.stopPropagation();
       const isOpen=g.classList.contains('open');
-      // 手风琴：收起所有
-      groups.forEach(x=>{x.classList.remove('open');x.classList.add('closed');});
-      if(!isOpen){ g.classList.remove('closed'); g.classList.add('open'); }
+      if(isOpen){ g.classList.remove('open'); g.classList.add('closed'); }
+      else{ g.classList.remove('closed'); g.classList.add('open'); }
     });
   });
 }
