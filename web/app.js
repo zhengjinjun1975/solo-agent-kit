@@ -237,12 +237,8 @@ async function runCleanDS(){
   out.innerHTML='⏳ 清洗中…'; prev.innerHTML='';
   const source=document.getElementById('ds-clean-path').value.trim();
   if(!source){out.innerHTML='⚠️ 请先浏览选择数据文件';return;}
-  // 用选定的数值列（若用户选了一个数值列做异常检测）
-  const selCol=document.querySelector('input[name="clean-col"]:checked');
-  const res=await api('/api/clean',{method:'POST',body:JSON.stringify({
-    ...dsBody(source),
-    numeric_cols: selCol?[selCol.value]:null
-  })});
+  // 清洗=整表处理（去重/缺失/异常全列），不选列
+  const res=await api('/api/clean',{method:'POST',body:JSON.stringify(dsBody(source))});
   if(res.error){out.innerHTML='❌ '+res.error;return;}
   const r=res.report||{};
   out.innerHTML=`<b>清洗完成 ${res.input}→${res.output} 行</b><br>
@@ -454,13 +450,15 @@ function dsConfirm(){
 async function loadColumns(mod, source){
   const box=document.getElementById(mod+'-cols');
   if(!box)return;
+  // 清洗=整表处理(不选列); 只有分析需要选数值列
+  if(mod==='clean'){ box.innerHTML=''; return; }
   box.innerHTML='⏳ 检测列…';
   const body = source.includes('::')
     ? (()=>{const [db,table]=source.split('::');return {db,table};})()
     : {csv:source};
   const res=await api('/api/datasource-columns',{method:'POST',body:JSON.stringify(body)});
   if(res.error){box.innerHTML='❌ '+res.error;return;}
-  box.innerHTML='<b>选择列：</b> '+(res.columns||[]).map((c,i)=>
+  box.innerHTML='<b>选择分析列：</b> '+(res.columns||[]).map((c,i)=>
     `<label style="margin-right:10px;font-size:12px"><input type="radio" name="${mod}-col" value="${c}" ${i===0?'checked':''}> ${c} <span style="color:var(--mute)">(${res.types[c]})</span></label>`).join('')
     +`<div style="color:var(--mute);font-size:11px;margin-top:4px">共 ${res.total_rows} 行</div>`;
 }
