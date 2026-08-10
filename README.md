@@ -1,14 +1,41 @@
 # solo-agent-kit
 
-> **给 FDE 与一人公司的 AI 原生全栈工具。**
+> **给 FDE（工厂/前置部署工程师）与一人公司的 AI 原生全栈工具。**
 > 方法论决定一切：不是工具堆砌，是同一套方法论在不同层的落地。
 > 零依赖，能打；单文件，能审；独立主体，不绑定平台。
 
-[![License](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
-[![Python](https://img.shields.io/badge/Python-3.9%2B-blue.svg)](pyproject.toml)
-[![Version](https://img.shields.io/badge/version-0.8.1-blue.svg)](CHANGELOG.md)
+<p align="center">
+  <a href="https://github.com/zhengjinjun1975/solo-agent-kit/blob/main/LICENSE">
+    <img src="https://img.shields.io/badge/License-Apache--2.0-blue.svg" alt="License">
+  </a>
+  <a href="https://github.com/zhengjinjun1975/solo-agent-kit/blob/main/CHANGELOG.md">
+    <img src="https://img.shields.io/badge/version-0.9.0-blue.svg" alt="Version">
+  </a>
+  <a href="https://www.python.org/">
+    <img src="https://img.shields.io/badge/Python-3.9%2B-blue.svg" alt="Python">
+  </a>
+  <a href="https://github.com/zhengjinjun1975/solo-agent-kit">
+    <img src="https://img.shields.io/badge/deps-zero%20third--party-green.svg" alt="Zero third-party deps">
+  </a>
+</p>
 
-## AI 原生思想：方法论点亮，功能落地
+## 目录
+
+- [AI 原生思想](#ai-原生思想)
+- [它解决什么](#它解决什么)
+- [快速开始](#快速开始)
+- [真实场景示例](#真实场景示例)
+- [核心能力](#核心能力)
+- [配置](#配置)
+- [项目结构](#项目结构)
+- [文档](#文档)
+- [与 Obsidian 的关系](#与-obsidian-的关系)
+- [限制与诚实声明](#限制与诚实声明)
+- [贡献](#贡献)
+- [来源与致谢](#来源与致谢)
+- [License](#license)
+
+## AI 原生思想
 
 solo-agent-kit 不是又一个工具合集。它是一个由方法论决定一切的 AI 原生系统，每个能力模块都不是为了"有这个功能"而存在，而是一套验证过的方法论在某个具体层的落地。
 
@@ -25,7 +52,7 @@ solo-agent-kit 不是又一个工具合集。它是一个由方法论决定一�
 
 ### 为什么是"本体优先"
 
-RAG 检索文本，本体检索知识。solo 先建实体-关系的语义结构，再谈检索，这让 agent 理解你的领域里什么是真的、什么能行动。这不只是更准的搜索，是整个系统的地基。同一套方法论点，从个人写作到厂区运维，落到哪一层，哪一层的体验就不会塌。社区普遍印证这是 RAG 的缺失层，只是轻量开源无人做。
+RAG 检索文本，本体检索知识。solo 先建实体-关系的语义结构，再谈检索，这让 agent 理解你的领域里什么是真的、什么能行动。这不只是更准的搜索，是整个系统的地基。社区普遍印证这是 RAG 的缺失层，只是轻量开源无人做。
 
 ## 它解决什么
 
@@ -39,15 +66,19 @@ RAG 检索文本，本体检索知识。solo 先建实体-关系的语义结构�
 ## 快速开始
 
 ```bash
-pip install solo-agent-kit
-solo init                     # 初始化记忆库
-solo run "写一篇公众号推文"    # 走完整方法论
-solo site use 华东一厂         # 进入厂区运维模式，定位
-solo site devices             # 查看该厂区设备台账
-solo site add-device MES服务器 192.168.1.10 --user root   # 登记设备
+# 安装
+pip install solo-agent-kit        # 或 git clone 后 pip install .
+solo init                          # 初始化记忆库
+solo run "写一篇公众号推文"        # 走完整方法论
 ```
 
-厂区运维的远程采集、设备监控、统一数据源，通过对话交给 agent 执行，或由 `solo run` 调度。
+厂区运维（FDE 进厂区）：
+```bash
+solo site use 华东一厂              # 进入厂区运维模式，定位
+solo site devices                  # 查看该厂区设备台账
+solo site add-device MES服务器 192.168.1.10 --user root   # 登记设备
+solo site role on-site             # 部署角色：laptop本机 / on-site部署在对方机
+```
 
 ## 真实场景示例
 
@@ -67,7 +98,7 @@ python examples/example_03_oss_preflight.py <项目目录>
 python examples/example_04_factory_ontology.py
 ```
 
-## 核心能力：个人与厂区双套件
+## 核心能力
 
 **个人套件**（`solo/`，一人公司日常）：
 
@@ -91,9 +122,9 @@ python examples/example_04_factory_ontology.py
 | `data_connector.py` | 数据源统一 | connect(type=device) 远程拉厂区数据 |
 | `clean.py`、`stats.py`、`ontology.py` | 数据三件套 | 清洗、SPC 分析、本体建模，对接厂区数据 |
 
-## 配置：本地与远端模型分层
+## 配置
 
-复制 `provider.yaml.example` 为 `provider.yaml`：
+本地与远端模型分层。复制 `provider.yaml.example` 为 `provider.yaml`：
 
 ```yaml
 provider:
@@ -108,6 +139,34 @@ provider:
     type: ollama
     model: nomic-embed-text:latest
 ```
+
+## 项目结构
+
+```
+solo-agent-kit/
+├── solo/                 # 个人套件（零依赖）
+│   ├── memory.py         #   三层两域记忆
+│   ├── writing.py        #   六维写作检查
+│   ├── desensitize.py    #   写作脱敏
+│   ├── code_agent.py     #   代码生成/审查/测试
+│   ├── site.py           #   厂区配置与定位
+│   └── factory/          # 厂区套件
+│       ├── clean.py      #   数据清洗
+│       ├── stats.py      #   数据分析(SPC)
+│       ├── ontology.py   #   本体建模
+│       ├── remote.py     #   远程运维
+│       └── monitor.py    #   设备监控
+├── examples/             # 真实场景示例
+├── docs/                 # 设计文档
+├── web/                  # Web 前端
+└── CHANGELOG.md
+```
+
+## 文档
+
+- [VISION.md](VISION.md) — 设计哲学与核心思想
+- [docs/](docs/) — 设计文档（厂区运维、插件体系）
+- [CHANGELOG.md](CHANGELOG.md) — 版本记录
 
 ## 与 Obsidian 的关系
 
@@ -127,10 +186,19 @@ solo 不是通用 agent 框架，不试图替代 Hermes、Claude Code 等成熟�
 - 不是已完成的产品。诚实标注什么能用、什么在长。
 - 定位：一人公司与 FDE 的方法论套件。本体优先，能力边界清楚。
 
+## 贡献
+
+欢迎提交 issue 与 PR。核心原则：
+
+- 保持零第三方依赖（只用标准库）
+- 每个模块单文件、可独立 import、可审计
+- 非平凡逻辑留一个可运行的测试
+- 方法论驱动优先于功能堆砌
+
 ## 来源与致谢
 
 solo-agent-kit 借鉴了多个项目的方法论，非代码复制。详见 [NOTICE](NOTICE)。
 
 ## License
 
-Apache-2.0，见 [LICENSE](LICENSE)。
+[Apache-2.0](LICENSE)。
