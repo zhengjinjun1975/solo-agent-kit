@@ -2,6 +2,16 @@
 
 所有显著变更记录在此。格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [0.5.2] - 2026-08-10
+
+### 变更(小版本递增, 不跳大版本)
+- 前端导航全部关联真实模块执行(不再摆设)
+- 前端结果友好化(fmtResult替代裸JSON)
+- agent补config/capabilities意图 + skill分支
+
+### 版本规则
+- 小版本+0.01递增, 不轻易跳大版本(除非用户主动要求)
+
 ## [0.5.1] - 2026-08-10
 
 ### 修复(OpenClaw审查P0)
