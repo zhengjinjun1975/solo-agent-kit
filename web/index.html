@@ -41,8 +41,9 @@ body{font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
 .ni{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:8px;font-size:12px;color:var(--dim);cursor:pointer;transition:.15s}
 .ni:hover{background:var(--panel-h);color:var(--text)}
 .ni.on{background:#e3ecff;color:var(--blue);border-left:2px solid var(--blue)}
-.ni .ic{width:12px;height:12px;border-radius:3px;flex-shrink:0}
-.ni.f .ic{background:rgba(108,140,255,.3)}.ni.p .ic{background:rgba(255,184,108,.3)}.ni.s .ic{background:rgba(140,150,180,.3)}
+.ni .ic{width:16px;height:16px;flex-shrink:0;color:var(--dim)}
+.ni.f .ic{color:var(--blue)}.ni.p .ic{color:var(--orange)}.ni.s .ic{color:#7a8699}
+.ni.on .ic{color:var(--blue)}
 
 /* 主区：聊天中心 */
 .main{display:flex;flex-direction:column;overflow:hidden}
@@ -95,21 +96,39 @@ body{font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
 </div>
     <nav>
       <div class="ng"><div class="lbl">工作台</div>
-        <div class="ni s on" data-cap="chat"><span class="ic"></span> AI 工作台</div>
+        <div class="ni s on" data-cap="chat">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          AI 工作台</div>
       </div>
       <div class="ng"><div class="lbl">工厂数据</div>
-        <div class="ni f" data-cap="clean"><span class="ic"></span> 数据清洗</div>
-        <div class="ni f" data-cap="stats"><span class="ic"></span> 数据分析</div>
-        <div class="ni f" data-cap="ontology"><span class="ic"></span> 本体建模</div>
+        <div class="ni f" data-cap="clean">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 3h16a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M9 12h6"/><path d="M12 9v6"/></svg>
+          数据清洗</div>
+        <div class="ni f" data-cap="stats">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 3v18h18"/><path d="M7 15l3-4 3 2 4-6"/></svg>
+          数据分析</div>
+        <div class="ni f" data-cap="ontology">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="6" r="2"/><circle cx="19" cy="6" r="2"/><circle cx="12" cy="18" r="2"/><path d="M5 8v3a3 3 0 0 0 3 3h8a3 3 0 0 0 3-3V8"/><path d="M7 9l3 6M17 9l-3 6"/></svg>
+          本体建模</div>
       </div>
       <div class="ng"><div class="lbl">工作区</div>
-        <div class="ni p" data-cap="writing"><span class="ic"></span> 写作</div>
-        <div class="ni p" data-cap="code"><span class="ic"></span> 代码</div>
-        <div class="ni p" data-cap="skill"><span class="ic"></span> 技能</div>
+        <div class="ni p" data-cap="writing">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+          写作</div>
+        <div class="ni p" data-cap="code">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 18l6-6-6-6"/><path d="M8 6l-6 6 6 6"/></svg>
+          代码</div>
+        <div class="ni p" data-cap="skill">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.9 6.3 6.9.8-5.1 4.7 1.4 6.8L12 17.8 5.9 20.6l1.4-6.8L2.2 9.1l6.9-.8z"/></svg>
+          技能</div>
       </div>
       <div class="ng"><div class="lbl">系统</div>
-        <div class="ni s" data-cap="setup"><span class="ic"></span> 部署</div>
-        <div class="ni s" data-cap="config"><span class="ic"></span> 配置</div>
+        <div class="ni s" data-cap="setup">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 3v18h18"/><path d="M7 9l4 3 4-2 5 4"/><circle cx="4" cy="20" r="1" fill="currentColor"/><circle cx="8" cy="20" r="1" fill="currentColor"/><circle cx="12" cy="20" r="1" fill="currentColor"/><circle cx="16" cy="20" r="1" fill="currentColor"/><circle cx="20" cy="20" r="1" fill="currentColor"/></svg>
+          部署</div>
+        <div class="ni s" data-cap="config">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.2a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3h.1a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 1 1.5h.1a1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9v.1a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.2a1.7 1.7 0 0 0-1.5 1z"/></svg>
+          配置</div>
       </div>
     </nav>
   </aside>
@@ -146,9 +165,9 @@ body{font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
     <!-- 系统状态（默认视图） -->
     <div id="ws-status">
       <div class="lbl">系统状态</div>
-      <div class="stat"><span class="num blue" id="s-facts">0</span> 记忆事实</div>
-      <div class="stat"><span class="num orange" id="s-skills">0</span> 技能</div>
-      <div class="stat"><span class="num green" id="s-api">—</span> 后端状态</div>
+      <div class="stat"><span class="num blue" id="s-facts">0</span> 已沉淀知识</div>
+      <div class="stat"><span class="num orange" id="s-skills">0</span> 可复用技能</div>
+      <div class="stat"><span class="num green" id="s-api">—</span> 后端服务</div>
       <div class="lbl">方法论</div>
       <div class="tag-row">
         <span class="tag blue">本体优先</span><span class="tag blue">三层两域</span>
