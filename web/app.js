@@ -356,28 +356,42 @@ function drawOntoGraph(model){
   Object.values(nodes).forEach(n=>{ (grp[n.entity]=grp[n.entity]||[]).push(n); });
   const entityList=Object.keys(grp);
   const colorOf=et=>ONTO_COLORS[entityList.indexOf(et)%ONTO_COLORS.length];
-  // ECharts 节点/边
+  // 三层结构: 企业hub → 实体类节点 → 实例节点
+  const idSet=new Set(Object.values(nodes).map(n=>n.entity+':'+n.id));
+  // 实例节点（连到对应实体类）
   const data=Object.values(nodes).map(n=>({
-    id:n.entity+':'+n.id,  // 完整标识，与 edges 的 from/to 一致
+    id:n.entity+':'+n.id,
     name:String(n.id).split(':').pop().slice(0,10),
-    category:entityList.indexOf(n.entity),
-    symbolSize:n.entity==='Category'?16:12,
+    category:entityList.indexOf(n.entity)+1,  // 分类索引偏移(0=企业)
+    symbolSize:n.entity==='Category'?16:10,
     itemStyle:{color:colorOf(n.entity)},
     tooltip:{formatter:`<b>${n.entity}</b> ${n.id}<br/>${Object.entries(n.data||{}).slice(0,3).map(([k,v])=>`${k}: ${v}`).join('<br/>')}`}
   }));
-  const idSet=new Set(Object.values(nodes).map(n=>n.entity+':'+n.id));
-  const links=edges.map(e=>({source:e.from,target:e.to}))
-    .filter(l=>idSet.has(l.source)&&idSet.has(l.target));
-  // 企业 hub → 各实体类代表节点（企业拥有/运营所有业务对象，体现关联度）
+  // 实体类节点（每实体一个，连到企业hub）
   entityList.forEach(et=>{
-    const rep=grp[et][0];
-    if(rep&&idSet.has(rep.id)) links.push({source:'__hub__',target:rep.id,
-      lineStyle:{color:'#2f6bff',opacity:0.35,width:1.5},label:{show:false}});
+    data.push({id:'__cls__'+et, name:et, category:entityList.indexOf(et)+1,
+      symbolSize:26, symbol:'roundRect',
+      itemStyle:{color:colorOf(et),opacity:0.85},
+      label:{show:true,fontSize:11,fontWeight:'bold',color:colorOf(et)}});
   });
-  data.push({id:'__hub__',name:'企业',category:-1,symbolSize:64,itemStyle:{color:'#2f6bff'},
+  // 企业 hub
+  data.push({id:'__hub__',name:'企业',category:0,symbolSize:64,itemStyle:{color:'#2f6bff'},
     label:{show:true,fontSize:15,fontWeight:'bold',color:'#fff'}});
-  el.innerHTML=`<div id="ontchart" style="height:420px;width:100%"></div>
-    <div style="padding:6px 2px;font-size:11px;color:var(--mute)">${Object.keys(nodes).length} 实例 · ${edges.length} 关系 · 拖动缩放 · 悬停看详情</div>
+  // 边: 企业→实体类 + 实体类→实例 + 原关系边
+  const links=[];
+  entityList.forEach(et=>{
+    links.push({source:'__hub__',target:'__cls__'+et,lineStyle:{color:'#2f6bff',opacity:0.6,width:2},label:{show:false}});
+    (grp[et]||[]).forEach(n=>{
+      links.push({source:'__cls__'+et,target:et+':'+n.id,lineStyle:{color:colorOf(et),opacity:0.35,width:1},label:{show:false}});
+    });
+  });
+  // 原跨实体关系边
+  edges.forEach(e=>{
+    if(idSet.has(e.from)&&idSet.has(e.to)) links.push({source:e.from,target:e.to,
+      lineStyle:{color:'#ff8c1a',opacity:0.8,width:1.5},label:{show:false}});
+  });
+  el.innerHTML=`<div id="ontchart" style="height:480px;width:100%"></div>
+    <div style="padding:6px 2px;font-size:11px;color:var(--mute)">${Object.keys(nodes).length} 实例 · ${entityList.length} 实体类 · ${edges.length} 跨实体关系 · 拖动缩放 · 悬停看详情</div>
     <div style="padding:2px">${entityList.map(et=>`<span style="display:inline-block;margin-right:12px;font-size:11px;color:var(--dim)"><i style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${colorOf(et)};margin-right:4px"></i>${et}</span>`).join('')}</div>`;
   if(window._ontChart) window._ontChart.dispose();
   const chart=echarts.init(document.getElementById('ontchart'));
@@ -386,12 +400,14 @@ function drawOntoGraph(model){
     tooltip:{show:true},
     animationDuration:800,
     series:[{type:'graph', layout:'force', roam:true,
-      force:{repulsion:300, edgeLength:[60,120], gravity:0.12, friction:0.6},
+      force:{repulsion:250, edgeLength:[50,110], gravity:0.15, friction:0.6},
       label:{show:true,position:'right',fontSize:9,color:'#1a2233'},
-      edgeSymbol:['none','arrow'], edgeSymbolSize:6,
-      categories:entityList.map(et=>({name:et})),
+      edgeSymbol:['none','arrow'], edgeSymbolSize:[0,5],
+      categories:[{name:'企业',itemStyle:{color:'#2f6bff'}},
+        ...entityList.map(et=>({name:et,itemStyle:{color:colorOf(et)}}))],
       data:data, links:links,
-      lineStyle:{opacity:0.6,width:1.5,curveness:0.1}}]
+      lineStyle:{opacity:0.6,width:1.5,curveness:0.1},
+      emphasis:{focus:'adjacency',label:{show:true,fontSize:11,fontWeight:'bold'}}}]
   });
   return '';
 }
