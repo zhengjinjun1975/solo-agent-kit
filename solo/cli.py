@@ -85,6 +85,20 @@ def main(argv=None):
     p_rs = sub.add_parser("restore", help="恢复备份")
     p_rs.add_argument("src", help="备份目录")
 
+    # 插件体系
+    p_plug = sub.add_parser("plugins", help="插件体系(Obsidian/可视化)")
+    psub = p_plug.add_subparsers(dest="plug_cmd")
+    psub.add_parser("list", help="列出全部插件及可用性")
+    p_psave = psub.add_parser("report", help="现场报告归档到Obsidian")
+    p_psave.add_argument("title")
+    p_psave.add_argument("content", nargs="?", default="")
+    p_psave.add_argument("--category", default="site")
+    p_psave.add_argument("--tags", default="")
+    p_pspv = psub.add_parser("spc", help="SPC控制图")
+    p_pspv.add_argument("values", nargs="+", type=float)
+    p_pspv.add_argument("--title", default="SPC 控制图")
+    p_pspv.add_argument("--file", default="spc")
+
     # 厂区运维配置与定位
     p_site = sub.add_parser("site", help="厂区配置与定位")
     ssub = p_site.add_subparsers(dest="site_cmd")
@@ -177,6 +191,8 @@ def _dispatch(args):
         return t.resolve(args.tid)
     if cmd == "site":
         return _site(args)
+    if cmd == "plugins":
+        return _plugins(args)
     if cmd == "backup":
         return _backup(args.dest)
     if cmd == "restore":
@@ -322,6 +338,22 @@ def _factory_onto(args):
     return {"entities": list(o.entities.keys()), "triples": len(o.triples),
             "summary": o.entity_summary()}
 
+
+
+def _plugins(args):
+    """插件体系命令分发。"""
+    from solo import plugins
+    pc = args.plug_cmd
+    if pc == "list":
+        return {"plugins": plugins.list_plugins()}
+    if pc == "report":
+        from solo.plugins import obsidian
+        tags = [t.strip() for t in args.tags.split(",") if t.strip()] if args.tags else None
+        return obsidian.save_report(args.title, args.content or "# 报告\n", tags, args.category)
+    if pc == "spc":
+        from solo.plugins import visualize
+        return visualize.spc_chart(list(args.values), title=args.title, filename=args.file)
+    return {"error": f"未知 plugins 子命令: {pc}"}
 
 
 def _site(args):

@@ -122,6 +122,13 @@ python examples/example_04_factory_ontology.py
 | `data_connector.py` | 数据源统一 | connect(type=device) 远程拉厂区数据 |
 | `clean.py`、`stats.py`、`ontology.py` | 数据三件套 | 清洗、SPC 分析、本体建模，对接厂区数据 |
 
+**插件**（`solo/plugins/`，可降级）：
+
+| 模块 | 能力 | 依赖 |
+|---|---|---|
+| `obsidian.py` | Obsidian 知识库集成：报告归档/检索/经验沉淀 | 零依赖 |
+| `visualize.py` | 数据可视化：SPC 控制图/趋势图/异常标记 | matplotlib(可选) |
+
 ## 配置
 
 本地与远端模型分层。复制 `provider.yaml.example` 为 `provider.yaml`：

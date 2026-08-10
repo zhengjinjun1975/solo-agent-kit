@@ -2,6 +2,21 @@
 
 所有显著变更记录在此。格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [0.8.3] - 2026-08-10
+
+### 新增(外部插件体系 — 增强综合能力)
+- solo/plugins/: 插件注册表(list_plugins/get, 可降级)
+- obsidian.py: Obsidian知识库集成(文件读写vault)
+  - save_report 现场报告归档到 reports/<category>/
+  - search 知识检索(文件名+正文, 零依赖)
+  - save_experience 经验沉淀到 knowledge/<domain>/atoms/
+- visualize.py: matplotlib可视化
+  - spc_chart SPC控制图(UCL/LCL/失控点标红)
+  - trend_chart 趋势图 + 异常标记
+  - 中文字体配置(微软雅黑/SimHei)
+- CLI plugins 子命令: list / report / spc
+- 验证: 插件13项 + CLI 10项 ad-hoc, 43测试全绿
+
 ## [0.8.2] - 2026-08-10
 
 ### 新增(CodeAgent 全链路能力整合 + README 重写)
