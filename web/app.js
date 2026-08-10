@@ -194,9 +194,14 @@ document.querySelectorAll('.ni').forEach(n=>n.addEventListener('click',()=>{
   // 数据模块 + 工作区 → 右侧面板
   if(['clean','stats','ontology','writing','code','skill','config','setup'].includes(cap)){
     showWorkspace(cap);
-    if(cap==='clean'){/* 面板自带 */} 
-    if(cap==='stats')runStatsDS();
-    if(cap==='ontology')runOntoDS();
+    // 数据工作区：恢复已选文件显示（不自动执行）
+    if(['clean','stats','ontology'].includes(cap)){
+      const sel=dsSelected[cap];
+      const box=document.getElementById('browse-'+cap);
+      if(sel&&box) box.innerHTML=`<div class="ds-file">📄 ${esc(sel.split(/[\\\\\\/]/).pop())}</div>`;
+      if(cap==='stats'&&sel) loadColumns('stats', sel);
+      return;
+    }
     if(cap==='skill')loadSkillPanel();
     if(cap==='config')loadConfigPanel();
     if(cap==='setup')loadSetupPanel();
@@ -235,8 +240,8 @@ async function runCleanDS(){
   const out=document.getElementById('clean-result');
   const prev=document.getElementById('clean-preview');
   out.innerHTML='⏳ 清洗中…'; prev.innerHTML='';
-  const source=document.getElementById('ds-clean-path').value.trim();
-  if(!source){out.innerHTML='⚠️ 请先浏览选择数据文件';return;}
+  const source=dsSelected['clean']||'';
+  if(!source){out.innerHTML='⚠️ 请先选择数据文件';return;}
   // 清洗=整表处理（去重/缺失/异常全列），不选列
   const res=await api('/api/clean',{method:'POST',body:JSON.stringify(dsBody(source))});
   if(res.error){out.innerHTML='❌ '+res.error;return;}
@@ -253,8 +258,8 @@ async function runStatsDS(){
   const out=document.getElementById('stats-result');
   const chart=document.getElementById('stats-chart');
   out.innerHTML='⏳ 分析中…'; chart.innerHTML='';
-  const source=document.getElementById('ds-stats-path').value.trim();
-  if(!source){out.innerHTML='⚠️ 请先浏览选择数据文件';return;}
+  const source=dsSelected['stats']||'';
+  if(!source){out.innerHTML='⚠️ 请先选择数据文件';return;}
   const selCol=document.querySelector('input[name="stats-col"]:checked');
   const col=selCol?selCol.value:null;
   const body=dsBody(source);
@@ -310,8 +315,8 @@ async function runOntoDS(){
   const out=document.getElementById('onto-result');
   const graph=document.getElementById('onto-graph');
   out.innerHTML='⏳ 建模中…'; graph.innerHTML='';
-  const source=document.getElementById('ds-onto-path').value.trim();
-  if(!source){out.innerHTML='⚠️ 请先浏览选择数据文件';return;}
+  const source=dsSelected['ontology']||'';
+  if(!source){out.innerHTML='⚠️ 请先选择数据文件';return;}
   const res=await api('/api/ontology',{method:'POST',body:JSON.stringify({...dsBody(source)})});
   if(res.error){out.innerHTML='❌ '+res.error;return;}
   out.innerHTML=`<b>${res.entities.length} 实体 · ${res.triples} 关系</b><br>${(res.entities||[]).join(' · ')}`;
@@ -428,6 +433,7 @@ loadOverview();
 
 // ===== 数据源选择 Modal（文件浏览 + 数据库对接）=====
 let dsModalTarget='', dsCurrentDir='', dsSelectedSource='';
+let dsSelected={clean:'',stats:'',ontology:''};  // 每工作区独立选中文件
 function openDsModal(mod){
   dsModalTarget=mod; dsSelectedSource='';
   document.getElementById('ds-modal').style.display='flex';
@@ -456,12 +462,14 @@ function dsSelectFile(path){
 }
 function dsConfirm(){
   if(!dsSelectedSource)return;
-  const map={clean:'ds-clean-path',stats:'ds-stats-path',ontology:'ds-onto-path'};
-  document.getElementById(map[dsModalTarget]).value=dsSelectedSource;
-  document.getElementById('browse-'+dsModalTarget).innerHTML=`✅ 已选择：${dsSelectedSource}`;
+  // 每工作区独立存储选中文件 + 显示文件名
+  dsSelected[dsModalTarget]=dsSelectedSource;
+  const box=document.getElementById('browse-'+dsModalTarget);
+  const fname=dsSelectedSource.split(/[\\\\\\/]/).pop();
+  box.innerHTML=`<div class="ds-file">📄 ${esc(fname)}</div>`;
   closeDsModal();
-  // 选择数据源后加载列（清洗/分析需要选列）
-  if(dsModalTarget==='clean'||dsModalTarget==='stats'){
+  // 选择数据源后加载列（分析需要选列）
+  if(dsModalTarget==='stats'){
     loadColumns(dsModalTarget, dsSelectedSource);
   }
 }

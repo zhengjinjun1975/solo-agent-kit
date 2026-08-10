@@ -97,10 +97,9 @@
 
     <!-- 数据分析工作区 -->
     <div id="ws-stats" style="display:none">
-      <div class="lbl">数据分析 — 浏览文件→选择→分析</div>
-      <button class="btn" onclick="openDsModal('stats')">📂 浏览数据文件</button>
+      <div class="lbl">数据分析</div>
+      <div class="ds-picker" onclick="openDsModal('stats')">＋ 选择数据文件</div>
       <div id="browse-stats" style="font-size:11px;margin-top:6px"></div>
-      <input type="text" id="ds-stats-path" placeholder="已选文件" readonly>
       <div id="stats-cols" style="font-size:11px;margin-top:6px"></div>
       <div style="margin-top:6px"><button class="btn pri" onclick="runStatsDS()">分析</button></div>
       <div id="stats-result" style="font-size:11px;margin-top:8px"></div>
@@ -109,10 +108,9 @@
 
     <!-- 数据清洗工作区 -->
     <div id="ws-clean" style="display:none">
-      <div class="lbl">数据清洗 — 浏览文件→选择→清洗</div>
-      <button class="btn" onclick="openDsModal('clean')">📂 浏览数据文件</button>
+      <div class="lbl">数据清洗</div>
+      <div class="ds-picker" onclick="openDsModal('clean')">＋ 选择数据文件</div>
       <div id="browse-clean" style="font-size:11px;margin-top:6px"></div>
-      <input type="text" id="ds-clean-path" placeholder="已选文件" readonly>
       <div id="clean-cols" style="font-size:11px;margin-top:6px"></div>
       <div style="margin-top:6px"><button class="btn pri" onclick="runCleanDS()">清洗</button></div>
       <div id="clean-result" style="font-size:11px;margin-top:8px"></div>
@@ -121,10 +119,9 @@
 
     <!-- 本体建模工作区 -->
     <div id="ws-ontology" style="display:none">
-      <div class="lbl">本体建模 — 浏览文件→选择→建本体</div>
-      <button class="btn" onclick="openDsModal('ontology')">📂 浏览数据文件</button>
+      <div class="lbl">本体建模</div>
+      <div class="ds-picker" onclick="openDsModal('ontology')">＋ 选择数据文件</div>
       <div id="browse-ontology" style="font-size:11px;margin-top:6px"></div>
-      <input type="text" id="ds-onto-path" placeholder="已选文件" readonly>
       <div style="margin-top:6px"><button class="btn pri" onclick="runOntoDS()">建本体</button></div>
       <div id="onto-result" style="font-size:11px;margin-top:8px"></div>
       <div id="onto-graph" style="margin-top:6px"></div>
