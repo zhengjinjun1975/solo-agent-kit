@@ -361,6 +361,41 @@ class SoloHandler(BaseHTTPRequestHandler):
                     self._json(remote_mod.run_command(host, body.get("cmd", ""), user, port))
             except Exception as e:
                 self._json({"error": str(e)}, 500)
+        elif path == "/api/rdbms-connect":
+            # 企业数据库接入（MySQL/Postgres）：测试连接 + 列出表
+            from solo import data_connector as dc
+            body = self._read_body()
+            stype = body.get("type", "mysql")
+            cfg = {"type": stype, "host": body.get("host", "127.0.0.1"),
+                   "port": int(body.get("port") or (3306 if stype == "mysql" else 5432)),
+                   "user": body.get("user", ""), "password": body.get("password", ""),
+                   "db": body.get("db", "")}
+            try:
+                dc.connect({**cfg, "table": "x"})  # 试连（无表也行，验证连接）
+                # 列表：驱动可用时尝试
+                import importlib
+                mod = importlib.import_module("pymysql" if stype == "mysql" else "psycopg2")
+                if stype == "mysql":
+                    conn = mod.connect(host=cfg["host"], port=cfg["port"], user=cfg["user"],
+                                       password=cfg["password"], database=cfg["db"], connect_timeout=8)
+                    cur = conn.cursor()
+                    cur.execute("SHOW TABLES")
+                    tables = [r[0] for r in cur.fetchall()]
+                else:
+                    conn = mod.connect(host=cfg["host"], port=cfg["port"], user=cfg["user"],
+                                       password=cfg["password"], dbname=cfg["db"], connect_timeout=8)
+                    cur = conn.cursor()
+                    cur.execute("SELECT tablename FROM pg_tables WHERE schemaname='public'")
+                    tables = [r[0] for r in cur.fetchall()]
+                cur.close(); conn.close()
+                self._json({"ok": True, "type": stype, "host": cfg["host"], "tables": tables})
+            except dc.DataSourceError as e:
+                self._json({"ok": False, "error": str(e)}, 400)
+            except ImportError:
+                pkg = "pymysql" if stype == "mysql" else "psycopg2-binary"
+                self._json({"ok": False, "error": f"驱动未装，请 pip install {pkg}"}, 400)
+            except Exception as e:
+                self._json({"ok": False, "error": str(e)}, 400)
         elif path == "/api/task":
             # 工单闭环（FDE 问题管理）
             from solo.task import Task

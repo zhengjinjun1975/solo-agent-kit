@@ -37,7 +37,13 @@ body{font-family:-apple-system,"Segoe UI","Microsoft YaHei",system-ui,sans-serif
 .logo-text span{font-size:12px;color:#475569;display:block;margin-top:6px;font-weight:600;line-height:1.5;word-break:break-word;max-width:230px}
 .logo .dot{width:10px;height:10px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--orange));box-shadow:0 0 12px rgba(108,140,255,.6)}
 .ng{margin-bottom:10px}
-.ng .lbl{font-size:13px;text-transform:uppercase;letter-spacing:.1em;color:#94a3b8;margin-bottom:9px;padding:0 10px;font-weight:700}
+.ng .lbl{font-size:13px;text-transform:uppercase;letter-spacing:.1em;color:#94a3b8;margin-bottom:9px;padding:0 10px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:space-between;user-select:none;transition:color .2s}
+.ng .lbl:hover{color:var(--blue)}
+.ng .lbl .arrow{font-size:10px;color:#cbd5e1;transition:transform .25s var(--ease);display:inline-block}
+.ng.open .lbl .arrow{transform:rotate(90deg)}
+.ng .ni{transition:opacity .2s,transform .2s}
+.ng.closed .ni{display:none}
+.ng.closed .lbl{margin-bottom:2px}
 .ni{display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;font-size:16px;color:#374151;cursor:pointer;transition:all .2s var(--ease)}
 .ni:hover{background:#f0f4ff;color:#1d4ed8;transform:translateX(2px)}
 .ni.on{background:linear-gradient(90deg,#2563eb,#3b82f6);color:#fff;box-shadow:0 4px 16px rgba(37,99,235,.35);font-weight:700}

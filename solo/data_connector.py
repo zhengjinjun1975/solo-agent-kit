@@ -41,6 +41,8 @@ def connect(source: dict) -> list:
             return _read_sql(source)
         if stype == "xlsx":
             return _read_xlsx(source.get("path", ""))
+        if stype in ("mysql", "postgres"):
+            return _read_rdbms(source, limit, offset)
         raise DataSourceError(f"未知数据源类型: {stype}")
     except DataSourceError:
         raise
@@ -182,3 +184,58 @@ def _read_sql(source: dict) -> list:
     except Exception as e:
         log.warning("SQL 查询失败 %s: %s", db_path, e)
         raise DataSourceError("SQL 查询失败", str(e))
+
+
+def _read_rdbms(source: dict, limit: int = None, offset: int = 0) -> list:
+    """读取 MySQL / PostgreSQL 表（企业真实台账接入，可选驱动）。
+
+    source:
+      {"type":"mysql","host":"...","port":3306,"user":"...","password":"...","db":"...","table":"..."}
+      {"type":"postgres","host":"...","port":5432,"user":"...","password":"...","db":"...","table":"..."}
+
+    零依赖运行时：驱动未装时给出清晰安装提示，不破坏核心功能。
+    """
+    import importlib
+    stype = source.get("type")
+    host = source.get("host", "127.0.0.1")
+    port = source.get("port", 3306 if stype == "mysql" else 5432)
+    user = source.get("user", "")
+    password = source.get("password", "")
+    dbname = source.get("db", "")
+    table = source.get("table", "")
+    if not user or not dbname:
+        raise DataSourceError(f"{stype} 需提供 user/db")
+    if not table:
+        raise DataSourceError(f"{stype} 需提供 table")
+    try:
+        if stype == "mysql":
+            mod = importlib.import_module("pymysql")
+            conn = mod.connect(host=host, port=port, user=user, password=password,
+                               database=dbname, connect_timeout=8)
+            cur = conn.cursor(mod.cursors.DictCursor)
+        else:
+            mod = importlib.import_module("psycopg2")
+            conn = mod.connect(host=host, port=port, user=user, password=password,
+                               dbname=dbname, connect_timeout=8)
+            cur = conn.cursor()
+        # 只读 + 分页
+        safe_table = table.replace(";", "").strip("`\" ")
+        q = f"SELECT * FROM {safe_table}"
+        if limit:
+            q += f" LIMIT {int(limit)} OFFSET {int(offset)}"
+        cur.execute(q)
+        if stype == "mysql":
+            rows = [dict(r) for r in cur.fetchall()]
+        else:
+            cols = [d[0] for d in cur.description] if cur.description else []
+            rows = [dict(zip(cols, r)) for r in cur.fetchall()]
+        cur.close(); conn.close()
+        return rows
+    except ImportError as e:
+        pkg = "pymysql" if stype == "mysql" else "psycopg2-binary"
+        raise DataSourceError(f"{stype} 驱动未安装，请运行: pip install {pkg}（可选，不破坏零依赖运行时）")
+    except DataSourceError:
+        raise
+    except Exception as e:
+        log.warning("%s 读取失败 %s:%s/%s: %s", stype, host, port, table, e)
+        raise DataSourceError(f"{stype} 读取失败", str(e))
