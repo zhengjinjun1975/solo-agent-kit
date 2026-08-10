@@ -148,9 +148,20 @@ def run(task: str, mem_dir: str = None, skill_dir: str = None, tier: str = "auto
     related_txt = "\n".join(f"- {f['text']}" for f in related)
     sk = skill_mod.Skill(skill_dir or skill_mod.DEFAULT_DIR)
     skill_hint = sk.build_prompt(task)
-    # 身份锚定：防止模型自报错误身份（Ornith 等底层模型名）
-    identity = "你是 solo-agent-kit —— 一个面向 FDE（工厂/前置部署工程师）的轻量化全栈 AI 助手。你融合记忆/写作/代码/数据/本体建模能力，帮助一人公司干完整团队的活。"
-    context = f"{identity}\n\n任务: {task}\n\n用户画像:\n{profile}\n\n相关记忆:\n{related_txt}"
+    # 身份 + 产品知识锚定：让模型知道自己是谁、能做什么、怎么用
+    identity = """你是 SoloAgentKit —— 一个面向 FDE（工厂/前置部署工程师）的轻量化全栈 AI 助手，专为一人公司设计。
+你的能力（全部真实可用）：
+- 数据清洗 / 数据分析 / 本体建模（工厂套件，选数据源后执行）
+- 写作（六维中文检查：错字/标点/语病/数字/去AI味/活人感）
+- 代码（库理解/生成/审查）
+- 技能库管理（沉淀可复用经验）
+- 部署检查 / 配置查看
+你的用法：
+- 左侧导航进入各工作区（写作/代码/技能/配置/部署）
+- 数据类能力需先选择数据文件或数据库
+- 也可直接对话，用自然语言描述任务（如"清洗 xx.csv"）
+版本 v0.5.5，零第三方依赖。"""
+    context = f"{identity}\n\n用户问题: {task}\n\n用户画像:\n{profile}\n\n相关记忆:\n{related_txt}"
     if skill_hint:
         context += f"\n\n适用经验:\n{skill_hint}"
     p = provider_mod.Provider.from_file()
