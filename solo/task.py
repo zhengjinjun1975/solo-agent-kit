@@ -51,6 +51,69 @@ class Task:
         self._save(t)
         return t
 
+    def new_issue(self, problem: str, severity: str = "medium") -> dict:
+        """新建工单（FDE 现场问题闭环 triage→诊断→解决→记录）。
+
+        severity: low/medium/high/critical
+        返回工单，含 triage 分类。
+        """
+        import re as _re
+        tid = _slug(problem)[:40] or "issue"
+        t = {"id": tid, "problem": problem, "severity": severity,
+             "state": "open", "triage": "待诊断", "diagnosis": "",
+             "resolution": "", "events": [], "ts": _now()}
+        # triage 自动分类（基于关键词，FDE 现场快速分流）
+        p = problem.lower()
+        if any(k in p for k in ("deploy", "部署", "install", "启动")):
+            t["triage"] = "部署类"
+        elif any(k in p for k in ("data", "数据", "import", "清洗")):
+            t["triage"] = "数据类"
+        elif any(k in p for k in ("perf", "性能", "慢", "latency")):
+            t["triage"] = "性能类"
+        elif any(k in p for k in ("crash", "崩溃", "error", "报错")):
+            t["triage"] = "故障类"
+        else:
+            t["triage"] = "待分类"
+        t["events"].append({"ts": _now(), "event": f"open({t['triage']})"})
+        self._save(t)
+        return t
+
+    def diagnose(self, tid: str, diagnosis: str) -> dict:
+        """记录诊断（FDE 排障根因分析）。"""
+        t = self._load(tid)
+        if not t or "problem" not in t:
+            return {"error": "issue not found"}
+        t["diagnosis"] = diagnosis
+        t["state"] = "diagnosed"
+        t["events"].append({"ts": _now(), "event": "diagnosed"})
+        self._save(t)
+        return t
+
+    def resolve_issue(self, tid: str, resolution: str) -> dict:
+        """记录解决 + 闭环（FDE 问题闭环）。"""
+        t = self._load(tid)
+        if not t or "problem" not in t:
+            return {"error": "issue not found"}
+        t["resolution"] = resolution
+        t["state"] = "resolved"
+        t["events"].append({"ts": _now(), "event": "resolved"})
+        self._save(t)
+        return t
+
+    def list_issues(self) -> list:
+        """列出所有工单（含闭环状态）。"""
+        issues = []
+        for fname in os.listdir(self.dir):
+            if not fname.endswith(".json"):
+                continue
+            tid = fname[:-5]
+            t = self._load(tid)
+            if t and "problem" in t:
+                issues.append({"id": t["id"], "problem": t["problem"],
+                               "severity": t.get("severity"), "triage": t.get("triage"),
+                               "state": t.get("state"), "ts": t.get("ts")})
+        return issues
+
     def status(self, tid: str) -> dict:
         t = self._load(tid)
         if not t:

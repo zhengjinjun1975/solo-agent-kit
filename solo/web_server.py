@@ -337,6 +337,26 @@ class SoloHandler(BaseHTTPRequestHandler):
             self._json({"column": col, "describe": stats_mod.describe(vals),
                         "anomalies": stats_mod.detect_anomaly(vals, method="iqr"),
                         "control_chart": stats_mod.control_chart(vals)})
+        elif path == "/api/remote":
+            # 远程运维（FDE 现场 SSH 连接/执行/部署/日志）
+            from solo.factory import remote as remote_mod
+            body = self._read_body()
+            act = body.get("action", "exec")
+            host, user, port = body.get("host", ""), body.get("user"), body.get("port", 22)
+            if not host:
+                self._json({"error": "host 必填"}, 400)
+                return
+            try:
+                if act == "test":
+                    self._json(remote_mod.test_connection(host, user, port))
+                elif act == "deploy":
+                    self._json(remote_mod.remote_deploy(host, user, port, body.get("cmd", "")))
+                elif act == "logs":
+                    self._json(remote_mod.remote_logs(host, user, port, body.get("cmd", "")))
+                else:
+                    self._json(remote_mod.run_command(host, body.get("cmd", ""), user, port))
+            except Exception as e:
+                self._json({"error": str(e)}, 500)
         elif path == "/api/run":
             body = self._read_body()
             from solo import agent as agent_mod
