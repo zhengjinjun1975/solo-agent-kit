@@ -5,4 +5,4 @@
 """
 
 __version__ = "0.1.0"
-__all__ = ["provider", "memory", "ontology", "skill", "writing", "code", "task", "agent"]
+__all__ = ["provider", "memory", "ontology", "skill", "writing", "code", "gen", "task", "agent"]

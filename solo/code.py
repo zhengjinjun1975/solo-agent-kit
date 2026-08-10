@@ -105,6 +105,39 @@ class CodeGraph:
         f = self._find(file)
         return self.deps.get(f, [])
 
+    def overview(self) -> dict:
+        """代码库概览（FDE 接手项目时快速理解）。"""
+        # 核心模块：被最多文件依赖的
+        ranked = sorted(self.rev.items(), key=lambda kv: len(kv[1]), reverse=True)
+        core = [{"file": os.path.basename(f), "depended_by": len(deps)}
+                for f, deps in ranked[:5]]
+        # 统计
+        by_dir = {}
+        for f in self.files:
+            d = os.path.dirname(os.path.relpath(f, self.root)) or "."
+            by_dir[d] = by_dir.get(d, 0) + 1
+        return {
+            "files": len(self.files),
+            "symbols": len(self.symbols),
+            "top_core_modules": core,
+            "files_by_dir": dict(sorted(by_dir.items(), key=lambda kv: -kv[1])),
+        }
+
+    def explain(self, symbol: str) -> dict:
+        """理解一个符号：定义 + 谁用它 + 它依赖谁。"""
+        meta = self.symbols.get(symbol)
+        if not meta:
+            return {"error": f"symbol not found: {symbol}"}
+        f = meta["file"]
+        return {
+            "symbol": symbol,
+            "kind": meta["kind"],
+            "defined_in": os.path.relpath(f, self.root),
+            "line": meta["line"],
+            "used_by": [os.path.relpath(x, self.root) for x in self.rev.get(f, [])],
+            "depends_on": [os.path.relpath(x, self.root) for x in self.deps.get(f, [])],
+        }
+
     def save(self, path: str) -> None:
         with open(path, "w", encoding="utf-8") as fh:
             json.dump({"root": self.root, "files": self.files, "symbols": self.symbols,
