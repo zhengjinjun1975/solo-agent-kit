@@ -634,8 +634,13 @@ class SoloHandler(BaseHTTPRequestHandler):
                 self._json({"styles": writing_mod.list_styles()})
             elif body.get("action") == "rewrite":
                 from solo import provider as provider_mod2
+                from solo import desensitize as ds_mod
                 p = provider_mod2.Provider.from_file()
-                self._json(writing_mod.rewrite(body.get("text", ""), body.get("style", "tweet"), provider=p))
+                # 脱敏→改写→还原(防敏感信息泄露给LLM)
+                custom = body.get("custom_words") or None
+                self._json(ds_mod.mask_and_rewrite(
+                    body.get("text", ""), body.get("style", "tweet"),
+                    provider=p, custom_words=custom))
             else:
                 self._json(writing_mod.scan(body.get("text", "")))
         elif path == "/api/code-review":

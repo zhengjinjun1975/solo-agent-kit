@@ -2,6 +2,16 @@
 
 所有显著变更记录在此。格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [0.8.1] - 2026-08-10
+
+### 新增(写作脱敏 — 防敏感信息泄露)
+- solo/desensitize.py: 写作脱敏模块(mask/restore/mask_and_rewrite)
+  - 识别掩码: IP/手机号/座机/邮箱/金额/身份证/域名/长数字串/自定义词(客户名厂区名)
+  - 写作文本先脱敏→LLM改写→还原, 防敏感信息泄露给模型
+  - 修复中文紧邻数字的 \b 边界漏匹配(改用 (?<!\d)(?!\d))
+- web_server /api/writing rewrite 接入脱敏(mask_and_rewrite), 支持 custom_words
+- 验证: 12项ad-hoc全过(5类敏感掩码/中文边界/完整还原/一站式), 43测试全绿
+
 ## [0.8.0] - 2026-08-10
 
 ### 新增(厂区运维配置与定位 — FDE进厂区模式)
