@@ -17,6 +17,7 @@ from solo import memory as memory_mod
 from solo import skill as skill_mod
 from solo.factory import stats as stats_mod
 from solo.factory import clean as clean_mod
+from solo._util import is_num as num
 from solo.base import ApiError, get_logger
 
 # ---- 路径/数据辅助（从 web_server 搬来，纯业务） ----
@@ -95,12 +96,7 @@ def guess_col_type(vals: list) -> str:
     return clean_mod.guess_type(str(vals[0]))
 
 
-def num(v):
-    try:
-        float(v)
-        return True
-    except (ValueError, TypeError):
-        return False
+
 
 
 def build_report(rows: list, cols: list) -> dict:

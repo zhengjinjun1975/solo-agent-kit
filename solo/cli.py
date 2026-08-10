@@ -22,6 +22,7 @@ import os
 import sys
 
 from solo import __version__
+from solo._util import is_num as _num
 from solo import memory as memory_mod
 from solo import provider as provider_mod
 from solo.factory import clean as clean_mod
@@ -296,13 +297,6 @@ def _factory_onto(args):
     return {"entities": list(o.entities.keys()), "triples": len(o.triples),
             "summary": o.entity_summary()}
 
-
-def _num(v):
-    try:
-        float(v)
-        return True
-    except (ValueError, TypeError):
-        return False
 
 
 def _now():

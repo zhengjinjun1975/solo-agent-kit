@@ -15,6 +15,8 @@ import math
 import os
 import re
 
+from solo._util import is_num as _isnum, quantile as _quantile
+
 
 def guess_type(value: str) -> str:
     """猜值类型：空/整数/浮点/日期/文本。"""
@@ -166,16 +168,4 @@ class DataCleaner:
             w.writerows(rows)
 
 
-def _isnum(v) -> bool:
-    try:
-        float(v)
-        return True
-    except (ValueError, TypeError):
-        return False
 
-
-def _quantile(vals: list, q: float) -> float:
-    s = sorted(vals)
-    k = (len(s) - 1) * q
-    lo, hi = int(k), int(k) + 1
-    return s[lo] + (s[hi] - s[lo]) * (k - lo)

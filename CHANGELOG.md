@@ -2,6 +2,15 @@
 
 所有显著变更记录在此。格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [0.7.3] - 2026-08-10
+
+### 变更(基于原子库极简重构, 去重不改变行为)
+- 新增 solo/_util.py 统一跨模块重复工具(is_num/quantile), 从原子库(D:/domain-libs/solo-atoms)复制极简实现
+- 消除重复: stats(本地_num/_quantile)、clean(_isnum/_quantile)、cli(_num)、web_api(num) 全部统一到 _util
+- 净减代码 ~36 行, 43 项测试保持全绿(行为不变)
+- 保持零依赖独立(不从 domain-libs import, 复制源模式)
+- 版本号同步(三处一致)
+
 ## [0.7.2] - 2026-08-10
 
 ### 变更(端到端测试套件 + 数据入库)

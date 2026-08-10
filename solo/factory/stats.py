@@ -10,12 +10,13 @@
 from __future__ import annotations
 
 import math
-import re
+
+from solo._util import is_num, quantile
 
 
 def describe(values: list) -> dict:
     """描述性统计：count/min/max/mean/median/std/p25/p75。"""
-    vals = [float(v) for v in values if _num(v)]
+    vals = [float(v) for v in values if is_num(v)]
     if not vals:
         return {"count": 0}
     s = sorted(vals)
@@ -27,10 +28,10 @@ def describe(values: list) -> dict:
         "min": s[0],
         "max": s[-1],
         "mean": round(mean, 3),
-        "median": _quantile(s, 0.5),
+        "median": quantile(s, 0.5),
         "std": round(math.sqrt(var), 3),
-        "p25": _quantile(s, 0.25),
-        "p75": _quantile(s, 0.75),
+        "p25": quantile(s, 0.25),
+        "p75": quantile(s, 0.75),
     }
 
 
@@ -74,7 +75,7 @@ def describe_stream(values) -> dict:
 def trend(values: list) -> dict:
     """趋势分析：线性回归斜率（判断上升/下降/平稳）。"""
     xs = list(range(len(values)))
-    vals = [float(v) for v in values if _num(v)]
+    vals = [float(v) for v in values if is_num(v)]
     if len(vals) < 2:
         return {"slope": 0, "direction": "insufficient"}
     n = len(vals)
@@ -93,7 +94,7 @@ def detect_anomaly(values: list, method: str = "zscore", threshold: float = 3.0)
     method: 'zscore' 距均值>3σ / 'iqr' 超出 Q1-1.5IQR 到 Q3+1.5IQR
     空数据或数据过少返回 []（防 IndexError）。
     """
-    vals = [float(v) for v in values if _num(v)]
+    vals = [float(v) for v in values if is_num(v)]
     if len(vals) < 4:  # IQR 需要至少 4 个值；zscore 需至少 3 个，统一防护
         return []
     anomalies = []
@@ -105,7 +106,7 @@ def detect_anomaly(values: list, method: str = "zscore", threshold: float = 3.0)
                 anomalies.append({"index": i, "value": round(v, 3),
                                   "zscore": round((v - mean) / (std or 1), 2)})
     elif method == "iqr":
-        q1, q3 = _quantile(vals, 0.25), _quantile(vals, 0.75)
+        q1, q3 = quantile(vals, 0.25), quantile(vals, 0.75)
         iqr = q3 - q1
         lo, hi = q1 - 1.5 * iqr, q3 + 1.5 * iqr
         for i, v in enumerate(vals):
@@ -120,7 +121,7 @@ def control_chart(values: list) -> dict:
     UCL = mean + 3*σ, LCL = mean - 3*σ（工厂过程控制标准）。
     返回控制限 + 是否失控（越限点）。
     """
-    vals = [float(v) for v in values if _num(v)]
+    vals = [float(v) for v in values if is_num(v)]
     if len(vals) < 2:
         return {"error": "insufficient data"}
     mean = sum(vals) / len(vals)
@@ -139,8 +140,8 @@ def control_chart(values: list) -> dict:
 
 def correlation(a: list, b: list) -> float:
     """皮尔逊相关系数（两列相关，如温度↔能耗）。"""
-    x = [float(i) for i in a if _num(i)]
-    y = [float(i) for i in b if _num(i)]
+    x = [float(i) for i in a if is_num(i)]
+    y = [float(i) for i in b if is_num(i)]
     n = min(len(x), len(y))
     if n < 2:
         return 0.0
@@ -152,16 +153,4 @@ def correlation(a: list, b: list) -> float:
     return round(num / (dx * dy or 1), 3)
 
 
-def _num(v) -> bool:
-    try:
-        float(v)
-        return True
-    except (ValueError, TypeError):
-        return False
 
-
-def _quantile(vals: list, q: float) -> float:
-    s = sorted(vals)
-    k = (len(s) - 1) * q
-    lo, hi = int(k), int(k) + 1
-    return round(s[lo] + (s[hi] - s[lo]) * (k - lo), 3)
