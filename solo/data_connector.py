@@ -135,6 +135,20 @@ def _read_xlsx(path: str) -> list:
         raise DataSourceError(f"xlsx 读取失败: {path}", str(e))
 
 
+def _safe_table_name(table: str) -> str:
+    """表名白名单校验: 仅允许字母/下划线开头, 后跟字母数字下划线。
+
+    防 SQL 注入: 表名直接拼进 SELECT FROM, 若含特殊字符(引号/分号/空格)可注入。
+    返回清洗后的表名; 非法则抛 DataSourceError。
+    """
+    if not table:
+        raise DataSourceError("未指定数据库表")
+    t = str(table).strip('`" ')
+    if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", t):
+        raise DataSourceError(f"非法表名: {table}")
+    return t
+
+
 def _read_sqlite(path: str, table: str, limit: int = None, offset: int = 0) -> list:
     if not path or not os.path.exists(path):
         raise DataSourceError(f"数据库文件不存在: {path}")
@@ -146,7 +160,9 @@ def _read_sqlite(path: str, table: str, limit: int = None, offset: int = 0) -> l
         cur = conn.cursor()
         # P2-5: 分页读取（limit/offset），大表不一次全读
         lim = limit or 5000
-        cur.execute(f"SELECT * FROM \"{table}\" LIMIT {int(lim)} OFFSET {int(offset)}")
+        # 表名白名单校验(防注入), limit/offset 已 int() 强制
+        safe_table = _safe_table_name(table)
+        cur.execute(f"SELECT * FROM \"{safe_table}\" LIMIT {int(lim)} OFFSET {int(offset)}")
         rows = [dict(r) for r in cur.fetchall()]
         conn.close()
         return rows
@@ -219,7 +235,8 @@ def _read_rdbms(source: dict, limit: int = None, offset: int = 0) -> list:
                                dbname=dbname, connect_timeout=8)
             cur = conn.cursor()
         # 只读 + 分页
-        safe_table = table.replace(";", "").strip("`\" ")
+        # 表名白名单校验(防注入, 替代弱 replace), limit/offset 已 int() 强制
+        safe_table = _safe_table_name(table)
         q = f"SELECT * FROM {safe_table}"
         if limit:
             q += f" LIMIT {int(limit)} OFFSET {int(offset)}"

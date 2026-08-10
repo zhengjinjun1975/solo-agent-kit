@@ -2,6 +2,13 @@
 
 所有显著变更记录在此。格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [0.7.4] - 2026-08-10
+
+### 修复(代码审查发现的SQL注入漏洞)
+- data_connector SQL注入: _read_sqlite/_read_rdbms 表名拼接未白名单校验, 新增 _safe_table_name(仅允许字母数字下划线)彻底防注入
+- 实测7种注入载荷(;DROP/OR 1=1/引号/;--/DELETE/注释)全部拦截, 12项验证通过
+- 43测试保持全绿
+
 ## [0.7.3] - 2026-08-10
 
 ### 变更(基于原子库极简重构, 去重不改变行为)
