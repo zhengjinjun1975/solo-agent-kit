@@ -300,8 +300,14 @@ class Ontology:
             for col in rows[0]:
                 if col.endswith(("_id", "_code")) and f"{table}.{col}" not in declared_fks:
                     target = col.replace("_id", "").replace("_code", "")
+                    # 同义词映射（device↔equipment 等），让外键列能指向语义匹配的实体
+                    SYN = {"device": "equipment", "equip": "equipment", "machine": "equipment",
+                           "product": "product", "customer": "customer", "supplier": "supplier",
+                           "sensor": "sensor", "wo": "workorder", "work": "workorder"}
+                    target = SYN.get(target, target)
                     for tname in entities:
-                        if tname.lower() != src_ent.lower() and target.lower() in tname.lower():
+                        if tname.lower() != src_ent.lower() and (target.lower() in tname.lower()
+                                                                 or tname.lower() in target.lower()):
                             link_types.append({"id": f"auto_{table}_{col}", "from": src_ent,
                                                "to": tname, "fk": f"{table}.{col}",
                                                "label": "关联", "auto": True})
