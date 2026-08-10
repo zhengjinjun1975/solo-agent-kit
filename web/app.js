@@ -452,9 +452,10 @@ loadOverview();
 
 // ===== 数据源选择 Modal（文件浏览 + 数据库对接）=====
 let dsModalTarget='', dsCurrentDir='', dsSelectedSource='';
+let dsMulti=[];  // 多选文件数组（Ctrl/Shift）
 let dsSelected={clean:'',stats:'',ontology:''};  // 每工作区独立选中文件
 function openDsModal(mod){
-  dsModalTarget=mod; dsSelectedSource='';
+  dsModalTarget=mod; dsSelectedSource=''; dsMulti=[];
   document.getElementById('ds-modal').style.display='flex';
   document.getElementById('ds-selected-info').textContent='';
   browseDir('');
@@ -471,13 +472,30 @@ async function browseDir(dir){
   // 上级目录
   if(res.parent) html+=`<div class="ds-item dir" onclick="browseDir(this.dataset.p)" data-p="${res.parent}">📁 .. (上级)</div>`;
   (res.dirs||[]).forEach(d=>{html+=`<div class="ds-item dir" onclick="browseDir(this.dataset.p)" data-p="${d.path}">📁 ${d.name}</div>`;});
-  (res.files||[]).forEach(f=>{html+=`<div class="ds-item file" onclick="dsSelectFile(this.dataset.p)" data-p="${f.path}">📄 ${f.name}</div>`;});
+  (res.files||[]).forEach(f=>{html+=`<div class="ds-item file" onclick="dsSelectFile(this.dataset.p, event)" data-p="${f.path}">📄 ${f.name}</div>`;});
   box.innerHTML=html||'<div style="color:var(--mute)">此目录无数据文件</div>';
 }
-function dsSelectFile(path){
-  dsSelectedSource=path;
-  document.getElementById('ds-selected-info').textContent='✅ 已选文件：'+path;
-  document.getElementById('ds-confirm').disabled=false;
+function dsSelectFile(path, evt){
+  evt = evt || window.event;
+  if(!dsMulti) dsMulti=[];  // 已选文件数组
+  if(evt && (evt.ctrlKey || evt.metaKey || evt.shiftKey)){
+    // Ctrl/Shift 多选：切换当前文件选中状态
+    const i=dsMulti.indexOf(path);
+    if(i>=0) dsMulti.splice(i,1); else dsMulti.push(path);
+  } else {
+    // 单选：清空后选当前
+    dsMulti=[path];
+  }
+  // 更新列表高亮
+  document.querySelectorAll('.ds-item.file').forEach(el=>{
+    const p=el.dataset.p;
+    el.classList.toggle('selected', dsMulti.includes(p));
+  });
+  dsSelectedSource = dsMulti.join(';');
+  const info=document.getElementById('ds-selected-info');
+  if(dsMulti.length>1) info.textContent=`✅ 已选 ${dsMulti.length} 个文件（Ctrl+点击可继续多选）`;
+  else info.textContent=`✅ 已选文件：${dsMulti[0]||''}`;
+  document.getElementById('ds-confirm').disabled = dsMulti.length===0;
 }
 function dsConfirm(){
   if(!dsSelectedSource)return;

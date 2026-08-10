@@ -92,6 +92,7 @@ body{font-family:-apple-system,"Segoe UI","Microsoft YaHei",system-ui,sans-serif
 .ds-picker{display:inline-block;padding:8px 14px;border:1px dashed var(--blue-border);border-radius:8px;color:var(--blue);font-size:12px;cursor:pointer;transition:all .2s var(--ease);background:var(--blue-bg)}
 .ds-picker:hover{background:var(--blue-border);transform:translateY(-1px)}
 .ds-file{display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:12px;color:var(--text)}
+.ds-item.file.selected{background:var(--blue-border);color:var(--blue);font-weight:600;border-color:var(--blue)}
 .tag{font-size:10px;padding:2px 7px;border-radius:5px}
 .tag.blue{background:rgba(108,140,255,.15);color:var(--blue)}.tag.orange{background:rgba(255,184,108,.15);color:var(--orange)}
 .cap{display:flex;align-items:center;gap:7px;padding:5px 9px;background:rgba(255,255,255,.05);border-radius:7px;font-size:11px;margin-bottom:5px}
