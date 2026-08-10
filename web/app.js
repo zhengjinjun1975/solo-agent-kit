@@ -584,13 +584,22 @@ function dsConfirm(){
   // 清洗/分析/本体都支持多文件（分号分隔累积）
   const cur=dsSelected[dsModalTarget];
   dsSelected[dsModalTarget] = cur ? cur+';'+dsSelectedSource : dsSelectedSource;
-  // 显示选中文件
+  // 收缩卡片：简洁显示已选文件，主体让给执行区
   const box=document.getElementById('browse-'+dsModalTarget);
   const files=(dsSelected[dsModalTarget]||'').split(';').filter(Boolean);
   const fnames=files.map(p=>esc(p.split(/[\\\\\\/]/).pop()));
   box.innerHTML=files.length>1
-    ? `<div class="ds-file">📄 ${fnames[0]}</div><div style="font-size:10px;color:var(--mute);margin-top:4px">+${files.length-1} 个文件（共${files.length}，用「继续选择」追加）</div>`
-    : `<div class="ds-file">📄 ${fnames[0]}</div>`;
+    ? `<span class="ds-pill">📄 ${fnames[0]}</span><span class="ds-pill">+${files.length-1}</span>`
+    : `<span class="ds-pill">📄 ${fnames[0]}</span>`;
+  // 收缩 ds-card（隐藏图标/箭头/标题，只留简洁状态行）
+  const card=box.closest('.ds-card');
+  if(card){
+    card.classList.add('collapsed');
+    const icon=card.querySelector('.ds-card-icon'), title=card.querySelector('.ds-card-title'), arrow=card.querySelector('.ds-card-arrow');
+    if(icon) icon.style.display='none';
+    if(title) title.style.display='none';
+    if(arrow) arrow.style.display='none';
+  }
   closeDsModal();
   // 选择数据源后加载列（分析需要选列）
   if(dsModalTarget==='stats'){

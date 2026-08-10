@@ -101,6 +101,9 @@ body{font-family:-apple-system,"Segoe UI","Microsoft YaHei",system-ui,sans-serif
 .ds-card-title{font-size:14px;font-weight:700;color:var(--text)}
 .ds-card-sub{font-size:12px;color:var(--mute);margin-top:3px;line-height:1.5}
 .ds-card-arrow{font-size:18px;color:var(--blue);opacity:.6}
+.ds-pill{display:inline-flex;align-items:center;gap:4px;background:#fff;border:1px solid var(--blue-border);border-radius:16px;padding:4px 12px;font-size:12px;color:var(--blue);font-weight:600}
+.ds-card.collapsed{padding:8px 12px;border-style:solid;border-color:var(--blue-border);background:#fff;gap:8px;min-height:auto}
+.ds-card.collapsed .ds-card-sub{margin-top:0;color:var(--blue)}
 .btn.pri.run{width:100%;margin-top:12px;padding:12px;font-size:15px;font-weight:700;border-radius:12px;background:linear-gradient(135deg,var(--blue),#4a7dff);box-shadow:0 4px 14px rgba(59,110,246,.25)}
 .btn.pri.run:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(59,110,246,.35)}
 .ds-picker:hover{background:var(--blue-border);transform:translateY(-1px)}
