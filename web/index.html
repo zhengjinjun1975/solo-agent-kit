@@ -261,11 +261,11 @@ body{font-family:-apple-system,"Segoe UI","Microsoft YaHei",system-ui,sans-serif
       <button class="btn" style="margin-top:8px;width:100%" onclick="loadConfigPanel()">刷新配置</button>
     </div>
 
-    <!-- 部署工作区 -->
+    <!-- 部署工作区（真实部署） -->
     <div id="ws-setup" style="display:none">
-      <div class="lbl">部署 — 系统环境检查</div>
-      <div id="setup-result" style="font-size:11px;max-height:280px;overflow:auto;white-space:pre-wrap;background:#f1f3f8;border:1px solid var(--border);border-radius:8px;padding:8px"></div>
-      <button class="btn" style="margin-top:8px;width:100%" onclick="loadSetupPanel()">重新检查</button>
+      <div class="lbl">部署 — 检查环境并启动服务</div>
+      <button class="btn pri" style="width:100%" onclick="runDeploy()">🚀 开始部署</button>
+      <div id="setup-result" style="font-size:12px;max-height:300px;overflow:auto;white-space:pre-wrap;background:#f1f3f8;border:1px solid var(--border);border-radius:8px;padding:10px;margin-top:8px;line-height:1.8"></div>
     </div>
   </aside>
 </div>
@@ -697,7 +697,10 @@ async function browseDir(dir){
   box.innerHTML='⏳ 加载…';
   const res=await api('/api/browse?dir='+encodeURIComponent(dir));
   let html='';
-  if(res.parent!==''&&res.parent!==undefined) html+=`<div class="ds-item dir" onclick="browseDir('${res.parent}')">📁 .. (上级)</div>`;
+  // 盘符导航（硬盘级）
+  if(res.drives&&res.drives.length) html+=`<div style="font-size:11px;color:var(--mute);margin-bottom:4px">💽 硬盘：</div>`+(res.drives||[]).map(d=>`<div class="ds-item dir" onclick="browseDir('${d.path}')">💽 ${d.name}</div>`).join('');
+  // 上级目录
+  if(res.parent) html+=`<div class="ds-item dir" onclick="browseDir('${res.parent}')">📁 .. (上级)</div>`;
   (res.dirs||[]).forEach(d=>{html+=`<div class="ds-item dir" onclick="browseDir('${d.path}')">📁 ${d.name}</div>`;});
   (res.files||[]).forEach(f=>{html+=`<div class="ds-item file" onclick="dsSelectFile('${f.path}')">📄 ${f.name}</div>`;});
   box.innerHTML=html||'<div style="color:var(--mute)">此目录无数据文件</div>';

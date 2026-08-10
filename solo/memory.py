@@ -64,13 +64,35 @@ class Memory:
         return True
 
     def search(self, query: str, top_k: int = 5, semantic: bool = True):
-        """事实层检索。语义用简单词重叠打分（零依赖），避免引向量库。"""
+        """事实层检索。优先 embed 向量（P1-5），无 embed 回退词重叠。"""
         facts = self._load(self._facts_path, [])
         if semantic:
-            scored = sorted(facts, key=lambda f: _overlap(f["text"], query), reverse=True)
+            q_emb = self._try_embed(query)
+            if q_emb is not None:
+                # 批量向量化一次，避免重复 embed 调用
+                vecs = {}
+                for f in facts:
+                    v = self._try_embed(f["text"])
+                    if v:
+                        vecs[f.get("h", id(f))] = v
+                scored = sorted(
+                    facts,
+                    key=lambda f: _cosine(q_emb, vecs.get(f.get("h", id(f)), [])),
+                    reverse=True)
+            else:
+                scored = sorted(facts, key=lambda f: _overlap(f["text"], query), reverse=True)
         else:
             scored = facts
         return scored[:top_k]
+
+    def _try_embed(self, text: str):
+        """尝试用配置的 embed 模型向量化。失败返回 None（回退词重叠）。"""
+        try:
+            from solo import provider as provider_mod
+            p = provider_mod.Provider.from_file()
+            return p.embed(text)
+        except Exception:
+            return None
 
     # ---- 温域·场景层 ----
     def set_scenario(self, name: str, content: str) -> None:
@@ -140,8 +162,9 @@ class Memory:
 
     @staticmethod
     def _save(path: str, data) -> None:
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=1)
+        from solo.base import atomic_write, lock_for
+        with lock_for(path):
+            atomic_write(path, data)
 
 
 def _now() -> str:
@@ -156,3 +179,15 @@ def _overlap(a: str, b: str) -> float:
     if not b_b:
         return 0.0
     return len(a_b & b_b) / len(b_b)
+
+
+def _cosine(a: list, b: list) -> float:
+    """余弦相似度（embed 向量检索）。"""
+    if not a or not b or len(a) != len(b):
+        return 0.0
+    dot = sum(x * y for x, y in zip(a, b))
+    na = sum(x * x for x in a) ** 0.5
+    nb = sum(y * y for y in b) ** 0.5
+    if not na or not nb:
+        return 0.0
+    return dot / (na * nb)

@@ -45,14 +45,39 @@ def route(task: str) -> str:
     return "chat"
 
 
+def route_llm(task: str) -> str:
+    """P1-6: LLM 意图识别。失败/不可用时回退关键词 route。"""
+    try:
+        p = provider_mod.Provider.from_file()
+        if not p.local and not p.remote:
+            return route(task)
+        intent_list = ", ".join(INTENTS.keys())
+        prompt = (f"判断以下用户请求属于哪个意图。可选意图: {intent_list}。"
+                  f"只回答一个意图名，不要解释。\n请求: {task}\n意图:")
+        text = p.complete(prompt, tier="local")
+        intent = text.strip().lower().split()[0] if text else ""
+        if intent in INTENTS:
+            return intent
+    except Exception:
+        pass
+    return route(task)
+
+
 def run(task: str, mem_dir: str = None, skill_dir: str = None, tier: str = "auto",
-        csv_path: str = None, col: str = None) -> dict:
+        csv_path: str = None, col: str = None, conversation_id: str = None,
+        history: list = None) -> dict:
     """AI 原生对话路由：理解意图 → 调用套件模块 → 返回结构化结果。
 
     csv_path/col 可由前端附带（工厂操作需要数据文件）。
+    conversation_id/history 支持多轮对话（P0-6）：传入会话历史注入上下文。
     """
     m = memory_mod.Memory(mem_dir or memory_mod.DEFAULT_DIR)
+    # P1-6: 关键词优先，无法判定时用 LLM 增强（仍回退关键词）
     intent = route(task)
+    if intent == "chat" and not any(k in task for k in ("你好", "hi", "hello")):
+        llm_intent = route_llm(task)
+        if llm_intent != "chat":
+            intent = llm_intent
 
     # ---- 套件模块路由 ----
     if intent == "clean":
@@ -107,8 +132,8 @@ def run(task: str, mem_dir: str = None, skill_dir: str = None, tier: str = "auto
         out = gen_mod.generate_doc(task, kind=kind) if kind != "code" else gen_mod.generate_code(task)
         return {"intent": "gen", "output": out, "memory_dir": m.dir}
     if intent == "setup":
-        from solo.web_server import _setup_checks
-        res = _setup_checks()
+        from solo import diagnostics as diag_mod
+        res = diag_mod.check_environment()
         res["intent"] = "setup"
         return res
     if intent == "task":
@@ -139,8 +164,8 @@ def run(task: str, mem_dir: str = None, skill_dir: str = None, tier: str = "auto
         sk = skill_mod.Skill(skill_dir or skill_mod.DEFAULT_DIR)
         return {"intent": "skill", "skills": sk.list(), "memory_dir": m.dir}
     if intent == "capabilities":
-        from solo.web_server import CAPABILITIES
-        return {"intent": "capabilities", "capabilities": CAPABILITIES, "memory_dir": m.dir}
+        from solo import registry as registry_mod
+        return {"intent": "capabilities", "capabilities": registry_mod.capabilities(), "memory_dir": m.dir}
 
     # ---- 兜底：对话（记忆装载 → 推理 → 记忆提交）----
     profile = m.profile_text()
@@ -161,7 +186,13 @@ def run(task: str, mem_dir: str = None, skill_dir: str = None, tier: str = "auto
 - 数据类能力需先选择数据文件或数据库
 - 也可直接对话，用自然语言描述任务（如"清洗 xx.csv"）
 版本 v0.5.5，零第三方依赖。"""
-    context = f"{identity}\n\n用户问题: {task}\n\n用户画像:\n{profile}\n\n相关记忆:\n{related_txt}"
+    context = f"{identity}\n\n用户画像:\n{profile}\n\n相关记忆:\n{related_txt}"
+    # P0-6 多轮对话：注入会话历史（最近 6 轮）供延续性对话
+    if history:
+        hist_txt = "\n".join(f"{'用户' if h.get('role')=='user' else '助手'}: {h.get('content','')}"
+                             for h in history[-6:])
+        context += f"\n\n对话历史:\n{hist_txt}"
+    context += f"\n\n用户问题: {task}"
     if skill_hint:
         context += f"\n\n适用经验:\n{skill_hint}"
     p = provider_mod.Provider.from_file()

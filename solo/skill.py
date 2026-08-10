@@ -85,8 +85,9 @@ class Skill:
             return {}
 
     def _save_index(self, idx: dict) -> None:
-        with open(self._index_path, "w", encoding="utf-8") as f:
-            json.dump(idx, f, ensure_ascii=False, indent=1)
+        from solo.base import atomic_write, lock_for
+        with lock_for(self._index_path):
+            atomic_write(self._index_path, idx)
 
 
 def _now() -> str:

@@ -38,8 +38,10 @@ class Task:
             return {}
 
     def _save(self, t: dict) -> None:
-        with open(self._path(t["id"]), "w", encoding="utf-8") as f:
-            json.dump(t, f, ensure_ascii=False, indent=1)
+        path = self._path(t["id"])
+        from solo.base import atomic_write, lock_for
+        with lock_for(path):
+            atomic_write(path, t)
 
     def new(self, goal: str, tid: str = None) -> dict:
         """新建任务。tid 可选；默认从 goal 生成。"""

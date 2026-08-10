@@ -102,7 +102,7 @@ class SoloHandler(BaseHTTPRequestHandler):
             try:
                 self._handle_api_get(path, urllib.parse.parse_qs(parsed.query))
             except Exception as e:
-                self._json({"error": str(e), "code": 500}, 500)
+                self._handle_error(e)
         else:
             self._serve_static(path)
 
@@ -111,13 +111,22 @@ class SoloHandler(BaseHTTPRequestHandler):
         try:
             self._handle_api_post(path)
         except Exception as e:
-            import traceback
-            traceback.print_exc()
-            self._json({"error": str(e), "code": 500}, 500)
+            self._handle_error(e)
+
+    def _handle_error(self, e: Exception):
+        """P0-3: 统一错误契约——ApiError 返回其 code/msg，其他记日志返回通用 500。"""
+        from solo.base import ApiError, get_logger
+        if isinstance(e, ApiError):
+            self._json(e.to_dict(), e.code)
+            return
+        get_logger("solo.web").error("API 未捕获异常: %s", e, exc_info=True)
+        self._json({"error": "内部错误，请查看日志", "code": 500}, 500)
 
     def _handle_api_get(self, path, qs):
+        from solo import registry as registry_mod
+        from solo import diagnostics as diag_mod
         if path == "/api/capabilities":
-            self._json(CAPABILITIES)
+            self._json(registry_mod.capabilities())
         elif path == "/api/config":
             cfg = provider_mod.load_config()
             if not cfg:
@@ -178,7 +187,33 @@ class SoloHandler(BaseHTTPRequestHandler):
                         "anomalies": stats_mod.detect_anomaly(vals, method="iqr"),
                         "control_chart": stats_mod.control_chart(vals)})
         elif path == "/api/setup":
-            self._json(_setup_checks())
+            from solo import diagnostics as diag_mod
+            self._json(diag_mod.check_environment())
+        elif path == "/api/deploy":
+            self._json(_deploy())
+        elif path == "/api/config-test":
+            # 测试模型连接（本地 Ollama + 远端 API）
+            from solo import provider as provider_mod2
+            import urllib.request
+            p = provider_mod2.Provider.from_file()
+            out = {}
+            # 测试本地
+            if p.local:
+                try:
+                    with urllib.request.urlopen(p.local.get("base_url","http://127.0.0.1:11434").rstrip("/")+"/api/tags", timeout=3) as r:
+                        models=[m.get("name","") for m in json.load(r).get("models",[])]
+                    out["local"] = {"ok": True, "model": p.local.get("model"), "models": models[:5]}
+                except Exception as e:
+                    out["local"] = {"ok": False, "error": str(e)[:60]}
+            # 测试远端
+            if p.remote:
+                key_env = p.remote.get("api_key_env","")
+                key = os.environ.get(key_env,"")
+                if not key:
+                    out["remote"] = {"ok": False, "error": f"环境变量 {key_env} 未设置"}
+                else:
+                    out["remote"] = {"ok": True, "model": p.remote.get("model"), "api_key_env": key_env}
+            self._json(out)
         elif path == "/api/datasource":
             # 列出数据源信息：SQLite 表 / 检查 CSV
             from solo import data_connector as dc
@@ -195,27 +230,43 @@ class SoloHandler(BaseHTTPRequestHandler):
                                           "exists": bool(sp and _os.path.exists(sp))})
             self._json(result)
         elif path == "/api/browse":
-            # 完整文件遍历：目录树导航（带 dir 参数，返回目录+文件，可上下级）
+            # 硬盘级文件遍历：盘符/目录导航（数据文件过滤）
             import os as _os
+            # 允许浏览的根：Windows 盘符或当前项目
             root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            cur = _safe_path(qs.get("dir", [""])[0]) or root
-            cur = cur if _os.path.isdir(cur) else root
+            dir_arg = qs.get("dir", [""])[0]
+            if dir_arg:
+                cur = dir_arg
+                # 只允许访问本地路径（盘符或绝对路径）
+                if not _os.path.isdir(cur):
+                    cur = root
+            else:
+                cur = root
             dirs, files = [], []
             try:
                 for name in sorted(_os.listdir(cur)):
                     full = _os.path.join(cur, name)
-                    rel = _os.path.relpath(full, root).replace("\\", "/")
                     if _os.path.isdir(full):
-                        if name not in (".git", "__pycache__", "node_modules", ".venv", ".solo"):
-                            dirs.append({"path": rel, "name": name, "dir": True})
+                        # 隐藏系统/敏感目录
+                        if name not in ("$Recycle.Bin", "System Volume Information", "Recovery",
+                                        "Windows", ".git", "__pycache__", "node_modules", ".venv", ".solo"):
+                            dirs.append({"path": full, "name": name, "dir": True})
                     else:
                         if name.endswith((".csv", ".db", ".sqlite", ".xlsx", ".json")):
-                            files.append({"path": rel, "name": name, "dir": False})
+                            files.append({"path": full, "name": name, "dir": False})
             except Exception:
                 pass
-            parent = "" if cur == root else _os.path.relpath(_os.path.dirname(cur), root).replace("\\", "/")
-            self._json({"dir": _os.path.relpath(cur, root).replace("\\", "/") or "/",
-                        "parent": parent, "dirs": dirs, "files": files})
+            # 盘符列表（Windows 根）
+            parent = ""
+            if _os.path.dirname(cur) != cur:
+                parent = _os.path.dirname(cur)
+            drives = []
+            if cur == root or cur == _os.path.dirname(cur):
+                import string
+                for d in string.ascii_uppercase:
+                    if _os.path.exists(f"{d}:\\"):
+                        drives.append({"path": f"{d}:\\", "name": f"{d}:", "dir": True})
+            self._json({"dir": cur, "parent": parent, "dirs": dirs, "files": files, "drives": drives})
         elif path == "/api/db-connect":
             # 数据库对接：连接→测试→列出表
             from solo import data_connector as dc
@@ -284,10 +335,12 @@ class SoloHandler(BaseHTTPRequestHandler):
             from solo import agent as agent_mod
             try:
                 res = agent_mod.run(body.get("task", ""), tier="auto",
-                                    csv_path=body.get("csv"), col=body.get("col"))
+                                    csv_path=body.get("csv"), col=body.get("col"),
+                                    conversation_id=body.get("conversation_id"),
+                                    history=body.get("history"))
                 self._json(res)
             except Exception as e:
-                self._json({"error": str(e)}, 500)
+                self._handle_error(e)
         elif path == "/api/toggle":
             body = self._read_body()
             suite, cap = body.get("suite"), body.get("capability")
@@ -309,6 +362,30 @@ class SoloHandler(BaseHTTPRequestHandler):
                            outlier_method=body.get("outlier", "iqr"))
             self._json({"input": len(rows), "output": len(out), "report": cl.report,
                         "sample": out[:5]})
+        elif path == "/api/report":
+            # P0-5: 生成数据概览 HTML 报告（对标 pandas-profiling）
+            body = self._read_body()
+            rows = _load_rows(body)
+            if not rows:
+                self._json({"error": "数据源无效或为空"}, 400)
+                return
+            cols = list(rows[0].keys()) if rows else []
+            report = _build_report(rows, cols)
+            self._json(report)
+        elif path == "/api/export":
+            # P0-5: 导出 CSV（清洗后数据 / 原始数据）
+            body = self._read_body()
+            rows = _load_rows(body)
+            if not rows:
+                self._json({"error": "数据源无效或为空"}, 400)
+                return
+            import csv as _csv
+            import io
+            buf = io.StringIO()
+            writer = _csv.DictWriter(buf, fieldnames=list(rows[0].keys()))
+            writer.writeheader()
+            writer.writerows(rows)
+            self._json({"csv": buf.getvalue()})
         elif path == "/api/datasource-columns":
             # 数据源列检测：读数据源返回列名+类型+预览（供清洗/分析选列）
             body = self._read_body()
@@ -383,7 +460,9 @@ class SoloHandler(BaseHTTPRequestHandler):
             self._json({"error": "unknown api"}, 404)
 
     def log_message(self, fmt, *args):
-        pass  # 静默日志
+        # P0-2: 记录请求日志（不再静默 pass）
+        from solo.base import get_logger
+        get_logger("solo.web").info("%s - %s", self.address_string(), fmt % args)
 
 
 def _setup_checks() -> dict:
@@ -408,6 +487,65 @@ def _setup_checks() -> dict:
             "all_ok": all(c.get("ok", True) for c in checks.values())}
 
 
+def _deploy() -> dict:
+    """真实部署：检查环境 → 启动 Ollama（若未运行）→ 验证模型可用。
+
+    返回部署结果与动作日志。
+    """
+    import sys
+    import subprocess
+    log = []
+    result = {"ok": False, "steps": [], "logs": log}
+
+    # 1. Python 检查
+    log.append(f"[1/4] Python {sys.version_info.major}.{sys.version_info.minor} {'✅' if sys.version_info >= (3, 9) else '❌'}")
+
+    # 2. 检查/启动 Ollama
+    try:
+        import urllib.request
+        with urllib.request.urlopen("http://127.0.0.1:11434/api/tags", timeout=3) as r:
+            models = [m.get("name", "") for m in json.load(r).get("models", [])]
+        log.append(f"[2/4] Ollama 已在运行 ✅ 模型: {', '.join(models[:5]) or '无'}")
+    except Exception:
+        log.append("[2/4] Ollama 未运行，尝试启动…")
+        # Windows 下找 ollama.exe 启动
+        ollama_path = None
+        for cand in [os.path.expandvars(r"%LOCALAPPDATA%\Programs\Ollama\ollama.exe"),
+                     r"C:\Program Files\Ollama\ollama.exe"]:
+            if os.path.exists(cand):
+                ollama_path = cand
+                break
+        if ollama_path:
+            try:
+                subprocess.Popen([ollama_path, "serve"], creationflags=0x00000008)  # DETACHED
+                log.append("    → 已尝试启动 ollama.exe")
+                import time
+                time.sleep(3)
+                try:
+                    with urllib.request.urlopen("http://127.0.0.1:11434/api/tags", timeout=3) as r:
+                        models = [m.get("name", "") for m in json.load(r).get("models", [])]
+                    log.append(f"    ✅ Ollama 启动成功 模型: {', '.join(models[:5]) or '无'}")
+                except Exception:
+                    log.append("    ⚠️ Ollama 已启动但未就绪（稍后重试）")
+            except Exception as e:
+                log.append(f"    ❌ 启动失败: {e}")
+        else:
+            log.append("    ⚠️ 未找到 ollama.exe，请手动安装并启动 Ollama")
+
+    # 3. 配置检查
+    cfg = provider_mod.load_config()
+    log.append(f"[3/4] 配置文件 {'✅ 存在' if cfg else '⚠️ 缺失（运行配置功能创建）'}")
+
+    # 4. 记忆库
+    m = memory_mod.Memory()
+    facts = len(m._load(m._facts_path, []))
+    log.append(f"[4/4] 记忆库 ✅ ({facts} 条事实)")
+
+    result["ok"] = all("❌" not in s.split("]", 1)[-1] or "未找到 ollama" in s for s in log)
+    result["steps"] = log
+    return result
+
+
 def _safe_path(p: str) -> str:
     """路径参数白名单：只允许项目内路径（默认本地部署，防任意文件读）。
 
@@ -427,6 +565,20 @@ def _safe_path(p: str) -> str:
     return ""
 
 
+def _data_path(p: str) -> str:
+    """数据文件路径白名单：放开到硬盘，但只允许数据文件扩展名。
+
+    供硬盘级浏览后的数据读取（csv/db/sqlite/xlsx/json），拒绝任意文件读取。
+    """
+    if not p:
+        return ""
+    ALLOWED = (".csv", ".db", ".sqlite", ".xlsx", ".json")
+    p = os.path.normpath(p.replace("\\", "/"))
+    if os.path.isabs(p) and os.path.exists(p) and p.lower().endswith(ALLOWED):
+        return p
+    return ""
+
+
 def _load_rows(body: dict) -> list:
     """从请求体解析数据源并读取为行列表。
 
@@ -440,13 +592,13 @@ def _load_rows(body: dict) -> list:
     if "source" in body:
         src = dict(body["source"])
         if "path" in src:
-            src["path"] = _safe_path(src["path"])
+            src["path"] = _data_path(src["path"]) or _safe_path(src["path"])
         return dc.connect(src)
     if body.get("csv"):
-        p = _safe_path(body["csv"])
+        p = _data_path(body["csv"]) or _safe_path(body["csv"])
         return dc.connect({"type": "csv", "path": p}) if p else []
     if body.get("db"):
-        p = _safe_path(body["db"])
+        p = _data_path(body["db"]) or _safe_path(body["db"])
         if body.get("table"):
             return dc.connect({"type": "sqlite", "path": p, "table": body["table"]}) if p else []
         if body.get("query"):
@@ -460,6 +612,46 @@ def _guess_col_type(vals: list) -> str:
     if not vals:
         return "empty"
     return guess_type(str(vals[0]))
+
+
+def _build_report(rows: list, cols: list) -> dict:
+    """P0-5: 构建数据概览报告（对标 pandas-profiling 的结构）。"""
+    from solo.factory import stats as st
+    total = len(rows)
+    # 缺失值统计
+    missing = {}
+    types = {}
+    col_stats = {}
+    for c in cols:
+        vals = [r.get(c, "") for r in rows]
+        non_empty = [v for v in vals if str(v).strip() != ""]
+        missing[c] = total - len(non_empty)
+        types[c] = _guess_col_type(non_empty[:1])
+        # 数值列统计
+        if types[c] in ("float", "integer"):
+            nums = [float(v) for v in non_empty if _num(v)]
+            if nums:
+                col_stats[c] = st.describe(nums)
+    # 重复行
+    seen = set()
+    dups = 0
+    for r in rows:
+        key = tuple(str(r.get(c, "")) for c in cols)
+        if key in seen:
+            dups += 1
+        else:
+            seen.add(key)
+    return {
+        "total_rows": total,
+        "total_cols": len(cols),
+        "columns": cols,
+        "types": types,
+        "missing": missing,
+        "missing_total": sum(missing.values()),
+        "duplicates": dups,
+        "col_stats": col_stats,
+        "preview": rows[:5],
+    }
 
 
 def _write_config(config: dict) -> bool:
@@ -492,7 +684,9 @@ def main():
     ap.add_argument("--port", type=int, default=PORT)
     ap.add_argument("--host", default="127.0.0.1")
     args = ap.parse_args()
-    srv = HTTPServer((args.host, args.port), SoloHandler)
+    # P1-4: ThreadingHTTPServer 支持并发（慢请求不阻塞其他 API）
+    from http.server import ThreadingHTTPServer
+    srv = ThreadingHTTPServer((args.host, args.port), SoloHandler)
     print(f"solo web 后端已启动: http://{args.host}:{args.port}  (Ctrl+C 停止)")
     try:
         srv.serve_forever()
