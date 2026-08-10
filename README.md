@@ -1,11 +1,12 @@
 # solo-agent-kit
 
-> 一人公司/中早期创业者的**本体优先**方法论 Agent —— 记忆/写作/代码/开源，一个人干完整活。
-> **轻量，但能打。零依赖，但方法论完整。** 不是通用 agent，是专为人公司定制的方法论套件。
+> **针对 FDE（工厂/前置部署工程师）的轻量化全栈工具，一人公司的必备能力。**
+> 本体优先 + 双套件（个人 + 工厂）+ 记忆/写作/代码/数据/建模，一个人干完整团队的活。
+> **轻量，但能打。零依赖，但方法论完整。** 不是通用 agent，是 FDE 与一人公司的全栈工具箱。
 
 [![License](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.9%2B-blue.svg)](pyproject.toml)
-[![Version](https://img.shields.io/badge/version-0.3.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.4.0-blue.svg)](CHANGELOG.md)
 
 ## 为什么是"本体优先"（不是又一个记忆库/RAG）
 

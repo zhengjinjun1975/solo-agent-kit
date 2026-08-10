@@ -35,6 +35,7 @@ class Provider:
 
     用法：
         p = Provider.from_config(config)   # 读 config dict
+        p = Provider.from_file()           # 从 provider.yaml 读（推荐）
         text = p.complete("轻量任务", tier="local")     # 本地
         text = p.complete("复杂任务", tier="remote")    # 远端
         vec = p.embed("文本")                            # 嵌入（本地）
@@ -54,6 +55,15 @@ class Provider:
             remote=p.get("remote", {}),
             embed=p.get("embed", {}),
         )
+
+    @classmethod
+    def from_file(cls, path: str = None) -> "Provider":
+        """从 provider.yaml 文件构造。path 缺省找 ./provider.yaml 或 ~/.solo/provider.yaml。
+
+        零依赖解析（极简缩进 yaml 子集），找不到返回默认（本地 ollama）。
+        """
+        config = load_config(path)
+        return cls.from_config(config or {})
 
     def complete(self, prompt: str, tier: str = "auto") -> str:
         """生成文本。tier: local / remote / auto。
@@ -132,3 +142,46 @@ class Provider:
         except (urllib.error.URLError, ConnectionError, OSError) as e:
             reason = getattr(e, "reason", e)
             raise ProviderError(f"远端不可用（{reason}）", EXIT_NETWORK)
+
+
+def load_config(path: str = None) -> dict:
+    """读取 provider.yaml 为 dict。零依赖极简 YAML 解析（按缩进层级）。
+
+    支持：顶层键(provider) → 二级(local/remote/embed) → 三级(type/base_url/model/api_key_env)。
+    找文件顺序：显式 path → ./provider.yaml → ~/.solo/provider.yaml
+    找不到返回空 dict。
+    """
+    if path is None:
+        candidates = ["provider.yaml",
+                      os.path.join(os.path.expanduser("~"), ".solo", "provider.yaml")]
+        path = next((p for p in candidates if os.path.exists(p)), None)
+    if not path or not os.path.exists(path):
+        return {}
+
+    def _parse_into(node, lines, idx, parent_indent=-1):
+        while idx < len(lines):
+            raw = lines[idx]
+            line = raw.rstrip("\n")
+            if not line.strip() or line.strip().startswith("#"):
+                idx += 1
+                continue
+            indent = len(line) - len(line.lstrip(" "))
+            if indent <= parent_indent:
+                break
+            key, _, val = line.strip().partition(":")
+            key = key.strip()
+            val = val.strip()
+            if val:
+                node[key] = val.strip('"').strip("'")
+                idx += 1
+            else:
+                child = {}
+                node[key] = child
+                idx = _parse_into(child, lines, idx + 1, indent)
+        return idx
+
+    with open(path, encoding="utf-8") as f:
+        lines = f.readlines()
+    cfg = {}
+    _parse_into(cfg, lines, 0, parent_indent=-1)
+    return cfg

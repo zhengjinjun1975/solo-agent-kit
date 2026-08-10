@@ -2,6 +2,19 @@
 
 所有显著变更记录在此。格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [0.4.0] - 2026-08-10
+
+### 新增
+- **provider.yaml 真正生效**：`Provider.from_file()` + `load_config()` 零依赖 YAML 解析，模型分层（本地/远端/嵌入）从配置文件读取
+- **factory 模块进 CLI**：`solo factory-clean` / `factory-stats` / `factory-onto` 命令
+- **部署检查**：`solo setup`（Python/Ollama/config/记忆库 四检）
+- **配置查看**：`solo config`（provider.yaml 脱敏显示）
+- **可视化前端**：`web/index.html`（单文件零依赖）——融合 OpenClaw（暗色玻璃拟态）+ WorkBuddy（办公多面板），工业蓝（工厂套件）+ 暖橙（个人套件），涵盖全部套件能力
+- 定位升级：**针对 FDE 的轻量化全栈工具，一人公司的必备能力**
+
+### 修复
+- provider.py 结构错乱：load_config 插入致 Provider.complete 游离（死代码），重写恢复类结构
+
 ## [0.3.0] - 2026-08-10
 
 ### 新增

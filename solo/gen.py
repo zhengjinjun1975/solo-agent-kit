@@ -12,7 +12,7 @@ from solo import provider as provider_mod
 
 def generate_code(prompt: str, language: str = "python", tier: str = "auto") -> str:
     """生成代码。language 提示语言；tier auto 复杂走远端。"""
-    p = provider_mod.Provider.from_config({})
+    p = provider_mod.Provider.from_file()
     sys_prompt = (
         f"你是资深工程师。用{language}写代码，遵守：\n"
         "1. 极简原则，不加过度抽象\n"
@@ -25,7 +25,7 @@ def generate_code(prompt: str, language: str = "python", tier: str = "auto") -> 
 
 def generate_doc(topic: str, kind: str = "readme", tier: str = "local") -> str:
     """生成工程文档。kind: readme / changelog / docstring / guide。"""
-    p = provider_mod.Provider.from_config({})
+    p = provider_mod.Provider.from_file()
     templates = {
         "readme": "为以下项目写一个简洁 README（定位/快速开始/能力/限制/致谢）",
         "changelog": "写一个 CHANGELOG 的 0.1.0 段（新增/修复/方法论）",
@@ -39,7 +39,7 @@ def generate_doc(topic: str, kind: str = "readme", tier: str = "local") -> str:
 
 def review_code(code: str, tier: str = "local") -> str:
     """代码审查（FDE 自查）。简单审查本地，深度审查远端。"""
-    p = provider_mod.Provider.from_config({})
+    p = provider_mod.Provider.from_file()
     sys_prompt = (
         "你是代码审查者。审查以下代码，指出：\n"
         "1. 真实 bug（注入/未用 import/边界）\n"

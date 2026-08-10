@@ -12,7 +12,7 @@ from solo import provider as provider_mod
 from solo import skill as skill_mod
 
 
-def run(task: str, mem_dir: str = None, skill_dir: str = None) -> dict:
+def run(task: str, mem_dir: str = None, skill_dir: str = None, tier: str = "auto") -> dict:
     """循环五态最小实现。返回 {task, suggestion, context}。"""
     # 1. 感知
     m = memory_mod.Memory(mem_dir or memory_mod.DEFAULT_DIR)
@@ -28,8 +28,8 @@ def run(task: str, mem_dir: str = None, skill_dir: str = None) -> dict:
     context = f"任务: {task}\n\n用户画像:\n{profile}\n\n相关记忆:\n{related_txt}"
     if skill_hint:
         context += f"\n\n适用经验(skill):\n{skill_hint}"
-    p = provider_mod.Provider.from_config({})
-    text = p.complete(context + "\n\n请给出简洁处理建议(中文):", tier="local")
+    p = provider_mod.Provider.from_file()
+    text = p.complete(context + "\n\n请给出简洁处理建议(中文):", tier=tier)
 
     # 4. 记忆提交：任务有价值 → 记入事实层
     m.add_fact(task, tags=["task"])

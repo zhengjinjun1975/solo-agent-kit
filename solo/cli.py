@@ -7,43 +7,71 @@
     solo skill-add "<经验>"      从任务提取可复用经验
     solo import-obsidian <dir>   导入 Obsidian 笔记为记忆
     solo export-markdown <dir>   导出记忆为 Markdown
+    solo setup                   部署检查（环境/模型/初始化）
+    solo config                  查看/校验 provider.yaml 配置
+    solo factory-clean <csv>     工厂数据清洗
+    solo factory-stats <csv>     工厂数据分析（描述/趋势/SPC）
+    solo factory-onto <csv>      工厂本体建模
     solo version                 显示版本
 """
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 
 from solo import __version__
 from solo import memory as memory_mod
 from solo import provider as provider_mod
+from solo.factory import clean as clean_mod
+from solo.factory import stats as stats_mod
+from solo.factory import ontology as ontology_mod
 
 
 def main(argv=None):
     argv = argv if argv is not None else sys.argv[1:]
-    parser = argparse.ArgumentParser(prog="solo", description="一人公司方法论 Agent")
+    parser = argparse.ArgumentParser(prog="solo", description="OPC 与工厂级 FDE 的方法论 Agent")
     sub = parser.add_subparsers(dest="cmd")
 
     sub.add_parser("version", help="显示版本")
     sub.add_parser("init", help="初始化记忆库")
+    sub.add_parser("setup", help="部署检查（环境/模型/初始化）")
+    sub.add_parser("config", help="查看/校验 provider.yaml 配置")
+
     p_run = sub.add_parser("run", help="运行一个任务（走完整方法论）")
     p_run.add_argument("task", help="任务描述")
-    p_run.add_argument("-", "--stdin", action="store_true", help="从 stdin 读任务正文")
+    p_run.add_argument("--tier", choices=["auto", "local", "remote"], default="auto", help="模型分层")
+
     p_skill = sub.add_parser("skill-add", help="从任务提取可复用经验")
     p_skill.add_argument("exp", help="经验内容")
+
     p_imp = sub.add_parser("import-obsidian", help="导入 Obsidian 笔记")
     p_imp.add_argument("dir")
     p_exp = sub.add_parser("export-markdown", help="导出记忆为 Markdown")
     p_exp.add_argument("dir")
 
-    args = parser.parse_args(argv)
+    # 工厂套件命令
+    p_fc = sub.add_parser("factory-clean", help="工厂数据清洗")
+    p_fc.add_argument("csv", help="CSV 数据文件")
+    p_fc.add_argument("--method", choices=["drop", "zero", "mean"], default="drop", help="缺失值处理")
+    p_fc.add_argument("--outlier", choices=["iqr", "zscore"], default="iqr", help="异常值方法")
 
-    # JSON 输出 + 分级退出码
+    p_fs = sub.add_parser("factory-stats", help="工厂数据分析")
+    p_fs.add_argument("csv", help="CSV 数据文件")
+    p_fs.add_argument("--col", help="分析的数值列名")
+
+    p_fo = sub.add_parser("factory-onto", help="工厂本体建模")
+    p_fo.add_argument("csv", help="CSV 数据文件")
+    p_fo.add_argument("--entity", help="实体名")
+    p_fo.add_argument("--id", dest="id_col", help="主键列")
+    p_fo.add_argument("--relations", help="关系声明 JSON 文件")
+
+    args = parser.parse_args(argv)
     try:
         result = _dispatch(args)
         if result is not None:
-            print(json.dumps(result, ensure_ascii=False))
+            print(json.dumps(result, ensure_ascii=False, indent=2))
         return provider_mod.EXIT_OK
     except provider_mod.ProviderError as e:
         print(json.dumps({"error": str(e), "code": e.code}, ensure_ascii=False), file=sys.stderr)
@@ -61,40 +89,131 @@ def _dispatch(args):
         m = memory_mod.Memory()
         m.set_profile("created", _now())
         return {"init": True, "mem_dir": m.dir}
+    if cmd == "setup":
+        return _setup()
+    if cmd == "config":
+        return _config()
     if cmd == "import-obsidian":
         m = memory_mod.Memory()
-        n = m.import_markdown(args.dir)
-        return {"imported": n}
+        return {"imported": m.import_markdown(args.dir)}
     if cmd == "export-markdown":
         m = memory_mod.Memory()
         m.export_markdown(args.dir)
         return {"exported_to": args.dir}
     if cmd == "skill-add":
         m = memory_mod.Memory()
-        added = m.add_fact(args.exp, tags=["skill"])
-        return {"added": added}
+        return {"added": m.add_fact(args.exp, tags=["skill"])}
     if cmd == "run":
-        return _run(args.task)
+        return _run(args.task, args.tier)
+    if cmd == "factory-clean":
+        return _factory_clean(args)
+    if cmd == "factory-stats":
+        return _factory_stats(args)
+    if cmd == "factory-onto":
+        return _factory_onto(args)
     return {"error": "unknown command"}
 
 
-def _run(task: str):
-    """最小闭环：记忆装载 → provider 推理 → 记忆提交。"""
+def _run(task: str, tier: str = "auto"):
+    """循环五态：记忆装载 → skill 注入 → 推理 → 记忆提交。"""
+    from solo import agent as agent_mod
+    return agent_mod.run(task, tier=tier)
+
+
+def _setup():
+    """部署检查：环境 / 本地模型 / 配置 / 初始化。"""
+    import subprocess
+    checks = {}
+    # 1. Python 版本
+    checks["python"] = {"ok": sys.version_info >= (3, 9), "version": f"{sys.version_info.major}.{sys.version_info.minor}"}
+    # 2. 本地 Ollama
+    try:
+        import urllib.request
+        with urllib.request.urlopen("http://127.0.0.1:11434/api/tags", timeout=3) as r:
+            models = [m.get("name", "") for m in json.load(r).get("models", [])]
+        checks["ollama"] = {"ok": True, "models": models[:5]}
+    except Exception:
+        checks["ollama"] = {"ok": False, "error": "本地 Ollama 未运行（记忆语义检索需要）"}
+    # 3. 配置
+    cfg = provider_mod.load_config()
+    checks["config"] = {"ok": bool(cfg), "has_provider_yaml": bool(cfg)}
+    # 4. 记忆库
     m = memory_mod.Memory()
-    # 1. 记忆装载（热域画像 + 温域相关事实）
-    profile = m.profile_text()
-    related = m.search(task, top_k=3)
-    related_txt = "\n".join(f"- {f['text']}" for f in related)
+    checks["memory"] = {"ok": True, "dir": m.dir, "facts": len(m._load(m._facts_path, []))}
+    return {"checks": checks,
+            "all_ok": all(c.get("ok", True) for c in checks.values())}
 
-    # 2. 推理（默认本地，轻量优先）
-    prompt = f"任务: {task}\n\n我已知的用户画像:\n{profile}\n\n相关记忆:\n{related_txt}\n\n请给出处理建议(简洁,中文):"
-    p = provider_mod.Provider.from_config({})
-    text = p.complete(prompt, tier="local")
 
-    # 3. 记忆提交：任务有价值 → 记入事实层
-    m.add_fact(task, tags=["task"])
+def _config():
+    """查看/校验 provider.yaml 配置（脱敏显示）。"""
+    cfg = provider_mod.load_config()
+    if not cfg:
+        return {"configured": False,
+                "hint": "未找到 provider.yaml。复制 provider.yaml.example 为 provider.yaml 并填写。"}
+    p = cfg.get("provider", {})
+    out = {"configured": True}
+    for k in ("local", "remote", "embed"):
+        item = p.get(k, {})
+        clean_item = dict(item)
+        if "api_key_env" in clean_item:  # 只显示 env 名，不显示 key
+            clean_item["api_key_env"] = clean_item["api_key_env"] + " (从环境变量读)"
+        out[k] = clean_item
+    return out
 
-    return {"task": task, "suggestion": text, "memory_dir": m.dir}
+
+def _factory_clean(args):
+    """工厂数据清洗。"""
+    cl = clean_mod.DataCleaner()
+    rows = cl.load_csv(args.csv)
+    out = cl.clean(rows, fill_missing=args.method, outlier_method=args.outlier)
+    return {"input": len(rows), "output": len(out), "report": cl.report}
+
+
+def _factory_stats(args):
+    """工厂数据分析。"""
+    cl = clean_mod.DataCleaner()
+    rows = cl.load_csv(args.csv)
+    col = args.col
+    if not col:  # 自动选第一个数值列
+        types = {}
+        for c in rows[0].keys():
+            if rows[0].get(c, "").strip():
+                types[c] = cl.report.get("types", {}).get(c) or "text"
+        col = next((c for c, t in types.items() if t in ("integer", "float")), None)
+    if not col:
+        return {"error": "未找到数值列，用 --col 指定"}
+    values = [float(r[col]) for r in rows if r.get(col, "").strip() and _num(r.get(col))]
+    return {
+        "column": col,
+        "describe": stats_mod.describe(values),
+        "anomalies": stats_mod.detect_anomaly(values, method="iqr"),
+        "control_chart": stats_mod.control_chart(values),
+        "trend": stats_mod.trend(values),
+    }
+
+
+def _factory_onto(args):
+    """工厂本体建模。"""
+    o = ontology_mod.Ontology()
+    relations = None
+    if args.relations:
+        with open(args.relations, encoding="utf-8") as f:
+            relations = json.load(f)
+        # 兼容：relations 文件可能含 {实体名:{object_properties:...}}
+        if isinstance(relations, dict) and "object_properties" in relations:
+            relations = relations["object_properties"]
+    o.from_csv(args.csv, entity_name=args.entity, id_col=args.id_col, relations=relations)
+    o.build()
+    return {"entities": list(o.entities.keys()), "triples": len(o.triples),
+            "summary": o.entity_summary()}
+
+
+def _num(v):
+    try:
+        float(v)
+        return True
+    except (ValueError, TypeError):
+        return False
 
 
 def _now():
