@@ -1,0 +1,35 @@
+{
+  "factory_equipment": {
+    "object_properties": {
+      "device_type": {
+        "rel": "http://solo.local/ontology#hasType",
+        "target_class": "DeviceType",
+        "label": "设备类型"
+      },
+      "location": {
+        "rel": "http://solo.local/ontology#locatedIn",
+        "target_class": "Location",
+        "label": "位于"
+      },
+      "line_id": {
+        "rel": "http://solo.local/ontology#belongsToLine",
+        "target_class": "Line",
+        "label": "属于产线"
+      },
+      "manufacturer": {
+        "rel": "http://solo.local/ontology#manufacturedBy",
+        "target_class": "Manufacturer",
+        "label": "制造商"
+      }
+    }
+  },
+  "factory_workorders": {
+    "object_properties": {
+      "equipment_id": {
+        "rel": "http://solo.local/ontology#concernsEquipment",
+        "target_class": "factory_equipment",
+        "label": "关联设备"
+      }
+    }
+  }
+}

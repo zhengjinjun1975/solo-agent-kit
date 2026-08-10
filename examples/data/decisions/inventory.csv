@@ -1,0 +1,4 @@
+﻿product_id,stock,safety_stock,lead_time_days
+P01,50,100,7
+P02,20,25,5
+P03,300,50,10

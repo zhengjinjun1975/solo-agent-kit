@@ -14,7 +14,8 @@ venv/
 .env.*
 
 # 运行时数据（数据留在本地，不入仓库）
-data/
+/data/
+!examples/data/
 *.db
 *.sqlite
 *.sqlite3

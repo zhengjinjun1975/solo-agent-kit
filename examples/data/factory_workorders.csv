@@ -1,0 +1,6 @@
+wo_id,equipment_id,work_type,status,priority
+W001,D002,维护,待处理,高
+W002,D006,维修,进行中,中
+W003,D004,巡检,已完成,低
+W004,D002,维修,待处理,高
+W005,D001,维护,进行中,中
