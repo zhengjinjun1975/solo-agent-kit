@@ -54,8 +54,11 @@ def detect_anomaly(values: list, method: str = "zscore", threshold: float = 3.0)
     """异常检测：返回异常点索引+值。
 
     method: 'zscore' 距均值>3σ / 'iqr' 超出 Q1-1.5IQR 到 Q3+1.5IQR
+    空数据或数据过少返回 []（防 IndexError）。
     """
     vals = [float(v) for v in values if _num(v)]
+    if len(vals) < 4:  # IQR 需要至少 4 个值；zscore 需至少 3 个，统一防护
+        return []
     anomalies = []
     if method == "zscore":
         mean = sum(vals) / len(vals) if vals else 0

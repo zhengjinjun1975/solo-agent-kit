@@ -66,12 +66,16 @@ def main(argv=None):
     p_fo.add_argument("--id", dest="id_col", help="主键列")
     p_fo.add_argument("--relations", help="关系声明 JSON 文件")
 
-    args = parser.parse_args(argv)
     try:
+        args = parser.parse_args(argv)
         result = _dispatch(args)
         if result is not None:
             print(json.dumps(result, ensure_ascii=False, indent=2))
         return provider_mod.EXIT_OK
+    except SystemExit as e:
+        # argparse 未知命令/参数错误 → 用户错误(1)，不与 EXIT_NETWORK(2) 撞车
+        code = e.code if isinstance(e.code, int) and e.code not in (0, 2) else (provider_mod.EXIT_OK if e.code == 0 else provider_mod.EXIT_USER_ERR)
+        return code
     except provider_mod.ProviderError as e:
         print(json.dumps({"error": str(e), "code": e.code}, ensure_ascii=False), file=sys.stderr)
         return e.code

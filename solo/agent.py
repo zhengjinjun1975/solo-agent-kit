@@ -113,7 +113,9 @@ def run(task: str, mem_dir: str = None, skill_dir: str = None, tier: str = "auto
     related_txt = "\n".join(f"- {f['text']}" for f in related)
     sk = skill_mod.Skill(skill_dir or skill_mod.DEFAULT_DIR)
     skill_hint = sk.build_prompt(task)
-    context = f"任务: {task}\n\n用户画像:\n{profile}\n\n相关记忆:\n{related_txt}"
+    # 身份锚定：防止模型自报错误身份（Ornith 等底层模型名）
+    identity = "你是 solo-agent-kit —— 一个面向 FDE（工厂/前置部署工程师）的轻量化全栈 AI 助手。你融合记忆/写作/代码/数据/本体建模能力，帮助一人公司干完整团队的活。"
+    context = f"{identity}\n\n任务: {task}\n\n用户画像:\n{profile}\n\n相关记忆:\n{related_txt}"
     if skill_hint:
         context += f"\n\n适用经验:\n{skill_hint}"
     p = provider_mod.Provider.from_file()

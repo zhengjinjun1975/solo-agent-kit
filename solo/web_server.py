@@ -53,7 +53,9 @@ class SoloHandler(BaseHTTPRequestHandler):
         body = json.dumps(data, ensure_ascii=False).encode("utf-8")
         self.send_response(code)
         self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Access-Control-Allow-Origin", "*")
+        # CORS 收窄到本地（默认本地部署，不暴露 *）
+        self.send_header("Access-Control-Allow-Origin", "http://127.0.0.1:" + str(self.server.server_port) if hasattr(self.server, "server_port") else "null")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
@@ -136,15 +138,15 @@ class SoloHandler(BaseHTTPRequestHandler):
             self._json({"query": q, "results": results})
         elif path == "/api/code-overview":
             from solo import code as code_mod
-            d = qs.get("dir", [""])[0]
+            d = _safe_path(qs.get("dir", [""])[0])
             cg = code_mod.CodeGraph()
-            n = cg.index(d or ".")
+            n = cg.index(d or "solo")
             self._json({"indexed": n, "symbols": len(cg.symbols), "overview": cg.overview()})
         elif path == "/api/stats":
-            csv_path = qs.get("csv", [""])[0]
+            csv_path = _safe_path(qs.get("csv", [""])[0])
             col = qs.get("col", [None])[0]
             if not csv_path or not os.path.exists(csv_path):
-                self._json({"error": "csv not found"}, 400)
+                self._json({"error": "csv not found or outside project"}, 400)
                 return
             cl = clean_mod.DataCleaner()
             rows = cl.load_csv(csv_path)
@@ -194,7 +196,11 @@ class SoloHandler(BaseHTTPRequestHandler):
         elif path == "/api/clean":
             body = self._read_body()
             cl = clean_mod.DataCleaner()
-            rows = cl.load_csv(body.get("csv", ""))
+            csv_path = _safe_path(body.get("csv", ""))
+            if not csv_path or not os.path.exists(csv_path):
+                self._json({"error": "csv not found or outside project"}, 400)
+                return
+            rows = cl.load_csv(csv_path)
             out = cl.clean(rows, fill_missing=body.get("method", "drop"),
                            outlier_method=body.get("outlier", "iqr"))
             self._json({"input": len(rows), "output": len(out), "report": cl.report})
@@ -203,9 +209,17 @@ class SoloHandler(BaseHTTPRequestHandler):
             body = self._read_body()
             o = onto_mod.Ontology()
             relations = None
+            csv_path = _safe_path(body.get("csv", ""))
+            if not csv_path or not os.path.exists(csv_path):
+                self._json({"error": "csv not found or outside project"}, 400)
+                return
             if body.get("relations"):
                 import json as _json
-                with open(body["relations"], encoding="utf-8") as f:
+                rel_path = _safe_path(body["relations"])
+                if not rel_path:
+                    self._json({"error": "relations outside project"}, 400)
+                    return
+                with open(rel_path, encoding="utf-8") as f:
                     relations = _json.load(f)
                 if isinstance(relations, dict) and "object_properties" in relations:
                     relations = relations["object_properties"]
@@ -215,7 +229,7 @@ class SoloHandler(BaseHTTPRequestHandler):
                     if ent not in relations:
                         ent = next(iter(relations))
                     relations = relations[ent].get("object_properties", relations[ent])
-            o.from_csv(body.get("csv", ""), entity_name=body.get("entity"),
+            o.from_csv(csv_path, entity_name=body.get("entity"),
                        id_col=body.get("id"), relations=relations)
             o.build()
             self._json({"entities": list(o.entities.keys()), "triples": len(o.triples),
@@ -272,6 +286,25 @@ def _setup_checks() -> dict:
                         "facts": len(m._load(m._facts_path, []))}
     return {"checks": checks,
             "all_ok": all(c.get("ok", True) for c in checks.values())}
+
+
+def _safe_path(p: str) -> str:
+    """路径参数白名单：只允许项目内路径（默认本地部署，防任意文件读）。
+
+    项目根 = web_server.py 所在仓库根。绝对路径或超出项目根 → 返回 ""（调用方报错）。
+    """
+    if not p:
+        return ""
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # 仓库根
+    p = p.replace("\\", "/")
+    if os.path.isabs(p):
+        full = p
+    else:
+        full = os.path.join(root, p)
+    full = os.path.normpath(full)
+    if full.startswith(os.path.normpath(root)):
+        return full
+    return ""
 
 
 def _write_config(config: dict) -> bool:

@@ -13,7 +13,7 @@ import re
 # 排除目录
 SKIP_DIRS = {"__pycache__", ".venv", "node_modules", ".git", "dist", "build"}
 
-RE_DEF = re.compile(r"^(?:async\s+)?(?:def|class)\s+(\w+)", re.M)
+RE_DEF = re.compile(r"^(?:\s{0,16})(?:async\s+)?(?:def|class)\s+(\w+)", re.M)
 RE_IMPORT = re.compile(r"^\s*(?:from\s+([\w.]+)\s+import\s+([\w, ]*)|import\s+([\w.]+))", re.M)
 
 

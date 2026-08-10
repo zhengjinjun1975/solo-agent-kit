@@ -2,6 +2,15 @@
 
 所有显著变更记录在此。格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [0.5.1] - 2026-08-10
+
+### 修复(OpenClaw审查P0)
+- detect_anomaly 空数据/少数据防护(防IndexError)
+- CodeGraph RE_DEF 支持缩进 → 方法级符号索引(39→110)
+- agent chat兜底身份锚定(防模型自报Ornith)
+- web_server CORS收窄到本地 + 路径参数白名单(防任意文件读)
+- cli 退出码转译(未知命令2→1, 不与EXIT_NETWORK撞车)
+
 ## [0.5.0] - 2026-08-10
 
 ### 新增
