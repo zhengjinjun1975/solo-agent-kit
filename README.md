@@ -129,6 +129,23 @@ python examples/example_04_factory_ontology.py
 | `obsidian.py` | Obsidian 知识库集成：报告归档/检索/经验沉淀 | 零依赖 |
 | `visualize.py` | 数据可视化：SPC 控制图/趋势图/异常标记 | matplotlib(可选) |
 
+### 插件设计说明
+
+插件不是功能堆砌，而是**在零依赖内核之上的可降级能力层**。三个设计原则：
+
+**一、内核零依赖，插件可降级**
+核心套件（记忆/写作/代码/数据/建模）只用标准库，任何机器拉下来即用。插件承载"增强但不必需"的能力，依赖本机已装工具（matplotlib/文件系统），缺失时明确降级不崩溃：
+
+```bash
+solo plugins list          # 查看各插件可用性（obsidian/visualize 等）
+```
+
+**二、可靠优先，用本机已有的**
+插件优先复用本机已装工具，不引入脆弱依赖。Obsidian 集成直接用文件系统读写 vault（`D:/knowledge-base/obsidian-vault/`），因为 Obsidian 笔记应用无官方 CLI；可视化复用 matplotlib（本机已装），零新增依赖。
+
+**三、能力可扩展，注册表驱动**
+`plugins/__init__.py` 的注册表声明每个插件的依赖与能力。新增插件只需注册模块，`list_plugins()` 自动显示可用性。这是 FDE 套件"进厂区后按需加载能力"的机制：用不到的不装，装上的必须可靠。
+
 ## 配置
 
 本地与远端模型分层。复制 `provider.yaml.example` 为 `provider.yaml`：
