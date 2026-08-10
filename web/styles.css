@@ -29,12 +29,12 @@ body{font-family:-apple-system,"Segoe UI","Microsoft YaHei",system-ui,sans-serif
 /* 左导航 */
 .sidebar{padding:20px 16px;display:flex;flex-direction:column;gap:18px;overflow-y:auto;background:linear-gradient(180deg,#f8fafc,#ffffff);border-right:1px solid var(--border)}
 .logo{display:flex;align-items:center;gap:12px}
-.logo-icon{width:46px;height:46px;border-radius:14px;background:linear-gradient(135deg,var(--blue),var(--blue-soft),#7a5bf0);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 18px rgba(47,94,240,.4);flex-shrink:0;transition:transform .3s var(--ease)}
+.logo-icon{width:40px;height:40px;border-radius:14px;background:linear-gradient(135deg,var(--blue),var(--blue-soft),#7a5bf0);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 18px rgba(47,94,240,.4);flex-shrink:0;transition:transform .3s var(--ease)}
 .logo-icon:hover{transform:rotate(-6deg) scale(1.05)}
 .logo-icon .l-s{font-size:26px;font-weight:800;color:#fff;letter-spacing:-1px;line-height:1}
 .logo-icon .l-dot{width:7px;height:7px;border-radius:50%;background:var(--orange);position:relative;top:15px;left:-3px;box-shadow:0 0 8px var(--orange)}
-.logo-text h1{font-size:30px;font-weight:800;letter-spacing:-.5px;color:#1d4ed8;line-height:1.1}
-.logo-text span{font-size:14px;color:#475569;display:block;margin-top:6px;font-weight:600;line-height:1.5;word-break:break-word;max-width:230px}
+.logo-text h1{font-size:26px;font-weight:800;letter-spacing:-.5px;color:#1d4ed8;line-height:1.1}
+.logo-text span{font-size:12px;color:#475569;display:block;margin-top:6px;font-weight:600;line-height:1.5;word-break:break-word;max-width:230px}
 .logo .dot{width:10px;height:10px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--orange));box-shadow:0 0 12px rgba(108,140,255,.6)}
 .ng{margin-bottom:10px}
 .ng .lbl{font-size:13px;text-transform:uppercase;letter-spacing:.1em;color:#94a3b8;margin-bottom:9px;padding:0 10px;font-weight:700}
