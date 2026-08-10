@@ -357,6 +357,22 @@ class SoloHandler(BaseHTTPRequestHandler):
                     self._json(remote_mod.run_command(host, body.get("cmd", ""), user, port))
             except Exception as e:
                 self._json({"error": str(e)}, 500)
+        elif path == "/api/task":
+            # 工单闭环（FDE 问题管理）
+            from solo.task import Task
+            body = self._read_body()
+            t = Task()
+            cmd = body.get("cmd") or "new_issue"
+            if cmd == "new_issue":
+                self._json(t.new_issue(body.get("problem", ""), body.get("severity", "medium")))
+            elif cmd == "diagnose":
+                self._json(t.diagnose(body.get("id", ""), body.get("diagnosis", "")))
+            elif cmd == "resolve":
+                self._json(t.resolve_issue(body.get("id", ""), body.get("resolution", "")))
+            elif cmd == "status":
+                self._json(t.status(body.get("id", "")))
+            else:
+                self._json({"issues": t.list_issues()})
         elif path == "/api/run":
             body = self._read_body()
             from solo import agent as agent_mod

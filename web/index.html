@@ -50,6 +50,20 @@
           <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.2a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3h.1a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 1 1.5h.1a1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9v.1a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.2a1.7 1.7 0 0 0-1.5 1z"/></svg>
           配置</div>
       </div>
+      <div class="ng"><div class="lbl">运维</div>
+        <div class="ni o" data-cap="monitor">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 3v18h18"/><path d="M7 14l3-4 3 2 4-6 4 3"/></svg>
+          监控</div>
+        <div class="ni o" data-cap="logs">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+          日志</div>
+        <div class="ni o" data-cap="remote">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          远程</div>
+        <div class="ni o" data-cap="issue">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+          工单</div>
+      </div>
       <div class="ng"><div class="lbl">能力扩展</div>
         <div class="ni p" data-cap="skill">
           <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.9 6.3 6.9.8-5.1 4.7 1.4 6.8L12 17.8 5.9 20.6l1.4-6.8L2.2 9.1l6.9-.8z"/></svg>
@@ -112,8 +126,8 @@
       <div class="ds-card" onclick="openDsModal('stats')">
         <div class="ds-card-icon">📊</div>
         <div class="ds-card-body">
-          <div class="ds-card-title">选择数据文件</div>
-          <div class="ds-card-sub" id="browse-stats">点击选择 CSV / 数据库文件</div>
+          <div class="ds-card-title">选择数据文件（可多选）</div>
+          <div class="ds-card-sub" id="browse-stats">点击选择，Ctrl 多选多个文件</div>
         </div>
         <div class="ds-card-arrow">→</div>
       </div>
@@ -129,8 +143,8 @@
       <div class="ds-card" onclick="openDsModal('clean')">
         <div class="ds-card-icon">🧹</div>
         <div class="ds-card-body">
-          <div class="ds-card-title">选择数据文件</div>
-          <div class="ds-card-sub" id="browse-clean">点击选择 CSV / 数据库文件</div>
+          <div class="ds-card-title">选择数据文件（可多选）</div>
+          <div class="ds-card-sub" id="browse-clean">点击选择，Ctrl 多选多个文件</div>
         </div>
         <div class="ds-card-arrow">→</div>
       </div>
@@ -163,6 +177,51 @@
       <div id="browse-decisions" style="font-size:11px;margin-top:6px"></div>
       <div style="margin-top:6px"><button class="btn pri" onclick="runDecisionsDS()">生成决策建议</button></div>
       <div id="decisions-result" style="font-size:11px;margin-top:8px"></div>
+    </div>
+
+    <!-- 监控工作区（FDE 资源监控） -->
+    <div id="ws-monitor" style="display:none">
+      <div class="lbl">环境监控 — FDE 资源看板</div>
+      <button class="btn pri run" onclick="runMonitor()">📈 刷新监控</button>
+      <div id="monitor-result" style="font-size:12px;margin-top:10px"></div>
+    </div>
+
+    <!-- 日志工作区（FDE 日志诊断） -->
+    <div id="ws-logs" style="display:none">
+      <div class="lbl">日志诊断 — FDE 排障</div>
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <button class="btn" onclick="runLogs()">📋 全部日志</button>
+        <button class="btn" onclick="runLogs('ERROR')">🔴 错误</button>
+        <button class="btn" onclick="runLogs('WARN')">🟠 警告</button>
+      </div>
+      <div id="logs-result" style="font-size:11px;margin-top:10px;background:#f1f3f8;border:1px solid var(--border);border-radius:10px;padding:10px;max-height:400px;overflow:auto;font-family:Consolas,monospace"></div>
+    </div>
+
+    <!-- 远程运维工作区（FDE SSH） -->
+    <div id="ws-remote" style="display:none">
+      <div class="lbl">远程运维 — SSH 连接/执行</div>
+      <input id="rm-host" placeholder="主机 host (如 192.168.1.100)" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;margin-top:8px;background:#fff;color:var(--text)">
+      <input id="rm-user" placeholder="用户（留空=当前用户）" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;margin-top:6px;background:#fff;color:var(--text)">
+      <textarea id="rm-cmd" rows="2" placeholder="命令（如：cd /app && git pull）" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;margin-top:6px;background:#fff;color:var(--text);resize:vertical"></textarea>
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <button class="btn pri" onclick="runRemote('test')">🔌 测试连接</button>
+        <button class="btn" onclick="runRemote('exec')">⚡ 执行命令</button>
+        <button class="btn" onclick="runRemote('logs')">📋 远程日志</button>
+      </div>
+      <div id="remote-result" style="font-size:11px;margin-top:10px;background:#f1f3f8;border:1px solid var(--border);border-radius:10px;padding:10px;max-height:300px;overflow:auto;font-family:Consolas,monospace"></div>
+    </div>
+
+    <!-- 工单工作区（FDE 问题闭环） -->
+    <div id="ws-issue" style="display:none">
+      <div class="lbl">工单闭环 — triage→诊断→解决</div>
+      <textarea id="is-problem" rows="2" placeholder="问题描述（如：生产环境部署失败）" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;margin-top:8px;background:#fff;color:var(--text);resize:vertical"></textarea>
+      <select id="is-severity" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;margin-top:6px;background:#fff">
+        <option value="medium">严重度：中</option><option value="low">严重度：低</option>
+        <option value="high">严重度：高</option><option value="critical">严重度：紧急</option>
+      </select>
+      <button class="btn pri run" onclick="runIssueNew()" style="margin-top:8px">📝 新建工单</button>
+      <div style="margin-top:8px"><button class="btn" onclick="runIssueList()" style="width:100%">📋 工单列表</button></div>
+      <div id="issue-result" style="font-size:12px;margin-top:10px"></div>
     </div>
 
     <!-- 写作工作区 -->

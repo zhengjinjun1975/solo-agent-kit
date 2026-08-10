@@ -184,7 +184,7 @@ async function selectDataSource(cap, ex){
 
 // ===== 工作区切换：导航点击在右侧渲染对应工作区 =====
 function showWorkspace(ws){
-  ['status','clean','stats','ontology','decisions','writing','code','skill','config','setup'].forEach(id=>{
+  ['status','clean','stats','ontology','decisions','writing','code','skill','config','setup','monitor','logs','remote','issue'].forEach(id=>{
     const el=document.getElementById('ws-'+id);
     if(el) el.style.display = (id===ws)?'block':'none';
   });
@@ -195,7 +195,7 @@ document.querySelectorAll('.ni').forEach(n=>n.addEventListener('click',()=>{
   const cap=n.dataset.cap;
   if(cap==='chat'){ showWorkspace('status'); input.placeholder='自然语言指挥，AI路由全部套件'; input.focus(); return; }
   // 数据模块 + 工作区 → 右侧面板
-  if(['clean','stats','ontology','decisions','writing','code','skill','config','setup'].includes(cap)){
+  if(['clean','stats','ontology','decisions','writing','code','skill','config','setup','monitor','logs','remote','issue'].includes(cap)){
     showWorkspace(cap);
     // 数据工作区：恢复已选文件显示（不自动执行）
     if(['clean','stats','ontology','decisions'].includes(cap)){
@@ -640,5 +640,86 @@ function dsSelectTable(db,table){
   dsSelectedSource=db+'::'+table;
   document.getElementById('ds-selected-info').textContent=`✅ 已选数据库表：${table}`;
   document.getElementById('ds-confirm').disabled=false;
+}
+
+// ===== 运维工作区（FDE 现场能力）=====
+// 环境监控
+async function runMonitor(){
+  const out=document.getElementById('monitor-result');
+  out.innerHTML='⏳ 采集资源…';
+  const r=await api('/api/monitor');
+  if(r.error){out.innerHTML='❌ '+r.error;return;}
+  const cpu=r.cpu||{}, mem=r.memory||{}, proc=r.processes||{}, disk=r.disk||{};
+  const bar=(p)=>`<div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden;margin-top:4px"><div style="width:${Math.min(100,p||0)}%;height:100%;background:${(p||0)>85?'#e74c3c':(p||0)>70?'#e8890c':'var(--green)'};border-radius:4px"></div></div>`;
+  out.innerHTML=`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div style="background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:12px">
+        <div style="font-size:11px;color:var(--mute)">CPU 使用率</div>
+        <div style="font-size:24px;font-weight:700;color:var(--blue)">${cpu.percent??'—'}%</div>
+        ${bar(cpu.percent)}
+        <div style="font-size:10px;color:var(--mute);margin-top:4px">${cpu.cores||'?'} 核</div>
+      </div>
+      <div style="background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:12px">
+        <div style="font-size:11px;color:var(--mute)">内存使用率</div>
+        <div style="font-size:24px;font-weight:700;color:var(--orange)">${mem.percent??'—'}%</div>
+        ${bar(mem.percent)}
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--mute)">磁盘：${(disk.parts||[]).map(p=>`${p.mount} ${p.percent}%`).join(' · ')||'—'}</div>
+    <div style="font-size:11px;color:var(--mute);margin-top:6px">进程：${proc.count||'?'} 个 · Top: ${(proc.top||[]).slice(0,4).map(p=>p.name).join(' / ')}</div>`;
+}
+// 日志诊断
+async function runLogs(level){
+  const out=document.getElementById('logs-result');
+  out.innerHTML='⏳ 加载日志…';
+  const q=level?`?level=${level}`:'';
+  const r=await api('/api/logs'+q);
+  if(r.error){out.innerHTML='❌ '+r.error;return;}
+  const logs=r.logs||[];
+  const color={INFO:'var(--blue)',WARN:'var(--orange)',ERROR:'var(--red)'};
+  out.innerHTML=logs.length?logs.map(l=>`<div style="white-space:pre-wrap"><span style="color:${color[l.level]||'var(--text)'}">[${l.level}]</span> ${esc(l.msg)}</div>`).join('')
+    :'<div style="color:var(--mute)">暂无日志</div>';
+}
+// 远程运维
+async function runRemote(action){
+  const out=document.getElementById('remote-result');
+  const host=document.getElementById('rm-host').value.trim();
+  if(!host){out.innerHTML='⚠️ 请输入主机';return;}
+  out.innerHTML='⏳ '+({test:'测试连接',exec:'执行命令',logs:'获取日志'}[action]||'执行')+'…';
+  const body={action,host,user:document.getElementById('rm-user').value.trim()||undefined};
+  if(action!=='test') body.cmd=document.getElementById('rm-cmd').value.trim();
+  const r=await api('/api/remote',{method:'POST',body:JSON.stringify(body)});
+  if(r.error){out.innerHTML='❌ '+r.error;return;}
+  out.innerHTML=action==='test'
+    ? `<div style="color:${r.ok?'var(--green)':'var(--red)'};font-weight:600">${r.ok?'✅ 连接成功':'❌ 连接失败'} ${r.host||''}</div>${r.error?`<div style="color:var(--red)">${esc(r.error)}</div>`:''}`
+    : `<div style="font-size:11px;color:var(--mute);margin-bottom:6px">${esc(r.command||'')} → 退出码 ${r.exit_code}</div><pre style="white-space:pre-wrap">${esc(r.stdout||r.error||'')}</pre>`;
+}
+// 工单
+async function runIssueNew(){
+  const out=document.getElementById('issue-result');
+  const problem=document.getElementById('is-problem').value.trim();
+  if(!problem){out.innerHTML='⚠️ 请输入问题描述';return;}
+  const severity=document.getElementById('is-severity').value;
+  out.innerHTML='⏳ 创建工单…';
+  const r=await api('/api/task',{method:'POST',body:JSON.stringify({cmd:'new_issue',problem,severity})});
+  if(r.error){out.innerHTML='❌ '+r.error;return;}
+  out.innerHTML=`<div style="background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:12px">
+    <div style="font-weight:600">📝 工单 #${esc(r.id||'')}</div>
+    <div style="font-size:12px;color:var(--mute);margin-top:4px">triage: <b style="color:var(--blue)">${esc(r.triage||'')}</b> · 严重度: ${esc(r.severity||'')}</div>
+    <div style="font-size:11px;margin-top:6px">${esc(r.problem||'')}</div>
+  </div>`;
+  document.getElementById('is-problem').value='';
+}
+async function runIssueList(){
+  const out=document.getElementById('issue-result');
+  out.innerHTML='⏳ 加载工单…';
+  const r=await api('/api/task?cmd=list_issues');
+  if(r.error){out.innerHTML='❌ '+r.error;return;}
+  const issues=r.issues||[];
+  const stateColor={open:'var(--red)',diagnosed:'var(--orange)',resolved:'var(--green)'};
+  out.innerHTML=issues.length?issues.map(i=>`<div style="background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:6px">
+    <div style="font-size:12px"><b>#${esc(i.id||'')}</b> <span style="color:var(--mute)">${esc(i.triage||'')}</span> <span style="color:${stateColor[i.state]||'var(--text)'}">[${esc(i.state||'')}]</span></div>
+    <div style="font-size:11px;color:var(--mute);margin-top:3px">${esc(i.problem||'')}</div>
+  </div>`).join(''):'<div style="color:var(--green)">✅ 无未关闭工单</div>';
 }
 
