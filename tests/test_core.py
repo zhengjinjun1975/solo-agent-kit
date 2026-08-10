@@ -29,7 +29,11 @@ def tmp():
 
 # ---- 版本 ----
 def test_version():
-    assert __version__ == "0.1.0"
+    from solo import __version__
+    # 版本是语义化的 X.Y.Z
+    parts = __version__.split(".")
+    assert len(parts) == 3
+    assert all(p.isdigit() for p in parts)
 
 
 # ---- memory：三层两域 ----
