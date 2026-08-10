@@ -68,7 +68,13 @@ class SoloHandler(BaseHTTPRequestHandler):
         else:
             path = path.lstrip("/")
         full = os.path.normpath(os.path.join(web_dir, path))
-        if not full.startswith(os.path.normpath(web_dir)) or not os.path.exists(full):
+        # 路径穿越防护: 用 commonpath 检查 full 确实在 web_dir 内(含分隔符边界, 防 web_evil 同前缀绕过)
+        web_dir_norm = os.path.normpath(web_dir)
+        try:
+            inside = os.path.commonpath([full, web_dir_norm]) == web_dir_norm
+        except ValueError:
+            inside = False
+        if not inside or not os.path.exists(full):
             self._json({"error": "not found"}, 404)
             return
         ext = os.path.splitext(full)[1]

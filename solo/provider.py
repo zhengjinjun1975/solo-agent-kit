@@ -44,7 +44,8 @@ class Provider:
     def __init__(self, local=None, remote=None, embed=None):
         self.local = local or {"type": "ollama", "base_url": "http://127.0.0.1:11434", "model": "ornith:latest"}
         self.remote = remote or {}
-        self.embed = embed or {"type": "ollama", "base_url": "http://127.0.0.1:11434", "model": "nomic-embed-text:latest"}
+        # 注意: 不能叫 self.embed——会遮蔽同名方法 embed()。配置用 embed_cfg。
+        self.embed_cfg = embed or {"type": "ollama", "base_url": "http://127.0.0.1:11434", "model": "nomic-embed-text:latest"}
 
     @classmethod
     def from_config(cls, config: dict) -> "Provider":
@@ -79,7 +80,7 @@ class Provider:
 
     def embed(self, text: str) -> list:
         """文本嵌入向量（本地，记忆不泄露）。"""
-        cfg = self.embed
+        cfg = self.embed_cfg
         if cfg.get("type") == "ollama":
             return self._ollama_embed(cfg, text)
         raise ProviderError("嵌入仅支持本地 ollama", EXIT_USER_ERR)
