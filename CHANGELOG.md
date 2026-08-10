@@ -2,7 +2,7 @@
 
 所有显著变更记录在此。格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
-## [0.9.0] - 2026-08-10
+## [0.8.2] - 2026-08-10
 
 ### 新增(CodeAgent 全链路能力整合 + README 重写)
 - solo/code_agent.py: 代码生成/审查/测试全链路(借鉴CodeAgent方法论,独立实现,零依赖)

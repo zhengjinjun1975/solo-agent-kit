@@ -654,6 +654,16 @@ class SoloHandler(BaseHTTPRequestHandler):
             from solo import gen as gen_mod
             body = self._read_body()
             try:
+                if body.get("kind") == "code-agent":
+                    # CodeAgent 全链路: 生成+审查+测试
+                    from solo import code_agent as ca_mod
+                    ca = ca_mod.CodeAgent()
+                    out = ca.implement(body.get("topic", ""), language=body.get("language", "python"))
+                    self._json({"output": out.get("files", {}).get("main.py", ""),
+                                "score": out.get("score"),
+                                "issues": [i["title"] for i in out.get("issues", [])][:10],
+                                "summary": out.get("summary", "")})
+                    return
                 if body.get("kind") in ("readme", "guide", "docstring"):
                     out = gen_mod.generate_doc(body.get("topic", ""), kind=body.get("kind"))
                 else:
