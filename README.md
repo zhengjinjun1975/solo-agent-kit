@@ -43,6 +43,9 @@ python examples/example_02_knowledge_query.py "阀门厂"
 
 # 场景③：开源发布前检查（脱敏扫描+代码影响分析+版本核查）
 python examples/example_03_oss_preflight.py <项目目录>
+
+# 场景④：工厂级本体建模（设备台账+关系声明→实体关系本体→结构化查询）
+python examples/example_04_factory_ontology.py
 ```
 
 ## 核心能力

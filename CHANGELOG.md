@@ -19,8 +19,8 @@
   - `agent.py`：循环五态最小实现（记忆装载+skill注入+推理+记忆提交）
   - `cli.py`：solo init/run/skill-add/import-obsidian/export-markdown/version
 - `provider.yaml.example`：模型配置模板（key 从环境变量读，不入仓库）
-- `tests/`：pytest 冒烟套件（12 项，覆盖全部模块核心路径）
-- `examples/`：一人公司 3 个真实场景（写推文/查知识/开源检查，零依赖跑通）
+- `tests/`：pytest 冒烟套件（13 项，覆盖全部模块 + 工厂本体关系建模）
+- `examples/`：一人公司 4 个真实场景（写推文/查知识/开源检查/工厂本体建模）
 - `.github/workflows/ci.yml`：轻量 CI（Python 3.9/3.11 + pytest）
 
 ### 修复

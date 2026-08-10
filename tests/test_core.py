@@ -80,6 +80,39 @@ def test_ontology_csv(tmp):
     assert hits and "泵" in hits[0][2]
 
 
+def test_factory_ontology_relations(tmp):
+    """工厂级本体：关系建模 + 实体间导航（FDE 核心）。"""
+    csvp = os.path.join(tmp, "equip.csv")
+    with open(csvp, "w", encoding="utf-8") as f:
+        f.write("id,device_type,line_id,status\n"
+                "D001,空压机,A线,运行中\n"
+                "D002,空压机,A线,待维护\n"
+                "D003,泵,B线,运行中\n")
+    relations = {
+        "device_type": {"rel": "http://solo.local/ontology#hasType",
+                        "target_class": "DeviceType", "label": "设备类型"},
+        "line_id": {"rel": "http://solo.local/ontology#belongsToLine",
+                    "target_class": "Line", "label": "属于产线"},
+    }
+    o = ontology_mod.Ontology()
+    o.from_csv(csvp, entity_name="equip", id_col="id", relations=relations)
+    o.build()
+
+    # 实体间导航（对象属性）
+    line = o.query("equip", "D001", "line_id")
+    assert line == ["Line:A线"], f"line={line}"
+    typ = o.query("equip", "D002", "device_type")
+    assert typ == ["DeviceType:空压机"], f"typ={typ}"
+
+    # 目标类已建（build 补全）
+    assert "Line" in o.entities and "DeviceType" in o.entities
+
+    # 待维护设备（结构化查询）
+    maintain = [s.split(":")[-1] for s, p, v in o.triples
+                if p.endswith("status") and v == "待维护"]
+    assert maintain == ["D002"], f"maintain={maintain}"
+
+
 # ---- skill：可复用经验 ----
 def test_skill_match(tmp):
     s = skill_mod.Skill(dir=os.path.join(tmp, "skills"))
