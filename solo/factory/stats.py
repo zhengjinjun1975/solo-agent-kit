@@ -128,10 +128,12 @@ def control_chart(values: list) -> dict:
     ucl, lcl = mean + 3 * std, mean - 3 * std
     out_of_control = [{"index": i, "value": round(v, 3), "violation": "UCL" if v > ucl else "LCL"}
                       for i, v in enumerate(vals) if v > ucl or v < lcl]
+    # 数据点序列（供前端画真实折线，最多取前100点避免过大）
+    points = [{"index": i, "value": round(v, 3)} for i, v in enumerate(vals[:100])]
     return {
         "mean": round(mean, 3), "std": round(std, 3),
         "ucl": round(ucl, 3), "lcl": round(lcl, 3),
-        "out_of_control": out_of_control,
+        "out_of_control": out_of_control, "points": points,
     }
 
 

@@ -261,28 +261,47 @@ async function runStatsDS(){
   const res=await api('/api/stats',{method:'POST',body:JSON.stringify({...body,col})});
   if(res.error){out.innerHTML='❌ '+res.error;return;}
   const d=res.describe||{}, cc=res.control_chart||{};
-  out.innerHTML=`<b>分析报告 — 列「${res.column}」</b><br>
-    · 均值 ${d.mean} · 中位数 ${d.median} · 标准差 ${d.std}<br>
-    · min ${d.min} · max ${d.max}<br>
-    · ${(res.anomalies||[]).length} 异常点 · ${(cc.out_of_control||[]).length} 控制图越限`;
+  // 报表式指标卡片（常规数据工具表达）
+  const metric=(label,val,color)=>`<div style="flex:1;min-width:70px;background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:8px;text-align:center"><div style="font-size:10px;color:var(--mute)">${label}</div><div style="font-size:16px;font-weight:700;color:${color};margin-top:2px">${val}</div></div>`;
+  out.innerHTML=`<div style="margin-bottom:8px"><b style="font-size:13px">📊 分析报告 — ${res.column}</b><span style="font-size:11px;color:var(--mute);margin-left:8px">共 ${d.count} 个样本</span></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+      ${metric('均值', d.mean, 'var(--blue)')}
+      ${metric('中位数', d.median, 'var(--blue)')}
+      ${metric('标准差', d.std, 'var(--blue)')}
+      ${metric('最小值', d.min, 'var(--green)')}
+      ${metric('最大值', d.max, 'var(--orange)')}
+    </div>
+    <div style="font-size:11px;color:var(--mute)">⚠️ ${(res.anomalies||[]).length} 异常点 · 📈 控制图 ${(cc.out_of_control||[]).length} 点越限</div>`;
   chart.innerHTML=drawControlChart(res.column, cc);
 }
 
 // SPC 控制图 SVG
 function drawControlChart(col, cc){
   if(!cc||cc.ucl===undefined)return'';
-  const W=280,H=90,P=8;
+  const W=280,H=100,P=12;
   const mean=cc.mean,ucl=cc.ucl,lcl=cc.lcl;
-  const range=Math.max(ucl-mean,mean-lcl)*1.2||1;
-  const y=v=>P+(H-2*P)*(1-(v-(mean-range))/(2*range));
+  const pts=cc.points||[];
+  const all=[...pts.map(p=>p.value),mean,ucl,lcl];
+  const lo=Math.min(...all), hi=Math.max(...all);
+  const range=(hi-lo)||1;
+  const y=v=>P+(H-2*P)*(1-(v-lo)/(range*1.15));
+  const x=i=>P+(pts.length>1?(i*(W-2*P)/(pts.length-1)):(W/2));
+  // 数据点折线
+  let line='', dots='';
+  if(pts.length>1){
+    line=pts.map((p,i)=>`${i?'L':'M'}${x(p.index).toFixed(1)},${y(p.value).toFixed(1)}`).join(' ');
+    dots=pts.map(p=>`<circle cx="${x(p.index).toFixed(1)}" cy="${y(p.value).toFixed(1)}" r="2" fill="#2f5ef0"/>`).join('');
+  }
   return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
-    <line x1="${P}" y1="${y(mean)}" x2="${W-P}" y2="${y(mean)}" stroke="#3b6ef6" stroke-width="1" stroke-dasharray="3,3"/>
+    <line x1="${P}" y1="${y(mean)}" x2="${W-P}" y2="${y(mean)}" stroke="#3b6ef6" stroke-width="1.2" stroke-dasharray="4,3"/>
     <line x1="${P}" y1="${y(ucl)}" x2="${W-P}" y2="${y(ucl)}" stroke="#dc2626" stroke-width="1"/>
     <line x1="${P}" y1="${y(lcl)}" x2="${W-P}" y2="${y(lcl)}" stroke="#dc2626" stroke-width="1"/>
-    <text x="${W-P-4}" y="${y(ucl)-2}" fill="#dc2626" font-size="7">UCL ${ucl}</text>
-    <text x="${W-P-4}" y="${y(lcl)+8}" fill="#dc2626" font-size="7">LCL ${lcl}</text>
+    <text x="${W-4}" y="${y(ucl)-2}" fill="#dc2626" font-size="7" text-anchor="end">UCL ${ucl}</text>
+    <text x="${W-4}" y="${y(lcl)+8}" fill="#dc2626" font-size="7" text-anchor="end">LCL ${lcl}</text>
     <text x="2" y="${y(mean)-2}" fill="#3b6ef6" font-size="7">μ ${mean}</text>
-    ${(cc.out_of_control||[]).map((o,i)=>`<circle cx="${P+ (o.index*8 % (W-2*P))}" cy="${y(o.value)}" r="3" fill="#dc2626"/>`).join('')}
+    ${line?`<path d="${line}" fill="none" stroke="#2f5ef0" stroke-width="1.5" opacity="0.7"/>`:''}
+    ${dots}
+    ${(cc.out_of_control||[]).map(o=>`<circle cx="${x(o.index).toFixed(1)}" cy="${y(o.value).toFixed(1)}" r="4" fill="#dc2626"/>`).join('')}
   </svg>`;
 }
 
