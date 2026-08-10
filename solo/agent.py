@@ -136,6 +136,14 @@ def run(task: str, mem_dir: str = None, skill_dir: str = None, tier: str = "auto
     remote_ready = bool(p.remote and p.remote.get("api_key_env")
                         and os.environ.get(p.remote.get("api_key_env")))
     tier = "remote" if (complex_task and remote_ready) else "local"
-    text = p.complete(context + "\n\n请给出简洁处理建议(中文):", tier=tier)
+    # 配置健康检查：防止模型编造配置类信息（如 API key 名）
+    cfg_ok = bool(provider_mod.load_config())
+    if not cfg_ok:
+        return {"intent": "chat", "tier": tier, "config_unready": True,
+                "suggestion": "⚠️ 模型未配置。请运行 `solo setup` 检查环境，并按提示配置 provider.yaml（本地 ornith / 远端 DeepSeek，key 从环境变量读）。",
+                "memory_dir": m.dir}
+    # 明确引导：模型不得编造配置/环境信息，只答能力范围内
+    guard = "\n\n重要约束：若用户询问配置、API key、环境变量、模型设置等，不要猜测或编造，统一指引运行 `solo setup` 和 `solo config` 查看。只回答你实际知道的、能力范围内的事。"
+    text = p.complete(context + guard + "\n\n请给出简洁回复(中文):", tier=tier)
     m.add_fact(task, tags=["task"])
     return {"intent": "chat", "suggestion": text, "tier": tier, "memory_dir": m.dir}
