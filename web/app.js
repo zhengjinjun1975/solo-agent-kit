@@ -427,11 +427,11 @@ async function browseDir(dir){
   const res=await api('/api/browse?dir='+encodeURIComponent(dir));
   let html='';
   // 盘符导航（硬盘级）
-  if(res.drives&&res.drives.length) html+=`<div style="font-size:11px;color:var(--mute);margin-bottom:4px">💽 硬盘：</div>`+(res.drives||[]).map(d=>`<div class="ds-item dir" onclick="browseDir('${d.path}')">💽 ${d.name}</div>`).join('');
+  if(res.drives&&res.drives.length) html+=`<div style="font-size:11px;color:var(--mute);margin-bottom:4px">💽 硬盘：</div>`+(res.drives||[]).map(d=>`<div class="ds-item dir" onclick="browseDir(this.dataset.p)" data-p="${d.path}">💽 ${d.name}</div>`).join('');
   // 上级目录
-  if(res.parent) html+=`<div class="ds-item dir" onclick="browseDir('${res.parent}')">📁 .. (上级)</div>`;
-  (res.dirs||[]).forEach(d=>{html+=`<div class="ds-item dir" onclick="browseDir('${d.path}')">📁 ${d.name}</div>`;});
-  (res.files||[]).forEach(f=>{html+=`<div class="ds-item file" onclick="dsSelectFile('${f.path}')">📄 ${f.name}</div>`;});
+  if(res.parent) html+=`<div class="ds-item dir" onclick="browseDir(this.dataset.p)" data-p="${res.parent}">📁 .. (上级)</div>`;
+  (res.dirs||[]).forEach(d=>{html+=`<div class="ds-item dir" onclick="browseDir(this.dataset.p)" data-p="${d.path}">📁 ${d.name}</div>`;});
+  (res.files||[]).forEach(f=>{html+=`<div class="ds-item file" onclick="dsSelectFile(this.dataset.p)" data-p="${f.path}">📄 ${f.name}</div>`;});
   box.innerHTML=html||'<div style="color:var(--mute)">此目录无数据文件</div>';
 }
 function dsSelectFile(path){
