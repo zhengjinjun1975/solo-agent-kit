@@ -66,6 +66,17 @@ def main(argv=None):
     p_fo.add_argument("--id", dest="id_col", help="主键列")
     p_fo.add_argument("--relations", help="关系声明 JSON 文件")
 
+    # 任务状态控制面
+    p_tn = sub.add_parser("task-new", help="新建任务")
+    p_tn.add_argument("goal", help="任务目标")
+    p_ts = sub.add_parser("task-status", help="查看任务状态")
+    p_ts.add_argument("tid", nargs="?", help="任务id(缺省列出所有)")
+    p_tg = sub.add_parser("task-gate", help="记录决策门")
+    p_tg.add_argument("tid")
+    p_tg.add_argument("question", help="待确认问题")
+    p_tr = sub.add_parser("task-resolve", help="解决所有待确认门")
+    p_tr.add_argument("tid")
+
     try:
         args = parser.parse_args(argv)
         result = _dispatch(args)
@@ -114,6 +125,25 @@ def _dispatch(args):
         return _factory_stats(args)
     if cmd == "factory-onto":
         return _factory_onto(args)
+    if cmd == "task-new":
+        from solo.task import Task
+        t = Task()
+        task = t.new(args.goal)
+        return {"id": task["id"], "goal": task["goal"], "state": task["state"]}
+    if cmd == "task-status":
+        from solo.task import Task
+        t = Task()
+        if args.tid:
+            return t.status(args.tid)
+        return {"tasks": t.list()}
+    if cmd == "task-gate":
+        from solo.task import Task
+        t = Task()
+        return t.gate(args.tid, args.question)
+    if cmd == "task-resolve":
+        from solo.task import Task
+        t = Task()
+        return t.resolve(args.tid)
     return {"error": "unknown command"}
 
 

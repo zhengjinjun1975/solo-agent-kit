@@ -10,6 +10,8 @@ v2 升级：LLM 意图识别（provider 远端）。
 """
 from __future__ import annotations
 
+import os
+
 from solo import memory as memory_mod
 from solo import provider as provider_mod
 from solo import skill as skill_mod
@@ -19,6 +21,7 @@ from solo.factory import ontology as ontology_mod
 
 # 意图 → 处理函数 路由表
 INTENTS = {
+    "task": ["新建任务", "记录任务", "task-new", "决策门", "任务状态", "跟进任务", "建一个任务"],
     "memory_search": ["查记忆", "回忆", "我记得", "记忆检索", "查一查记忆"],
     "clean": ["清洗", "clean", "去重", "缺失", "异常值", "数据清洗"],
     "stats": ["分析", "stats", "统计", "趋势", "spc", "控制图", "数据分析", "describe", "看 "],
@@ -106,6 +109,14 @@ def run(task: str, mem_dir: str = None, skill_dir: str = None, tier: str = "auto
         res = _setup_checks()
         res["intent"] = "setup"
         return res
+    if intent == "task":
+        from solo.task import Task
+        t = Task()
+        task = t.new(task)
+        # 自动 predict（决策可观察性最小种子）：记录预期，供后续验证
+        t.predict(task["id"], f"任务「{task['goal']}」将被推进")
+        return {"intent": "task", "id": task["id"], "goal": task["goal"],
+                "state": task["state"], "prediction": task["id"]}
 
     # ---- 兜底：对话（记忆装载 → 推理 → 记忆提交）----
     profile = m.profile_text()
@@ -119,7 +130,12 @@ def run(task: str, mem_dir: str = None, skill_dir: str = None, tier: str = "auto
     if skill_hint:
         context += f"\n\n适用经验:\n{skill_hint}"
     p = provider_mod.Provider.from_file()
-    # 兜底对话固定走本地（对话是高频轻量，不因 context 长误判复杂走远端）
-    text = p.complete(context + "\n\n请给出简洁处理建议(中文):", tier="local")
+    # agent 层模型分层（P1-9）：按任务复杂度选模型，而非 context 长度
+    # 简单对话/短任务 → 本地(快/免费)；复杂任务(长文/报告/复杂分析) → 远端(强)
+    complex_task = any(w in task for w in ("写一篇", "报告", "深度分析", "长文", "方案", "复盘", "论文"))
+    remote_ready = bool(p.remote and p.remote.get("api_key_env")
+                        and os.environ.get(p.remote.get("api_key_env")))
+    tier = "remote" if (complex_task and remote_ready) else "local"
+    text = p.complete(context + "\n\n请给出简洁处理建议(中文):", tier=tier)
     m.add_fact(task, tags=["task"])
-    return {"intent": "chat", "suggestion": text, "memory_dir": m.dir}
+    return {"intent": "chat", "suggestion": text, "tier": tier, "memory_dir": m.dir}

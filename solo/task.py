@@ -16,7 +16,8 @@ STATES = ("todo", "doing", "waiting", "done", "cancelled")
 
 
 def _slug(s: str) -> str:
-    return re.sub(r"[^A-Za-z0-9_-]", "_", s.strip())[:40] or "task"
+    """生成任务 id：保留字母数字/中文/下划线，去特殊字符。"""
+    return re.sub(r"[^\w\u4e00-\u9fff\-]", "_", s.strip())[:40] or "task"
 
 
 class Task:
