@@ -182,12 +182,14 @@ def _supplier_score(data, rule, thr):
     return out
 
 
-def run_decisions(data: dict, rules_path: str = None) -> dict:
+def run_decisions(data: dict, rules_path: str = None, model: dict = None) -> dict:
     """执行声明式决策规则，返回可解释行动清单。
 
     data: {表名: [行...]}
     rules_path: decisions.json（默认 ~/.solo/decisions.json，可复制默认）
-    返回: {"decisions": [{module, id, name, entity, action, reason, level}], "total"}
+    model: 可选本体模型（ontology.from_schema 返回），自动提取企业实体表名，
+           用于决策与本体打通（哪些实体参与决策）。
+    返回: {"decisions": [...], "total": N, "entities": 参与决策的企业实体}
     """
     rules_path = rules_path or os.path.join(os.path.expanduser("~"), ".solo", "decisions.json")
     if not os.path.exists(rules_path):
@@ -206,7 +208,13 @@ def run_decisions(data: dict, rules_path: str = None) -> dict:
             for d in fn(data, rule, thr):
                 decisions.append({"module": module, "id": rule.get("id", ""),
                                   "name": rule.get("name", ""), **d})
-    return {"decisions": decisions, "total": len(decisions)}
+    # 本体打通：提取参与决策的企业实体（从本体 model）
+    entities = []
+    if model and model.get("object_types"):
+        for ot in model["object_types"]:
+            entities.append({"id": ot.get("id"), "table": ot.get("table"),
+                             "label": ot.get("label", ot.get("id"))})
+    return {"decisions": decisions, "total": len(decisions), "entities": entities}
 
 
 # 内置默认规则（复制到 ~/.solo/decisions.json 可自定义）

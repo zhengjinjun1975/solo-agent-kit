@@ -607,7 +607,7 @@ class SoloHandler(BaseHTTPRequestHandler):
             if not data:
                 self._json({"error": "无数据源"}, 400)
                 return
-            res = dec_mod.run_decisions(data)
+            res = dec_mod.run_decisions(data, model=body.get("model"))
             res["tables"] = list(data.keys())
             self._json(res)
         elif path == "/api/memory-add":
