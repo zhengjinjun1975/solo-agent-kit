@@ -30,6 +30,21 @@ solo init                     # 初始化记忆库
 solo run "写一篇公众号推文"    # 走完整方法论
 ```
 
+## 真实场景示例（证明"轻≠不行"）
+
+`examples/` 演示一人公司的 3 个真实场景（零依赖跑通）：
+
+```bash
+# 场景①：写公众号推文（记忆装载→生成→六维检查→提交）
+python examples/example_01_wechat_post.py "本体驱动的知识管理"
+
+# 场景②：查知识（本体优先检索：实体关系而非相似文本）
+python examples/example_02_knowledge_query.py "阀门厂"
+
+# 场景③：开源发布前检查（脱敏扫描+代码影响分析+版本核查）
+python examples/example_03_oss_preflight.py <项目目录>
+```
+
 ## 核心能力
 
 | 模块 | 能力 | 说明 |

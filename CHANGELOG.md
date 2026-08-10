@@ -20,6 +20,8 @@
   - `cli.py`：solo init/run/skill-add/import-obsidian/export-markdown/version
 - `provider.yaml.example`：模型配置模板（key 从环境变量读，不入仓库）
 - `tests/`：pytest 冒烟套件（12 项，覆盖全部模块核心路径）
+- `examples/`：一人公司 3 个真实场景（写推文/查知识/开源检查，零依赖跑通）
+- `.github/workflows/ci.yml`：轻量 CI（Python 3.9/3.11 + pytest）
 
 ### 修复
 - memory 去重失效：add_fact 未存 h 字段导致重复写入，现已存
