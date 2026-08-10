@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 
 from solo import __version__
@@ -76,6 +77,12 @@ def main(argv=None):
     p_tg.add_argument("question", help="待确认问题")
     p_tr = sub.add_parser("task-resolve", help="解决所有待确认门")
     p_tr.add_argument("tid")
+
+    # 备份恢复（P2-3）
+    p_bk = sub.add_parser("backup", help="备份记忆/技能/任务")
+    p_bk.add_argument("dest", nargs="?", help="备份目录(默认 ~/.solo/backups)")
+    p_rs = sub.add_parser("restore", help="恢复备份")
+    p_rs.add_argument("src", help="备份目录")
 
     try:
         args = parser.parse_args(argv)
@@ -144,7 +151,47 @@ def _dispatch(args):
         from solo.task import Task
         t = Task()
         return t.resolve(args.tid)
+    if cmd == "backup":
+        return _backup(args.dest)
+    if cmd == "restore":
+        return _restore(args.src)
     return {"error": "unknown command"}
+
+
+def _backup(dest: str = None) -> dict:
+    """P2-3: 备份记忆/技能/任务数据。"""
+    import shutil
+    import datetime
+    home = os.path.expanduser("~")
+    src_dirs = {"memory": os.path.join(home, ".solo", "memory"),
+                "skills": os.path.join(home, ".solo", "skills"),
+                "tasks": os.path.join(home, ".solo", "tasks")}
+    dest_dir = dest or os.path.join(home, ".solo", "backups",
+                                    datetime.datetime.now().strftime("%Y%m%d_%H%M%S"))
+    copied = {}
+    for name, src in src_dirs.items():
+        if os.path.exists(src):
+            shutil.copytree(src, os.path.join(dest_dir, name), dirs_exist_ok=True)
+            copied[name] = True
+    return {"backup_dir": dest_dir, "copied": list(copied.keys())}
+
+
+def _restore(src: str) -> dict:
+    """P2-3: 从备份目录恢复。"""
+    import shutil
+    home = os.path.expanduser("~")
+    if not os.path.exists(src):
+        return {"error": f"备份目录不存在: {src}"}
+    targets = {"memory": os.path.join(home, ".solo", "memory"),
+               "skills": os.path.join(home, ".solo", "skills"),
+               "tasks": os.path.join(home, ".solo", "tasks")}
+    restored = []
+    for name, tgt in targets.items():
+        bsrc = os.path.join(src, name)
+        if os.path.exists(bsrc):
+            shutil.copytree(bsrc, tgt, dirs_exist_ok=True)
+            restored.append(name)
+    return {"restored": restored, "from": src}
 
 
 def _run(task: str, tier: str = "auto"):

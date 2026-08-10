@@ -596,7 +596,8 @@ def _load_rows(body: dict) -> list:
         return dc.connect(src)
     if body.get("csv"):
         p = _data_path(body["csv"]) or _safe_path(body["csv"])
-        return dc.connect({"type": "csv", "path": p}) if p else []
+        stype = "xlsx" if p.lower().endswith(".xlsx") else "csv"
+        return dc.connect({"type": stype, "path": p}) if p else []
     if body.get("db"):
         p = _data_path(body["db"]) or _safe_path(body["db"])
         if body.get("table"):

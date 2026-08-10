@@ -35,6 +35,8 @@ def connect(source: dict) -> list:
             return _read_sqlite(source.get("path", ""), source.get("table", ""))
         if stype == "sql":
             return _read_sql(source)
+        if stype == "xlsx":
+            return _read_xlsx(source.get("path", ""))
         raise DataSourceError(f"未知数据源类型: {stype}")
     except DataSourceError:
         raise
@@ -68,6 +70,49 @@ def _read_csv(path: str) -> list:
     except Exception as e:
         log.warning("CSV 读取失败 %s: %s", path, e)
         raise DataSourceError(f"CSV 读取失败: {path}", str(e))
+
+
+def _read_xlsx(path: str) -> list:
+    """P2-4: 读取 xlsx（标准库 zipfile+xml 解析，零依赖）。
+
+    支持单 sheet 的 xlsx，返回 list[dict]（首行为表头）。
+    """
+    if not path or not os.path.exists(path):
+        raise DataSourceError(f"xlsx 文件不存在: {path}")
+    import zipfile
+    from xml.etree import ElementTree as ET
+    NS = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
+    try:
+        with zipfile.ZipFile(path) as z:
+            # 找第一个 sheet
+            sheet_name = [n for n in z.namelist() if n.startswith("xl/worksheets/sheet") and n.endswith(".xml")]
+            if not sheet_name:
+                raise DataSourceError("xlsx 无工作表")
+            root = ET.fromstring(z.read(sheet_name[0]))
+        rows = []
+        for row in root.iter(f"{NS}row"):
+            cells = {}
+            for c in row.iter(f"{NS}c"):
+                ref = c.get("r", "")
+                col = "".join(ch for ch in ref if ch.isalpha())
+                v = c.find(f"{NS}v")
+                val = v.text if v is not None else ""
+                cells[col] = val
+            rows.append(cells)
+        if not rows:
+            return []
+        # 首行做表头，后续行映射为 dict
+        header = rows[0]
+        cols = list(header.keys())
+        out = []
+        for r in rows[1:]:
+            out.append({header.get(c, c): r.get(c, "") for c in cols})
+        return out
+    except DataSourceError:
+        raise
+    except Exception as e:
+        log.warning("xlsx 读取失败 %s: %s", path, e)
+        raise DataSourceError(f"xlsx 读取失败: {path}", str(e))
 
 
 def _read_sqlite(path: str, table: str) -> list:
