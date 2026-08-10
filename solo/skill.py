@@ -48,7 +48,9 @@ class Skill:
     def all_details(self) -> list:
         """返回全部技能的完整信息（供列表式展示）。"""
         idx = self._load_index()
-        return [idx[name] for name in sorted(idx.keys())]
+        # 过滤乱码技能(含 U+FFFD 替换字符 = 写入时编码损坏, 无法恢复)
+        return [idx[name] for name in sorted(idx.keys())
+                if "\ufffd" not in name and "\ufffd" not in str(idx[name])]
 
     def match(self, text: str) -> list:
         """按触发词匹配当前任务的适用 skill（按触发词命中排序）。"""
