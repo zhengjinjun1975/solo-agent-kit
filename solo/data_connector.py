@@ -25,14 +25,18 @@ def connect(source: dict) -> list:
       {"type":"csv", "path":"..."}             CSV 文件
       {"type":"sqlite", "path":"...", "table":"..."}   SQLite 表
       {"type":"sql", "path":"...", "query":"..."}    只读 SQL 查询
+      {"type":"xlsx", "path":"..."}            Excel 文件
     失败抛 DataSourceError（区分原因，不再静默返回 []）。
+    limit/offset 支持分页（大表友好）。
     """
     stype = source.get("type", "csv")
+    limit = source.get("limit")
+    offset = source.get("offset", 0)
     try:
         if stype == "csv":
             return _read_csv(source.get("path", ""))
         if stype == "sqlite":
-            return _read_sqlite(source.get("path", ""), source.get("table", ""))
+            return _read_sqlite(source.get("path", ""), source.get("table", ""), limit, offset)
         if stype == "sql":
             return _read_sql(source)
         if stype == "xlsx":
@@ -59,6 +63,20 @@ def list_tables(db_path: str) -> list:
     except Exception as e:
         log.warning("列出表失败 %s: %s", db_path, e)
         return []
+
+
+def iter_csv(path: str):
+    """P2-5: 流式读取 CSV——逐行 yield dict，不整文件入内存（大文件友好）。"""
+    if not path or not os.path.exists(path):
+        raise DataSourceError(f"CSV 文件不存在: {path}")
+    try:
+        with open(path, encoding="utf-8-sig") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                yield row
+    except Exception as e:
+        log.warning("CSV 流式读取失败 %s: %s", path, e)
+        raise DataSourceError(f"CSV 读取失败: {path}", str(e))
 
 
 def _read_csv(path: str) -> list:
@@ -115,7 +133,7 @@ def _read_xlsx(path: str) -> list:
         raise DataSourceError(f"xlsx 读取失败: {path}", str(e))
 
 
-def _read_sqlite(path: str, table: str) -> list:
+def _read_sqlite(path: str, table: str, limit: int = None, offset: int = 0) -> list:
     if not path or not os.path.exists(path):
         raise DataSourceError(f"数据库文件不存在: {path}")
     if not table:
@@ -124,7 +142,9 @@ def _read_sqlite(path: str, table: str) -> list:
         conn = sqlite3.connect(path)
         conn.row_factory = sqlite3.Row
         cur = conn.cursor()
-        cur.execute(f"SELECT * FROM \"{table}\" LIMIT 5000")
+        # P2-5: 分页读取（limit/offset），大表不一次全读
+        lim = limit or 5000
+        cur.execute(f"SELECT * FROM \"{table}\" LIMIT {int(lim)} OFFSET {int(offset)}")
         rows = [dict(r) for r in cur.fetchall()]
         conn.close()
         return rows

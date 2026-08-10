@@ -34,6 +34,43 @@ def describe(values: list) -> dict:
     }
 
 
+def describe_stream(values) -> dict:
+    """P2-5: 流式描述统计（Welford 在线算法，O(1) 内存，大文件友好）。
+
+    values 可为迭代器/生成器（逐值 yield），不整列入内存。
+    """
+    count = 0
+    mean = 0.0
+    m2 = 0.0
+    minv = None
+    maxv = None
+    for v in values:
+        try:
+            x = float(v)
+        except (ValueError, TypeError):
+            continue
+        count += 1
+        delta = x - mean
+        mean += delta / count
+        m2 += delta * (x - mean)
+        if minv is None or x < minv:
+            minv = x
+        if maxv is None or x > maxv:
+            maxv = x
+    if count == 0:
+        return {"count": 0}
+    variance = m2 / count if count > 1 else 0.0
+    return {
+        "count": count,
+        "min": minv,
+        "max": maxv,
+        "mean": round(mean, 3),
+        "std": round(math.sqrt(variance), 3),
+        # 流式无法算精确中位数/分位数（需排序），标注 O(1) 内存近似
+        "streaming": True,
+    }
+
+
 def trend(values: list) -> dict:
     """趋势分析：线性回归斜率（判断上升/下降/平稳）。"""
     xs = list(range(len(values)))
