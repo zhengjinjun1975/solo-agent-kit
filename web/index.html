@@ -171,7 +171,67 @@ const input=document.getElementById('chat-input'), scroll=document.getElementByI
 function addMsg(text,cls,intent){scroll.insertAdjacentHTML('beforeend',`<div class="msg ${cls}">${intent?`<div class="intent">⚡ <b>${intent}</b></div>`:''}${esc(text)}</div>`);scroll.scrollTop=scroll.scrollHeight;}
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function pretty(o){return JSON.stringify(o,null,2).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-function addData(msg,cls,o,intent){scroll.insertAdjacentHTML('beforeend',`<div class="msg ${cls}">${intent?`<div class="intent">⚡ <b>${INTENT_NAME[intent]||intent}</b></div>`:''}${esc(msg)}<div class="data">${pretty(o)}</div></div>`);scroll.scrollTop=scroll.scrollHeight;}
+// 各意图 → 友好可读的一句话结果（替代裸 JSON）
+function fmtResult(intent, res){
+  switch(intent){
+    case 'clean': {
+      const r=res.report||{}; const out=res.summary||`清洗完成 ${res.input}→${res.output} 行`;
+      let line=`✅ ${out}`;
+      if(r.dropped_dup)line+=`，去重 ${r.dropped_dup} 行`;
+      if(r.dropped_outlier)line+=`，剔除异常 ${r.dropped_outlier} 行`;
+      if(r.filled_missing)line+=`，补缺失 ${r.filled_missing} 处`;
+      return line;
+    }
+    case 'stats': {
+      const d=res.describe||{};
+      let line=`📊 列「${res.column}」：均值 ${d.mean}，中位数 ${d.median}，标准差 ${d.std}`;
+      if(res.anomalies&&res.anomalies.length)line+=`，⚠️ 检测到 ${res.anomalies.length} 个异常点`;
+      else line+=`，无异常`;
+      const cc=res.control_chart||{};
+      if(cc.out_of_control&&cc.out_of_control.length)line+=`，控制图 ${cc.out_of_control.length} 点越限`;
+      return line;
+    }
+    case 'ontology': return `🧬 本体建模完成：${res.entities.length} 个实体，${res.triples} 条关系。实体：${(res.entities||[]).join(', ')}`;
+    case 'memory_search': {
+      const n=(res.results||[]).length;
+      if(!n)return '🔍 记忆库无相关条目';
+      return `🔍 找到 ${n} 条相关记忆：\n`+(res.results||[]).map(r=>`  · ${r.text}`).join('\n');
+    }
+    case 'skill': {
+      const s=res.skills||[];
+      return s.length?`🎯 已有 ${s.length} 个技能：${s.join(', ')}`:'🎯 暂无技能，用「沉淀技能：X」添加';
+    }
+    case 'writing': return res.passed?`✍️ 写作检查通过（${res.total_issues} 处提示）`:`✍️ 检查发现 ${res.fail_count} 处需修正`;
+    case 'code_overview': return `📁 代码库：${res.indexed} 文件，${res.symbols} 符号。核心模块：${(res.overview?.top_core_modules||[]).map(m=>m.file).join(', ')}`;
+    case 'gen': return res.output||res.error||'生成完成';
+    case 'setup': {
+      const c=res.checks||{};
+      let line=`🔧 部署检查 ${res.all_ok?'✅ 全部就绪':'⚠️ 有项未就绪'}\n`;
+      line+=`  · Python ${c.python?.version||'?'}\n`;
+      line+=`  · Ollama ${c.ollama?.ok?'✅ '+((c.ollama.models||[]).join(', ')):'❌ 未运行'}\n`;
+      line+=`  · 配置 ${c.config?.ok?'✅':'❌'}\n`;
+      line+=`  · 记忆 ${c.memory?.facts||0} 条事实`;
+      return line;
+    }
+    case 'config': {
+      if(!res.configured)return `⚠️ ${res.hint||'未配置'}`;
+      const l=res.local||{},r=res.remote||{},e=res.embed||{};
+      return `⚙️ 模型配置：\n  · 本地 ${l.type}(${l.model||'?'})\n  · 远端 ${r.type?`${r.model}（key从环境变量读）`:'未配置'}\n  · 嵌入 ${e.model||'?'}`;
+    }
+    case 'capabilities': {
+      const f=res.capabilities?.factory||{},p=res.capabilities?.personal||{};
+      return `🧩 能力清单：\n  · 工厂套件：${Object.keys(f).join(', ')}\n  · 个人套件：${Object.keys(p).join(', ')}`;
+    }
+    case 'task': return `📌 已创建任务「${res.goal}」，状态 ${res.state}`;
+    default: return res.suggestion||JSON.stringify(res);
+  }
+}
+function addData(msg,cls,o,intent){
+  const friendly=fmtResult(intent,o);
+  scroll.insertAdjacentHTML('beforeend',
+    `<div class="msg ${cls}">${intent?`<div class="intent">⚡ <b>${INTENT_NAME[intent]||intent}</b></div>`:''}<div style="white-space:pre-wrap;line-height:1.8">${esc(friendly)}</div><div class="data" style="display:none">${pretty(o)}</div><div class="detail-toggle" style="font-size:10px;color:var(--mute);cursor:pointer;margin-top:6px" onclick="this.previousElementSibling.style.display=this.previousElementSibling.style.display==='none'?'block':'none'">🔍 查看原始数据</div></div>`);
+  scroll.scrollTop=scroll.scrollHeight;
+}
 
 async function send(){
   const text=input.value.trim(); if(!text)return;
