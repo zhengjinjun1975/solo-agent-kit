@@ -36,8 +36,6 @@ body{font-family:-apple-system,"Segoe UI","Microsoft YaHei",system-ui,sans-serif
 .logo-text h1{font-size:52px;font-weight:800;letter-spacing:-.5px;color:#1d4ed8;line-height:1.1}
 .logo-text span{font-size:20px;color:#475569;display:block;margin-top:6px;font-weight:600;line-height:1.5;word-break:break-word}
 .logo .dot{width:10px;height:10px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--orange));box-shadow:0 0 12px rgba(108,140,255,.6)}
-.logo h1{font-size:14px;font-weight:600}
-.logo span{font-size:9px;color:var(--mute);display:block}
 .ng{margin-bottom:10px}
 .ng .lbl{font-size:13px;text-transform:uppercase;letter-spacing:.1em;color:#94a3b8;margin-bottom:9px;padding:0 10px;font-weight:700}
 .ni{display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;font-size:16px;color:#374151;cursor:pointer;transition:all .2s var(--ease)}
