@@ -85,6 +85,29 @@ def main(argv=None):
     p_rs = sub.add_parser("restore", help="恢复备份")
     p_rs.add_argument("src", help="备份目录")
 
+    # 厂区运维配置与定位
+    p_site = sub.add_parser("site", help="厂区配置与定位")
+    ssub = p_site.add_subparsers(dest="site_cmd")
+    ssub.add_parser("list", help="列出所有厂区")
+    ssub.add_parser("devices", help="列出当前厂区设备台账")
+    p_suse = ssub.add_parser("use", help="切换到指定厂区")
+    p_suse.add_argument("name")
+    p_sadd = ssub.add_parser("add-site", help="新增厂区")
+    p_sadd.add_argument("name")
+    p_sadd.add_argument("--location", default="", help="厂区位置")
+    p_sadd.add_argument("--contact", default="", help="联系人")
+    p_sdev = ssub.add_parser("add-device", help="添加设备到当前厂区")
+    p_sdev.add_argument("name")
+    p_sdev.add_argument("host")
+    p_sdev.add_argument("--user", default="", help="SSH用户")
+    p_sdev.add_argument("--port", type=int, default=22, help="SSH端口")
+    p_sdev.add_argument("--group", default="", help="设备分组")
+    p_sdev.add_argument("--role", default="", help="设备角色")
+    p_srm = ssub.add_parser("rm-device", help="移除设备")
+    p_srm.add_argument("name")
+    p_srole = ssub.add_parser("role", help="查看/设置部署角色")
+    p_srole.add_argument("value", nargs="?", help="laptop / on-site（缺省查看）")
+
     try:
         args = parser.parse_args(argv)
         result = _dispatch(args)
@@ -152,6 +175,8 @@ def _dispatch(args):
         from solo.task import Task
         t = Task()
         return t.resolve(args.tid)
+    if cmd == "site":
+        return _site(args)
     if cmd == "backup":
         return _backup(args.dest)
     if cmd == "restore":
@@ -297,6 +322,34 @@ def _factory_onto(args):
     return {"entities": list(o.entities.keys()), "triples": len(o.triples),
             "summary": o.entity_summary()}
 
+
+
+def _site(args):
+    """厂区配置与定位命令分发。"""
+    from solo.site import Site
+    s = Site()
+    sc = args.site_cmd
+    if sc == "list":
+        return {"role": s.role, "current_site": s.current_site,
+                "sites": s.list_sites()}
+    if sc == "use":
+        r = s.use(args.name)
+        return r if not r["ok"] else {"ok": True, "current_site": r["current_site"],
+                                       "devices": [d["name"] for d in s.devices()]}
+    if sc == "add-site":
+        return s.add_site(args.name, args.location, args.contact)
+    if sc == "devices":
+        return {"current_site": s.current_site, "devices": s.devices()}
+    if sc == "add-device":
+        return s.add_device(args.name, args.host, args.user, args.port,
+                            args.group, args.role)
+    if sc == "rm-device":
+        return s.rm_device(args.name)
+    if sc == "role":
+        if args.value:
+            return s.set_role(args.value)
+        return {"role": s.role}
+    return {"error": "未知 site 子命令", "cmd": sc}
 
 
 def _now():

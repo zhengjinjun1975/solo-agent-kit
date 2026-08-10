@@ -2,6 +2,23 @@
 
 所有显著变更记录在此。格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [0.8.0] - 2026-08-10
+
+### 新增(厂区运维配置与定位 — FDE进厂区模式)
+- solo/site.py: 厂区配置模块(role部署角色/current_site定位/设备台账CRUD/设备解析)
+- CLI site 子命令: list/use/devices/add-site/add-device/rm-device/role
+- remote.py 设备名重载: resolve_device/remote_exec/remote_monitor(host可传台账设备名,自动解析连接)
+- monitor.py 远程采集: monitor_device(单设备)/monitor_devices(厂区批量巡检看板)
+- data_connector 设备数据源: connect({"type":"device",...}) 远程拉取厂区设备数据(SSH cat)
+- 数据三件套(清洗/分析/本体)经 connect 天然支持厂区设备数据, 端到端打通
+- 定位修正: 本机监控保留(次要), 服务对象=对方厂区局域网设备(主要)
+- 设计文档: docs/site-ops-design.md / docs/plugin-design.md(已同步Obsidian)
+
+### 验证
+- site.py 24项/CLI 6项/monitor 7项/data_connector设备源 7项/端到端设备数据 5项 ad-hoc全过
+- 43 pytest 全绿
+- CodeAgent review: SQL注入点均已白名单防护, 无真实漏洞
+
 ## [0.7.5] - 2026-08-10
 
 ### 修复(技能库乱码数据)

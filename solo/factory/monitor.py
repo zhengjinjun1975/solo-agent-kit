@@ -94,3 +94,35 @@ def top_processes(limit: int = 10) -> list:
         return procs[:limit]
     except ImportError:
         return []
+
+
+def monitor_device(name: str, site: str = None) -> dict:
+    """远程采集台账设备的资源状态（FDE 厂区模式）。
+
+    从 site 台账按设备名解析连接, 经 SSH 远程采集 CPU/内存/负载。
+    复用 remote.remote_monitor。设备不存在时明确报错。
+    """
+    from solo.factory.remote import remote_monitor, resolve_device
+    r = resolve_device(name, site)
+    if not r["ok"]:
+        return r
+    return remote_monitor(r["host"], r["user"], r["port"])
+
+
+def monitor_devices(site: str = None) -> dict:
+    """批量采集当前厂区所有设备的资源状态（FDE 巡检看板）。"""
+    from solo.site import Site
+    s = Site()
+    site = site or s.current_site
+    devices = s.devices(site)
+    if not devices:
+        return {"ok": False, "site": site, "error": "当前厂区无设备台账",
+                "devices": []}
+    results = []
+    for d in devices:
+        try:
+            r = remote_monitor(d["host"], d.get("user", ""), d.get("port", 22))
+            results.append({"name": d["name"], **r})
+        except Exception as e:
+            results.append({"name": d["name"], "ok": False, "error": str(e)})
+    return {"ok": True, "site": site, "count": len(results), "devices": results}

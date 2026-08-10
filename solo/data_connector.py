@@ -41,6 +41,8 @@ def connect(source: dict) -> list:
             return _read_sql(source)
         if stype == "xlsx":
             return _read_xlsx(source.get("path", ""))
+        if stype == "device":
+            return _read_device(source, limit, offset)
         if stype in ("mysql", "postgres"):
             return _read_rdbms(source, limit, offset)
         raise DataSourceError(f"未知数据源类型: {stype}")
@@ -256,3 +258,58 @@ def _read_rdbms(source: dict, limit: int = None, offset: int = 0) -> list:
     except Exception as e:
         log.warning("%s 读取失败 %s:%s/%s: %s", stype, host, port, table, e)
         raise DataSourceError(f"{stype} 读取失败", str(e))
+
+
+def _read_device(source: dict, limit: int = None, offset: int = 0) -> list:
+    """从厂区台账设备远程拉取数据（FDE 厂区模式）。
+
+    source:
+      {"type":"device", "device":"设备名", "remote_path":"/opt/data/x.csv",
+       "path_type":"csv"}         远程 cat 后按 csv/sqlite/xlsx 解析
+    复用 remote SSH 远程读文件内容, 再走本机解析, 不落地临时文件。
+    """
+    device = source.get("device", "")
+    remote_path = source.get("remote_path", "")
+    path_type = source.get("path_type", "csv")
+    if not device:
+        raise DataSourceError("device 数据源必须指定设备名(device)")
+    if not remote_path:
+        raise DataSourceError("device 数据源必须指定 remote_path")
+
+    from solo.factory.remote import resolve_device, run_command
+    r = resolve_device(device)
+    if not r["ok"]:
+        raise DataSourceError(f"设备解析失败: {r['error']}")
+    # 远程 cat 文件内容(文本文件), 或 sqlite 特殊处理
+    cmd = f"cat {remote_path}"
+    rr = run_command(r["host"], cmd, r.get("user", ""), r.get("port", 22))
+    if not rr["ok"]:
+        err = rr.get("error") or rr.get("stderr", "") or "远程读取失败"
+        raise DataSourceError(f"远程读取 {device}:{remote_path} 失败: {err[:150]}")
+    content = rr.get("stdout", "")
+    if not content.strip():
+        return []
+    # 按 path_type 解析远程内容(本地内存解析)
+    if path_type == "csv":
+        import io
+        reader = csv.DictReader(io.StringIO(content))
+        rows = [dict(r) for r in reader]
+        # 分页
+        if offset or limit:
+            start = offset or 0
+            end = (offset or 0) + (limit or len(rows))
+            rows = rows[start:end]
+        return rows
+    # sqlite/xlsx 需要真实文件, 落到临时区再读
+    if path_type in ("sqlite", "xlsx"):
+        import tempfile
+        fd, tmp = tempfile.mkstemp(suffix=("." + path_type))
+        with os.fdopen(fd, "w", encoding="utf-8", newline="") as f:
+            f.write(content)
+        try:
+            if path_type == "sqlite":
+                return _read_sqlite(tmp, source.get("table", ""), limit, offset)
+            return _read_xlsx(tmp)
+        finally:
+            os.remove(tmp)
+    raise DataSourceError(f"不支持远程 path_type: {path_type}")
