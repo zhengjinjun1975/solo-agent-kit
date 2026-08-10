@@ -126,7 +126,8 @@ class Provider:
     # ---- 远端 OpenAI 兼容 ----
     def _remote_generate(self, cfg, prompt: str) -> str:
         url = cfg.get("base_url", "").rstrip("/") + "/chat/completions"
-        api_key = os.environ.get(cfg.get("api_key_env", "DEEPSEEK_API_KEY"), "")
+        api_key = os.environ.get(cfg.get("api_key_env", "DEEPSEEK_API_KEY"), "") or \
+            _read_env_key(cfg.get("api_key_env", "DEEPSEEK_API_KEY"))
         if not api_key:
             # 模型闭环铁律：云端无 key 明确报错，不静默降级
             raise ProviderError("远端模型未配置 API key（设环境变量 %s）" % cfg.get("api_key_env"), EXIT_AUTH)
@@ -143,6 +144,20 @@ class Provider:
         except (urllib.error.URLError, ConnectionError, OSError) as e:
             reason = getattr(e, "reason", e)
             raise ProviderError(f"远端不可用（{reason}）", EXIT_NETWORK)
+
+
+def _read_env_key(key: str) -> str:
+    """从 Hermes .env 文件读取密钥（web 服务等进程未 source .env 时兜底）。"""
+    for p in [os.path.expanduser("~/.hermes/.env"),
+              os.path.expanduser("~/AppData/Local/hermes/.env")]:
+        try:
+            with open(p, encoding="utf-8") as f:
+                for line in f:
+                    if line.startswith(key):
+                        return line.split("=", 1)[1].strip()
+        except OSError:
+            continue
+    return ""
 
 
 def load_config(path: str = None) -> dict:

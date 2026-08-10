@@ -564,9 +564,15 @@ async function runCodeGen(){
   const prompt=document.getElementById('code-prompt').value.trim();
   const out=document.getElementById('gen-result');
   if(!prompt){out.textContent='请描述要生成的代码';return;}
-  out.textContent='⏳ 生成中（本地模型，稍候）…';
-  const res=await api('/api/gen',{method:'POST',body:JSON.stringify({kind:'code',topic:prompt})});
-  out.textContent=res.output||res.error||'完成';
+  out.textContent='⏳ CodeAgent 生成中（静态分析+双层审查+测试）…';
+  const res=await api('/api/gen',{method:'POST',body:JSON.stringify({kind:'code-agent',topic:prompt})});
+  if(res.error){out.textContent='✗ '+res.error;return;}
+  let txt='';
+  if(res.score!==undefined)txt+=`【评分 ${res.score}】`;
+  if(res.issues&&res.issues.length)txt+='\n⚠ 审查问题: '+res.issues.join('; ');
+  if(res.summary)txt+='\n'+res.summary;
+  txt+='\n\n'+ (res.output||'（无输出）');
+  out.textContent=txt;
 }
 
 // ===== 技能工作区 =====

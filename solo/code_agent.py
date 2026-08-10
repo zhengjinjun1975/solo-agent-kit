@@ -266,6 +266,7 @@ class CodeAgent:
         code = self._gen(prompt, tier="remote")
         if not code:
             return {"error": "生成失败（模型无返回）"}
+        code = self._strip_code_fences(code)
 
         versions = []
         best = code
@@ -370,3 +371,12 @@ class CodeAgent:
             return json.loads(m.group(0))
         except Exception:
             return {}
+
+    def _strip_code_fences(self, text: str) -> str:
+        """去掉模型输出里的 markdown 代码块包裹（```python ... ```）。"""
+        if not text:
+            return text
+        m = re.search(r"```[a-zA-Z]*\n(.*?)```", text, re.S)
+        if m:
+            return m.group(1).strip()
+        return text.strip()
