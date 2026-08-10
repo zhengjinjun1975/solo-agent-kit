@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 
 DEFAULT_DIR = os.path.join(os.path.expanduser("~"), ".solo", "skills")
 

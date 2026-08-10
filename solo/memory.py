@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import hashlib
 
 DEFAULT_DIR = os.path.join(os.path.expanduser("~"), ".solo", "memory")

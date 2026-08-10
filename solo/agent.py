@@ -10,7 +10,6 @@ from __future__ import annotations
 from solo import memory as memory_mod
 from solo import provider as provider_mod
 from solo import skill as skill_mod
-from solo import ontology as ontology_mod
 
 
 def run(task: str, mem_dir: str = None, skill_dir: str = None) -> dict:

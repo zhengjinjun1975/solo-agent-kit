@@ -113,6 +113,36 @@ def test_factory_ontology_relations(tmp):
     assert maintain == ["D002"], f"maintain={maintain}"
 
 
+def test_factory_multi_ontology(tmp):
+    """多表工厂本体：设备+工单跨实体关联（FDE 工厂级核心）。"""
+    # 设备表
+    eq_csv = os.path.join(tmp, "equip.csv")
+    with open(eq_csv, "w", encoding="utf-8") as f:
+        f.write("id,device_type,status\nD001,空压机,运行中\nD002,泵,待维护\n")
+    eq_rels = {"device_type": {"rel": "http://solo.local/ontology#hasType",
+                               "target_class": "DeviceType", "label": "设备类型"}}
+    # 工单表（equipment_id 外键→设备）
+    wo_csv = os.path.join(tmp, "workorders.csv")
+    with open(wo_csv, "w", encoding="utf-8") as f:
+        f.write("wo_id,equipment_id,priority\nW001,D002,高\nW002,D001,中\n")
+    wo_rels = {"equipment_id": {"rel": "http://solo.local/ontology#concernsEquipment",
+                                "target_class": "factory_equipment", "label": "关联设备"}}
+
+    o = ontology_mod.Ontology()
+    o.from_csv(eq_csv, entity_name="factory_equipment", id_col="id", relations=eq_rels)
+    o.from_csv(wo_csv, entity_name="factory_workorders", id_col="wo_id", relations=wo_rels)
+    o.build()
+
+    # 跨实体导航：工单→设备
+    dev = o.query("factory_workorders", "W001", "equipment_id")
+    assert dev == ["factory_equipment:D002"], f"dev={dev}"
+
+    # 高优先工单关联的设备类型（多表问题解答）
+    high_wo = [s.split(":")[-1] for s, p, v in o.triples
+               if s.startswith("factory_workorders:") and p.endswith("priority") and v == "高"]
+    assert high_wo == ["W001"], f"high={high_wo}"
+
+
 # ---- skill：可复用经验 ----
 def test_skill_match(tmp):
     s = skill_mod.Skill(dir=os.path.join(tmp, "skills"))
@@ -139,6 +169,34 @@ def test_code_impact(tmp):
     cg.index(pkg)
     imp = cg.impact("b.py")
     assert any("a.py" in f for f in imp), f"impact(b.py)={imp}"
+
+
+def test_code_overview_explain(tmp):
+    """代码库理解（FDE 接手项目能力）。"""
+    pkg = os.path.join(tmp, "pkg"); os.makedirs(os.path.join(pkg, "core"))
+    with open(os.path.join(pkg, "core", "main.py"), "w", encoding="utf-8") as f:
+        f.write("from core import util\ndef run():\n    return util.helper()\n")
+    with open(os.path.join(pkg, "core", "util.py"), "w", encoding="utf-8") as f:
+        f.write("def helper():\n    return 1\n")
+    cg = code_mod.CodeGraph()
+    cg.index(pkg)
+    ov = cg.overview()
+    assert ov["files"] == 2 and ov["symbols"] >= 2
+    ex = cg.explain("helper")
+    assert ex.get("defined_in", "").endswith("util.py")
+    assert any("main.py" in u for u in ex.get("used_by", []))
+
+
+# ---- gen：FDE 代码/文档/审查 ----
+def test_gen_signatures():
+    """gen 模块：代码生成/文档/审查函数可调用，参数正确。"""
+    import inspect
+    from solo import gen
+    assert callable(getattr(gen, "generate_code", None))
+    assert callable(getattr(gen, "generate_doc", None))
+    assert callable(getattr(gen, "review_code", None))
+    sig = inspect.signature(gen.generate_doc)
+    assert "kind" in sig.parameters and "topic" in sig.parameters
 
 
 # ---- task：状态控制面 ----

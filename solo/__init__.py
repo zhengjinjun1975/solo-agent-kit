@@ -4,5 +4,5 @@
 本体建模 / 三层两域记忆 / skill 提取 / 六维写作检查 / 代码影响分析。
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 __all__ = ["provider", "memory", "ontology", "skill", "writing", "code", "gen", "task", "agent"]

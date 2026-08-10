@@ -2,6 +2,26 @@
 
 所有显著变更记录在此。格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [0.2.0] - 2026-08-10
+
+### 新增
+- **工厂级本体建模**（差异化核心落点）：ontology.py 升级关系建模
+  - 对象属性声明（外键列→target_class，对齐 factory-ontology relations.json）
+  - 多实体加载 + build 补全参照类
+  - query/neighbors 实体间导航 + answer 工厂问题解答（零 LLM 结构化）
+- **多表工厂本体**：设备台账 + 工单 → 跨实体关联查询（工单→设备→设备类型）
+- FDE 能力：`gen.py`（代码生成/工程文档/代码审查）+ `code.overview/explain`（代码库理解）
+- `examples/example_04_factory_ontology.py`（工厂单表）+ `example_05_factory_multi_ontology.py`（多表）
+- 测试扩至 16 项（工厂关系/多表关联/code库理解/gen签名）
+
+### 修复
+- ontology 关系索引未存 rel 字段导致查询空，现已存
+- 清理 3 处未使用 import（agent 的 ontology_mod、memory/skill 的 re）——CodeAgent 静态审查发现
+
+### 方法论
+- 定位升级：OPC 与工厂级 FDE 的能力放大器（VISION §11）
+- "轻 ≠ 不行"：零依赖 1219 行核心，16 测试全绿，4+2 真实场景
+
 ## [0.1.0] - 2026-08-10
 
 ### 新增
