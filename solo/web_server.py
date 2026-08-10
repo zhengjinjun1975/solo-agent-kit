@@ -189,6 +189,10 @@ class SoloHandler(BaseHTTPRequestHandler):
         elif path == "/api/setup":
             from solo import diagnostics as diag_mod
             self._json(diag_mod.check_environment())
+        elif path == "/api/task":
+            # 工单列表（GET：FDE 现场看未闭环问题）
+            from solo.task import Task
+            self._json({"issues": Task().list_issues()})
         elif path == "/api/deploy":
             self._json(_deploy())
         elif path == "/api/monitor":
