@@ -2,6 +2,23 @@
 
 所有显著变更记录在此。格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [0.9.0] - 2026-08-10
+
+### 新增(CodeAgent 全链路能力整合 + README 重写)
+- solo/code_agent.py: 代码生成/审查/测试全链路(借鉴CodeAgent方法论,独立实现,零依赖)
+  - PONYTAIL_SYSTEM(懒人高级开发者阶梯)注入
+  - 静态分析层: 语法/未用import/圈复杂度/命名/安全(SQL注入/exec/硬编码密钥)
+  - 测试生成: AST生成参数化测试 + 边界值
+  - think(JSON方案) / implement(生成+loop迭代) / review(双层) / test / run_tests
+  - 模型调用接 provider(urllib零依赖): 生成走远端,审查走本地
+- README 重写: AI原生思想 + 方法论决定一切(单一事实源/本体优先/反过度工程/诚实定位)
+  - 经 OpenClaw 总编辑润色(科技感+严谨性), 修正虚构命令为真实CLI
+  - 六维写作自检通过(0问题, 无破折号/禁词)
+
+### 验证
+- code_agent 13项ad-hoc(静态分析/测试生成/think/implement/review/run_tests)
+- 43 pytest 全绿
+
 ## [0.8.1] - 2026-08-10
 
 ### 新增(写作脱敏 — 防敏感信息泄露)
