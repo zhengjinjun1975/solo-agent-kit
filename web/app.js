@@ -335,10 +335,10 @@ async function runOntoDS(){
     out.innerHTML=`<b>🏭 企业本体 ${res.entities.length} 实体 · ${res.triples} 关系</b><br>
       <span style="color:var(--mute)">${(res.entities||[]).join(' · ')}</span><br>
       <span style="font-size:11px;color:var(--mute)">${res.nodes} 节点 · ${res.edges} 关联边</span>`;
-    graph.innerHTML=drawOntoGraph(res.model||res);
+    drawOntoGraph(res.model||res);
   } else {
     out.innerHTML=`<b>${res.entities.length} 实体 · ${res.triples} 关系</b><br>${(res.entities||[]).join(' · ')}`;
-    graph.innerHTML=drawOntoGraph(res.model||res.entities);
+    drawOntoGraph(res.model||res.entities);
   }
 }
 // 企业级本体可视化（ECharts 力导向网络图，融合 SME 方式）
@@ -346,9 +346,10 @@ const ONTO_COLORS = ['#2f6bff','#27ae60','#f39c12','#e74c3c','#8e44ad','#16a085'
 function drawOntoGraph(model){
   const el=document.getElementById('onto-graph');
   if(!model || !model.graph || !model.graph.nodes || typeof echarts==='undefined'){
-    // 回退：旧式实体名展示
-    const ents = (model&&model.entities)||[];
-    return ents.length?`<div style="font-size:11px;color:var(--mute)">实体：${ents.join(' · ')}</div>`:'';
+    // 回退：单文件/无graph时显示实体名
+    const ents = (model&&model.entities)||(Array.isArray(model)?model:[]);
+    el.innerHTML=ents.length?`<div style="font-size:11px;color:var(--mute)">实体：${ents.join(' · ')}</div>`:'';
+    return;
   }
   const nodes=model.graph.nodes, edges=model.graph.edges||[];
   const grp={};
