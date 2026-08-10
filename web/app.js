@@ -335,19 +335,63 @@ async function runOntoDS(){
     out.innerHTML=`<b>🏭 企业本体 ${res.entities.length} 实体 · ${res.triples} 关系</b><br>
       <span style="color:var(--mute)">${(res.entities||[]).join(' · ')}</span><br>
       <span style="font-size:11px;color:var(--mute)">${res.nodes} 节点 · ${res.edges} 关联边</span>`;
-    graph.innerHTML=drawOntoGraph(res.entities||[]);
+    graph.innerHTML=drawOntoGraph(res.model||res);
   } else {
     out.innerHTML=`<b>${res.entities.length} 实体 · ${res.triples} 关系</b><br>${(res.entities||[]).join(' · ')}`;
-    graph.innerHTML=drawOntoGraph(res.entities||[]);
+    graph.innerHTML=drawOntoGraph(res.model||res.entities);
   }
 }
-function drawOntoGraph(entities){
-  // 简单网格布局实体节点
-  const cols=Math.min(entities.length,4),cw=70,ch=50;
-  return `<svg width="${cols*cw}" height="${Math.ceil(entities.length/cols)*ch}" viewBox="0 0 ${cols*cw} ${Math.ceil(entities.length/cols)*ch}">
-    ${entities.map((e,i)=>{const x=(i%cols)*cw+5,y=Math.floor(i/cols)*ch+5;
-      return `<rect x="${x}" y="${y}" width="${cw-10}" height="${ch-10}" rx="8" fill="#e6edff" stroke="#3b6ef6" stroke-width="1"/><text x="${x+(cw-10)/2}" y="${y+(ch-10)/2+3}" text-anchor="middle" fill="#2f5ef0" font-size="9">${e}</text>`;}).join('')}
-  </svg>`;
+// 企业级本体可视化（ECharts 力导向网络图，融合 SME 方式）
+const ONTO_COLORS = ['#2f6bff','#27ae60','#f39c12','#e74c3c','#8e44ad','#16a085','#e67e22','#1abc9c','#c0392b','#7f8c8d'];
+function drawOntoGraph(model){
+  const el=document.getElementById('onto-graph');
+  if(!model || !model.graph || !model.graph.nodes || typeof echarts==='undefined'){
+    // 回退：旧式实体名展示
+    const ents = (model&&model.entities)||[];
+    return ents.length?`<div style="font-size:11px;color:var(--mute)">实体：${ents.join(' · ')}</div>`:'';
+  }
+  const nodes=model.graph.nodes, edges=model.graph.edges||[];
+  const grp={};
+  Object.values(nodes).forEach(n=>{ (grp[n.entity]=grp[n.entity]||[]).push(n); });
+  const entityList=Object.keys(grp);
+  const colorOf=et=>ONTO_COLORS[entityList.indexOf(et)%ONTO_COLORS.length];
+  // ECharts 节点/边
+  const data=Object.values(nodes).map(n=>({
+    id:n.id, name:String(n.id).split(':').pop().slice(0,10),
+    category:entityList.indexOf(n.entity),
+    symbolSize:n.entity==='Category'?16:12,
+    itemStyle:{color:colorOf(n.entity)},
+    tooltip:{formatter:`<b>${n.entity}</b> ${n.id}<br/>${Object.entries(n.data||{}).slice(0,3).map(([k,v])=>`${k}: ${v}`).join('<br/>')}`}
+  }));
+  const idSet=new Set(Object.values(nodes).map(n=>n.id));
+  const links=edges.map(e=>({source:e.from,target:e.to}))
+    .filter(l=>idSet.has(l.source)&&idSet.has(l.target));
+  // 企业 hub → 各实体类代表节点（企业拥有/运营所有业务对象，体现关联度）
+  entityList.forEach(et=>{
+    const rep=grp[et][0];
+    if(rep&&idSet.has(rep.id)) links.push({source:'__hub__',target:rep.id,
+      lineStyle:{color:'#2f6bff',opacity:0.35,width:1.5},label:{show:false}});
+  });
+  data.push({id:'__hub__',name:'企业',category:-1,symbolSize:64,itemStyle:{color:'#2f6bff'},
+    label:{show:true,fontSize:15,fontWeight:'bold',color:'#fff'}});
+  el.innerHTML=`<div id="ontchart" style="height:420px;width:100%"></div>
+    <div style="padding:6px 2px;font-size:11px;color:var(--mute)">${Object.keys(nodes).length} 实例 · ${edges.length} 关系 · 拖动缩放 · 悬停看详情</div>
+    <div style="padding:2px">${entityList.map(et=>`<span style="display:inline-block;margin-right:12px;font-size:11px;color:var(--dim)"><i style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${colorOf(et)};margin-right:4px"></i>${et}</span>`).join('')}</div>`;
+  if(window._ontChart) window._ontChart.dispose();
+  const chart=echarts.init(document.getElementById('ontchart'));
+  window._ontChart=chart;
+  chart.setOption({
+    tooltip:{show:true},
+    animationDuration:800,
+    series:[{type:'graph', layout:'force', roam:true,
+      force:{repulsion:300, edgeLength:[60,120], gravity:0.12, friction:0.6},
+      label:{show:true,position:'right',fontSize:9,color:'#1a2233'},
+      edgeSymbol:['none','arrow'], edgeSymbolSize:6,
+      categories:entityList.map(et=>({name:et})),
+      data:data, links:links,
+      lineStyle:{opacity:0.6,width:1.5,curveness:0.1}}]
+  });
+  return '';
 }
 // 渲染数据表格(清洗预览)
 function renderTable(rows){
