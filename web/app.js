@@ -198,7 +198,13 @@ document.querySelectorAll('.ni').forEach(n=>n.addEventListener('click',()=>{
     if(['clean','stats','ontology'].includes(cap)){
       const sel=dsSelected[cap];
       const box=document.getElementById('browse-'+cap);
-      if(sel&&box) box.innerHTML=`<div class="ds-file">📄 ${esc(sel.split(/[\\\\\\/]/).pop())}</div>`;
+      if(sel&&box){
+        const files=sel.split(';').filter(Boolean);
+        const fnames=files.map(p=>esc(p.split(/[\\\\\\/]/).pop()));
+        box.innerHTML=files.length>1
+          ? `<div class="ds-file">📄 ${fnames[0]}</div><div style="font-size:10px;color:var(--mute);margin-top:4px">+${files.length-1} 个文件</div>`
+          : `<div class="ds-file">📄 ${fnames[0]}</div>`;
+      }
       if(cap==='stats'&&sel) loadColumns('stats', sel);
       return;
     }
@@ -240,10 +246,11 @@ async function runCleanDS(){
   const out=document.getElementById('clean-result');
   const prev=document.getElementById('clean-preview');
   out.innerHTML='⏳ 清洗中…'; prev.innerHTML='';
-  const source=dsSelected['clean']||'';
-  if(!source){out.innerHTML='⚠️ 请先选择数据文件';return;}
-  // 清洗=整表处理（去重/缺失/异常全列），不选列
-  const res=await api('/api/clean',{method:'POST',body:JSON.stringify(dsBody(source))});
+  const sources=dsSelected['clean']||'';
+  if(!sources){out.innerHTML='⚠️ 请先选择数据文件';return;}
+  const csvs=sources.split(';').map(s=>s.trim()).filter(Boolean);
+  // 多文件 → 合并清洗（后端 csvs）
+  const res=await api('/api/clean',{method:'POST',body:JSON.stringify(csvs.length>1?{csvs:csvs}:dsBody(csvs[0]))});
   if(res.error){out.innerHTML='❌ '+res.error;return;}
   const r=res.report||{};
   out.innerHTML=`<b>清洗完成 ${res.input}→${res.output} 行</b><br>
@@ -258,12 +265,13 @@ async function runStatsDS(){
   const out=document.getElementById('stats-result');
   const chart=document.getElementById('stats-chart');
   out.innerHTML='⏳ 分析中…'; chart.innerHTML='';
-  const source=dsSelected['stats']||'';
-  if(!source){out.innerHTML='⚠️ 请先选择数据文件';return;}
+  const sources=dsSelected['stats']||'';
+  if(!sources){out.innerHTML='⚠️ 请先选择数据文件';return;}
   const selCol=document.querySelector('input[name="stats-col"]:checked');
   const col=selCol?selCol.value:null;
-  const body=dsBody(source);
-  const res=await api('/api/stats',{method:'POST',body:JSON.stringify({...body,col})});
+  const csvs=sources.split(';').map(s=>s.trim()).filter(Boolean);
+  const body = csvs.length>1 ? {csvs:csvs,col:col} : {...dsBody(csvs[0]),col};
+  const res=await api('/api/stats',{method:'POST',body:JSON.stringify(body)});
   if(res.error){out.innerHTML='❌ '+res.error;return;}
   const d=res.describe||{}, cc=res.control_chart||{};
   // 报表式指标卡片（常规数据工具表达）
@@ -310,17 +318,28 @@ function drawControlChart(col, cc){
   </svg>`;
 }
 
-// ===== 本体建模工作区（动态数据源 + SVG 关系图）=====
+// ===== 本体建模工作区（企业级多实体 + 多文件）=====
 async function runOntoDS(){
   const out=document.getElementById('onto-result');
   const graph=document.getElementById('onto-graph');
   out.innerHTML='⏳ 建模中…'; graph.innerHTML='';
-  const source=dsSelected['ontology']||'';
-  if(!source){out.innerHTML='⚠️ 请先选择数据文件';return;}
-  const res=await api('/api/ontology',{method:'POST',body:JSON.stringify({...dsBody(source)})});
+  const sources=dsSelected['ontology']||'';
+  if(!sources){out.innerHTML='⚠️ 请先选择数据文件';return;}
+  // 支持多文件（分号分隔）→ 企业级多表本体
+  const csvs=sources.split(';').map(s=>s.trim()).filter(Boolean);
+  const body = csvs.length===1 ? {...dsBody(csvs[0])} : {csvs:csvs};
+  const res=await api(csvs.length>1?'/api/ontology-multi':'/api/ontology',{method:'POST',body:JSON.stringify(body)});
   if(res.error){out.innerHTML='❌ '+res.error;return;}
-  out.innerHTML=`<b>${res.entities.length} 实体 · ${res.triples} 关系</b><br>${(res.entities||[]).join(' · ')}`;
-  graph.innerHTML=drawOntoGraph(res.entities||[]);
+  if(csvs.length>1){
+    // 企业级多实体
+    out.innerHTML=`<b>🏭 企业本体 ${res.entities.length} 实体 · ${res.triples} 关系</b><br>
+      <span style="color:var(--mute)">${(res.entities||[]).join(' · ')}</span><br>
+      <span style="font-size:11px;color:var(--mute)">${res.nodes} 节点 · ${res.edges} 关联边</span>`;
+    graph.innerHTML=drawOntoGraph(res.entities||[]);
+  } else {
+    out.innerHTML=`<b>${res.entities.length} 实体 · ${res.triples} 关系</b><br>${(res.entities||[]).join(' · ')}`;
+    graph.innerHTML=drawOntoGraph(res.entities||[]);
+  }
 }
 function drawOntoGraph(entities){
   // 简单网格布局实体节点
@@ -462,11 +481,16 @@ function dsSelectFile(path){
 }
 function dsConfirm(){
   if(!dsSelectedSource)return;
-  // 每工作区独立存储选中文件 + 显示文件名
-  dsSelected[dsModalTarget]=dsSelectedSource;
+  // 清洗/分析/本体都支持多文件（分号分隔累积）
+  const cur=dsSelected[dsModalTarget];
+  dsSelected[dsModalTarget] = cur ? cur+';'+dsSelectedSource : dsSelectedSource;
+  // 显示选中文件
   const box=document.getElementById('browse-'+dsModalTarget);
-  const fname=dsSelectedSource.split(/[\\\\\\/]/).pop();
-  box.innerHTML=`<div class="ds-file">📄 ${esc(fname)}</div>`;
+  const files=(dsSelected[dsModalTarget]||'').split(';').filter(Boolean);
+  const fnames=files.map(p=>esc(p.split(/[\\\\\\/]/).pop()));
+  box.innerHTML=files.length>1
+    ? `<div class="ds-file">📄 ${fnames[0]}</div><div style="font-size:10px;color:var(--mute);margin-top:4px">+${files.length-1} 个文件（共${files.length}，用「继续选择」追加）</div>`
+    : `<div class="ds-file">📄 ${fnames[0]}</div>`;
   closeDsModal();
   // 选择数据源后加载列（分析需要选列）
   if(dsModalTarget==='stats'){
@@ -489,8 +513,10 @@ async function loadColumns(mod, source){
   const firstNumIdx = (res.columns||[]).findIndex(c => (res.types[c]==='float'||res.types[c]==='integer'));
   const defaultIdx = firstNumIdx >= 0 ? firstNumIdx : 0;
   box.innerHTML='<b>选择分析列：</b> '+(res.columns||[]).map((c,i)=>
-    `<label style="margin-right:10px;font-size:12px"><input type="radio" name="${mod}-col" value="${c}" ${i===defaultIdx?'checked':''}> ${c} <span style="color:var(--mute)">(${res.types[c]})</span></label>`).join('')
+    `<label style="margin-right:10px;font-size:12px"><input type="radio" name="${mod}-col" value="${c}" ${i===defaultIdx?'checked':''} onchange="if(this.checked&&this.name==='stats-col')runStatsDS()"> ${c} <span style="color:var(--mute)">(${res.types[c]})</span></label>`).join('')
     +`<div style="color:var(--mute);font-size:11px;margin-top:4px">共 ${res.total_rows} 行</div>`;
+  // 默认列自动触发分析（仅 stats 且已选文件）
+  if(mod==='stats' && dsSelected['stats']) runStatsDS();
 }
 async function dsConnectDb(){
   const out=document.getElementById('ds-db-result');

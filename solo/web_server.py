@@ -436,6 +436,57 @@ class SoloHandler(BaseHTTPRequestHandler):
             o.build()
             self._json({"entities": list(o.entities.keys()), "triples": len(o.triples),
                         "summary": o.entity_summary()})
+        elif path == "/api/ontology-multi":
+            # 企业级本体：多表 + 自动推断实体/外键
+            from solo.factory import ontology as onto_mod
+            body = self._read_body()
+            o = onto_mod.Ontology()
+            data = body.get("data") or {}
+            if not data:
+                # 支持 csvs 数组 → 读多表
+                csvs = body.get("csvs") or []
+                for cp in csvs[:10]:
+                    p = _data_path(cp) or _safe_path(cp)
+                    if p:
+                        import csv as _csv
+                        from solo import data_connector as dc
+                        try:
+                            rows = dc.connect({"type": "csv", "path": p})
+                            tbl = os.path.splitext(os.path.basename(p))[0]
+                            data[tbl] = rows
+                        except Exception:
+                            pass
+            if not data:
+                self._json({"error": "无多表数据"}, 400)
+                return
+            # 自动 schema：每表一实体 + 外键推断（实体名美化：去前缀/下划线→驼峰）
+            schema = {"entities": [], "relations": []}
+            for tbl, rows in data.items():
+                if not rows:
+                    continue
+                # 实体名：表名去常见前缀(Factory_/T_/tbl_) + 下划线→驼峰
+                raw = tbl
+                for pref in ("factory_", "Factory_", "tbl_", "T_"):
+                    if raw.lower().startswith(pref):
+                        raw = raw[len(pref):]
+                        break
+                ent_name = "".join(w.capitalize() for w in raw.split("_") if w) or tbl
+                ent = {"id": ent_name, "table": tbl, "key": "id",
+                       "label": ent_name, "domain": "业务"}
+                if "id" not in rows[0] and rows[0]:
+                    ent["key"] = list(rows[0].keys())[0]
+                attrs = [{"name": c, "type": "string"} for c in rows[0]] if rows else []
+                ent["attributes"] = attrs
+                schema["entities"].append(ent)
+            model = o.from_schema(schema, data)
+            # 从图生成三元组（企业级关系）
+            triples = len(model["graph"]["edges"])
+            self._json({"entities": [ot["id"] for ot in model["object_types"]],
+                        "triples": triples,
+                        "nodes": len(model["graph"]["nodes"]),
+                        "edges": len(model["graph"]["edges"]),
+                        "link_types": [lt["id"] for lt in model["link_types"]],
+                        "model": model})
         elif path == "/api/memory-add":
             body = self._read_body()
             m = memory_mod.Memory()
@@ -599,6 +650,19 @@ def _load_rows(body: dict) -> list:
         if "path" in src:
             src["path"] = _data_path(src["path"]) or _safe_path(src["path"])
         return dc.connect(src)
+    if body.get("csvs"):
+        # 多文件合并为行列表（清洗/分析/建模多选）
+        merged = []
+        for cp in body["csvs"][:10]:
+            p = _data_path(cp) or _safe_path(cp)
+            if not p:
+                continue
+            stype = "xlsx" if p.lower().endswith(".xlsx") else "csv"
+            try:
+                merged.extend(dc.connect({"type": stype, "path": p}))
+            except DataSourceError:
+                continue
+        return merged
     if body.get("csv"):
         p = _data_path(body["csv"]) or _safe_path(body["csv"])
         stype = "xlsx" if p.lower().endswith(".xlsx") else "csv"
