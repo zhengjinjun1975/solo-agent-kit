@@ -2,6 +2,19 @@
 
 所有显著变更记录在此。格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [0.5.0] - 2026-08-10
+
+### 新增
+- AI 原生对话路由：agent.py 意图识别→调用全部套件模块（自然语言指挥）
+- Web 后端 web_server.py：完整 REST API（clean/stats/ontology/memory/skill/writing/code-overview/gen/setup/config）
+- 前端重写为 AI 原生设计（OpenClaw 式聊天对话框为中心，WorkBuddy 多面板）
+- provider.yaml 从文件读取真正生效
+
+### 修复
+- agent 兜底对话固定本地（不因 context 长误判走远端无key报错）
+- web_server POST 异常返回 500 JSON（不静默）
+- route 意图识别 9/9（memory_search 优先于 ontology）
+
 ## [0.4.0] - 2026-08-10
 
 ### 新增

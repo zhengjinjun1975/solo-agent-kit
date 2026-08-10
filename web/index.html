@@ -3,417 +3,221 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>solo-agent-kit — FDE 全栈工作台</title>
+<title>solo-agent-kit — AI 原生套件工作台</title>
 <style>
 /* ============================================================
-   solo-agent-kit 前端 — 融合 OpenClaw(暗色玻璃拟态) + WorkBuddy(办公多面板)
-   色彩：工业蓝(工厂套件) #6c8cff · 暖橙(个人套件) #ffb86c
-   深蓝黑背景 #0a0e1a · 玻璃面板 rgba(255,255,255,0.04)
+   solo-agent-kit — AI 原生设计（类似 OpenClaw 聊天对话框为中心）
+   融合 WorkBuddy 多面板结构 · 工业蓝(工厂)+暖橙(个人)+深蓝黑
+   对话是主入口：自然语言 → AI 路由到全部套件能力
    ============================================================ */
-:root {
-  --bg: #0a0e1a;
-  --bg2: #0e1424;
-  --panel: rgba(255, 255, 255, 0.04);
-  --panel-hover: rgba(255, 255, 255, 0.07);
-  --border: rgba(255, 255, 255, 0.08);
-  --text: #e4e7f0;
-  --text-dim: #8b93a7;
-  --text-mute: #5c6375;
-  --blue: #6c8cff;      /* 工厂套件 · 工业蓝 */
-  --orange: #ffb86c;    /* 个人套件 · 暖橙 */
-  --green: #27ae60;
-  --red: #e74c3c;
-  --glass: blur(16px) saturate(140%);
-  --radius: 14px;
+:root{
+  --bg:#0a0e1a; --panel:rgba(255,255,255,0.04); --panel-h:rgba(255,255,255,0.07);
+  --border:rgba(255,255,255,0.08); --text:#e4e7f0; --dim:#8b93a7; --mute:#5c6375;
+  --blue:#6c8cff; --orange:#ffb86c; --green:#27ae60; --red:#e74c3c;
+  --glass:blur(16px) saturate(140%); --r:14px;
 }
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body {
-  font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
-  background:
-    radial-gradient(1200px 800px at 20% -10%, rgba(108,140,255,0.12), transparent 60%),
-    radial-gradient(1000px 600px at 90% 110%, rgba(255,184,108,0.08), transparent 60%),
-    var(--bg);
-  color: var(--text);
-  min-height: 100vh;
-}
-/* ---- 布局 ---- */
-.app {
-  display: grid;
-  grid-template-columns: 220px 1fr 260px;
-  gap: 14px;
-  padding: 14px;
-  height: 100vh;
-}
-/* ---- 玻璃面板通用 ---- */
-.glass {
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  backdrop-filter: var(--glass);
-  -webkit-backdrop-filter: var(--glass);
-}
-/* ---- 左侧导航 ---- */
-.sidebar {
-  padding: 18px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-.logo { display: flex; align-items: center; gap: 10px; }
-.logo .dot {
-  width: 10px; height: 10px; border-radius: 50%;
-  background: linear-gradient(135deg, var(--blue), var(--orange));
-  box-shadow: 0 0 12px rgba(108,140,255,0.6);
-}
-.logo h1 { font-size: 15px; font-weight: 600; letter-spacing: 0.02em; }
-.logo span { font-size: 10px; color: var(--text-mute); display: block; }
-.nav-group { margin-bottom: 14px; }
-.nav-group .label {
-  font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em;
-  color: var(--text-mute); margin-bottom: 6px; padding: 0 8px;
-}
-.nav-item {
-  display: flex; align-items: center; gap: 9px;
-  padding: 8px 10px; border-radius: 9px; font-size: 13px;
-  color: var(--text-dim); cursor: pointer; transition: all 0.15s;
-}
-.nav-item:hover { background: var(--panel-hover); color: var(--text); }
-.nav-item.active {
-  background: rgba(108,140,255,0.12); color: var(--blue);
-  border-left: 2px solid var(--blue);
-}
-.nav-item .ic { width: 14px; height: 14px; border-radius: 4px; flex-shrink: 0; }
-.ic.blue { background: rgba(108,140,255,0.25); }
-.ic.orange { background: rgba(255,184,108,0.25); }
-.nav-item.factory .ic { background: rgba(108,140,255,0.3); }
-.nav-item.personal .ic { background: rgba(255,184,108,0.3); }
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
+  background:radial-gradient(1200px 800px at 20% -10%,rgba(108,140,255,0.12),transparent 60%),
+    radial-gradient(1000px 600px at 90% 110%,rgba(255,184,108,0.08),transparent 60%),var(--bg);
+  color:var(--text);height:100vh;overflow:hidden}
+.app{display:grid;grid-template-columns:200px 1fr 240px;gap:12px;padding:12px;height:100vh}
+.glass{background:var(--panel);border:1px solid var(--border);border-radius:var(--r);backdrop-filter:var(--glass);-webkit-backdrop-filter:var(--glass)}
 
-/* ---- 主工作区 ---- */
-.main { display: flex; flex-direction: column; gap: 14px; overflow: hidden; }
-.toolbar {
-  padding: 10px 16px; display: flex; align-items: center; justify-content: space-between;
-}
-.toolbar .title { font-size: 14px; font-weight: 600; }
-.toolbar .title .sub { font-size: 11px; color: var(--text-mute); margin-left: 8px; }
-.toolbar .actions { display: flex; gap: 8px; }
-.btn {
-  padding: 6px 14px; border-radius: 8px; border: 1px solid var(--border);
-  background: var(--panel); color: var(--text); font-size: 12px; cursor: pointer;
-  transition: all 0.15s;
-}
-.btn:hover { background: var(--panel-hover); }
-.btn.primary { background: linear-gradient(135deg, var(--blue), #5a7ae0); border: none; color: #fff; }
-.btn.primary:hover { filter: brightness(1.1); }
+/* 左导航 */
+.sidebar{padding:16px 12px;display:flex;flex-direction:column;gap:14px;overflow-y:auto}
+.logo{display:flex;align-items:center;gap:9px}
+.logo .dot{width:10px;height:10px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--orange));box-shadow:0 0 12px rgba(108,140,255,.6)}
+.logo h1{font-size:14px;font-weight:600}
+.logo span{font-size:9px;color:var(--mute);display:block}
+.ng{margin-bottom:10px}
+.ng .lbl{font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:var(--mute);margin-bottom:5px;padding:0 8px}
+.ni{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:8px;font-size:12px;color:var(--dim);cursor:pointer;transition:.15s}
+.ni:hover{background:var(--panel-h);color:var(--text)}
+.ni.on{background:rgba(108,140,255,.12);color:var(--blue);border-left:2px solid var(--blue)}
+.ni .ic{width:12px;height:12px;border-radius:3px;flex-shrink:0}
+.ni.f .ic{background:rgba(108,140,255,.3)}.ni.p .ic{background:rgba(255,184,108,.3)}.ni.s .ic{background:rgba(140,150,180,.3)}
 
-.content { flex: 1; overflow-y: auto; padding: 6px 4px; }
-.view { display: none; }
-.view.active { display: block; }
-.view-title { font-size: 12px; color: var(--text-dim); margin: 14px 6px 8px; }
+/* 主区：聊天中心 */
+.main{display:flex;flex-direction:column;overflow:hidden}
+.toolbar{padding:10px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.toolbar .t{font-size:14px;font-weight:600}
+.toolbar .t .sub{font-size:11px;color:var(--mute);margin-left:8px}
+.btn{padding:6px 14px;border-radius:8px;border:1px solid var(--border);background:var(--panel);color:var(--text);font-size:12px;cursor:pointer}
+.btn:hover{background:var(--panel-h)}
+.btn.pri{background:linear-gradient(135deg,var(--blue),#5a7ae0);border:none;color:#fff}
 
-/* 卡片网格 */
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
-.card {
-  padding: 14px; background: var(--panel); border: 1px solid var(--border);
-  border-radius: 12px; cursor: pointer; transition: all 0.15s;
-}
-.card:hover { background: var(--panel-hover); transform: translateY(-1px); }
-.card h3 { font-size: 13px; margin-bottom: 5px; }
-.card p { font-size: 11px; color: var(--text-dim); line-height: 1.5; }
-.card .tag {
-  display: inline-block; font-size: 9px; padding: 2px 7px; border-radius: 5px;
-  margin-top: 8px; letter-spacing: 0.03em;
-}
-.tag.blue { background: rgba(108,140,255,0.15); color: var(--blue); }
-.tag.orange { background: rgba(255,184,108,0.15); color: var(--orange); }
+/* 聊天中心（OpenClaw 式）*/
+.chat{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.chat-scroll{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:14px}
+.msg{max-width:76%;padding:12px 16px;border-radius:14px;font-size:13px;line-height:1.7}
+.msg.user{align-self:flex-end;background:rgba(108,140,255,.16);border:1px solid rgba(108,140,255,.25)}
+.msg.ai{align-self:flex-start;background:var(--panel);border:1px solid var(--border)}
+.msg .intent{font-size:10px;color:var(--mute);margin-bottom:6px;letter-spacing:.05em}
+.msg .intent b{color:var(--blue)}
+.msg .data{font-family:Consolas,monospace;font-size:11px;background:rgba(0,0,0,.25);border:1px solid var(--border);border-radius:8px;padding:8px;margin-top:8px;max-height:220px;overflow:auto;white-space:pre-wrap}
+.chat-input{padding:12px;background:var(--panel);border-top:1px solid var(--border);display:flex;gap:10px;align-items:center;flex-shrink:0}
+.chat-input input{flex:1;background:transparent;border:none;outline:none;color:var(--text);font-size:14px}
+.chat-input input::placeholder{color:var(--mute)}
+.chat-input .hint{font-size:10px;color:var(--mute)}
+.quick{display:flex;gap:6px;padding:0 16px 10px;flex-wrap:wrap;flex-shrink:0}
+.qc{padding:4px 10px;border-radius:14px;background:var(--panel);border:1px solid var(--border);font-size:11px;color:var(--dim);cursor:pointer}
+.qc:hover{background:var(--panel-h);color:var(--text)}
+.qc.blue{border-color:rgba(108,140,255,.3);color:var(--blue)}
+.qc.orange{border-color:rgba(255,184,108,.3);color:var(--orange)}
 
-/* 对话区 */
-.chat { display: flex; flex-direction: column; height: 100%; }
-.chat-box {
-  flex: 1; overflow-y: auto; padding: 10px 6px; display: flex; flex-direction: column; gap: 10px;
-}
-.msg { max-width: 80%; padding: 10px 14px; border-radius: 12px; font-size: 13px; line-height: 1.6; }
-.msg.user { align-self: flex-end; background: rgba(108,140,255,0.18); border: 1px solid rgba(108,140,255,0.25); }
-.msg.solo { align-self: flex-start; background: var(--panel); border: 1px solid var(--border); }
-.chat-input {
-  display: flex; gap: 8px; padding: 10px;
-  background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
-}
-.chat-input input {
-  flex: 1; background: transparent; border: none; outline: none;
-  color: var(--text); font-size: 13px;
-}
-.chat-input input::placeholder { color: var(--text-mute); }
-
-/* 右侧上下文面板 */
-.context { padding: 16px; overflow-y: auto; }
-.context .ctx-title { font-size: 11px; color: var(--text-mute); margin: 12px 0 8px; letter-spacing: 0.05em; }
-.context .stat {
-  padding: 8px 10px; background: var(--panel); border: 1px solid var(--border);
-  border-radius: 8px; margin-bottom: 6px; font-size: 12px;
-}
-.context .stat .num { font-size: 18px; font-weight: 600; }
-.context .stat .num.blue { color: var(--blue); }
-.context .stat .num.orange { color: var(--orange); }
-.context .stat .num.green { color: var(--green); }
-.context .tag-row { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+/* 右侧能力面板 */
+.ctx{padding:14px;overflow-y:auto}
+.ctx .lbl{font-size:10px;color:var(--mute);margin:10px 0 6px;letter-spacing:.05em}
+.ctx .stat{padding:7px 10px;background:var(--panel);border:1px solid var(--border);border-radius:8px;margin-bottom:5px;font-size:12px}
+.ctx .stat .num{font-size:16px;font-weight:600}
+.ctx .stat .num.blue{color:var(--blue)}.ctx .stat .num.orange{color:var(--orange)}.ctx .stat .num.green{color:var(--green)}
+.tag-row{display:flex;flex-wrap:wrap;gap:5px}
+.tag{font-size:9px;padding:2px 7px;border-radius:5px}
+.tag.blue{background:rgba(108,140,255,.15);color:var(--blue)}.tag.orange{background:rgba(255,184,108,.15);color:var(--orange)}
+.cap{display:flex;align-items:center;gap:7px;padding:5px 9px;background:rgba(255,255,255,.05);border-radius:7px;font-size:11px;margin-bottom:5px}
+.cap input{accent-color:var(--blue)}
 </style>
 </head>
 <body>
 <div class="app">
-  <!-- ===== 左侧导航 ===== -->
+  <!-- 左导航 -->
   <aside class="sidebar glass">
-    <div class="logo">
-      <div class="dot"></div>
-      <div>
-        <h1>solo-agent-kit</h1>
-        <span>FDE 全栈工作台 · 轻量方法论</span>
-      </div>
-    </div>
-
+    <div class="logo"><div class="dot"></div><div><h1>solo-agent-kit</h1><span>AI 原生 · FDE 套件</span></div></div>
     <nav>
-      <div class="nav-group">
-        <div class="label">工作区</div>
-        <div class="nav-item active" data-view="chat"><span class="ic blue"></span> 对话工作台</div>
-        <div class="nav-item" data-view="dashboard"><span class="ic blue"></span> 总览</div>
+      <div class="ng"><div class="lbl">对话</div>
+        <div class="ni s on" data-cap="chat"><span class="ic"></span> AI 工作台</div>
       </div>
-
-      <div class="nav-group">
-        <div class="label">工厂套件 <span style="color:var(--blue)">●</span></div>
-        <div class="nav-item factory" data-view="factory-clean"><span class="ic"></span> 数据清洗</div>
-        <div class="nav-item factory" data-view="factory-stats"><span class="ic"></span> 数据分析</div>
-        <div class="nav-item factory" data-view="factory-onto"><span class="ic"></span> 本体建模</div>
+      <div class="ng"><div class="lbl">工厂套件</div>
+        <div class="ni f" data-cap="clean"><span class="ic"></span> 数据清洗</div>
+        <div class="ni f" data-cap="stats"><span class="ic"></span> 数据分析</div>
+        <div class="ni f" data-cap="ontology"><span class="ic"></span> 本体建模</div>
       </div>
-
-      <div class="nav-group">
-        <div class="label">个人套件 <span style="color:var(--orange)">●</span></div>
-        <div class="nav-item personal" data-view="memory"><span class="ic"></span> 记忆</div>
-        <div class="nav-item personal" data-view="skill"><span class="ic"></span> 技能</div>
-        <div class="nav-item personal" data-view="writing"><span class="ic"></span> 写作</div>
-        <div class="nav-item personal" data-view="code"><span class="ic"></span> 代码</div>
+      <div class="ng"><div class="lbl">个人套件</div>
+        <div class="ni p" data-cap="memory"><span class="ic"></span> 记忆</div>
+        <div class="ni p" data-cap="skill"><span class="ic"></span> 技能</div>
+        <div class="ni p" data-cap="writing"><span class="ic"></span> 写作</div>
+        <div class="ni p" data-cap="code"><span class="ic"></span> 代码</div>
+        <div class="ni p" data-cap="gen"><span class="ic"></span> 生成</div>
       </div>
-
-      <div class="nav-group">
-        <div class="label">系统</div>
-        <div class="nav-item" data-view="setup"><span class="ic"></span> 部署</div>
-        <div class="nav-item" data-view="config"><span class="ic"></span> 配置</div>
+      <div class="ng"><div class="lbl">系统</div>
+        <div class="ni s" data-cap="setup"><span class="ic"></span> 部署</div>
+        <div class="ni s" data-cap="config"><span class="ic"></span> 配置</div>
       </div>
     </nav>
   </aside>
 
-  <!-- ===== 主工作区 ===== -->
-  <main class="main">
-    <div class="toolbar glass">
-      <div class="title">对话工作台 <span class="sub">记忆装载 → 推理 → 行动 → 记忆提交</span></div>
-      <div class="actions">
-        <button class="btn" id="btn-run">运行</button>
-        <button class="btn primary" id="btn-new">新建任务</button>
-      </div>
+  <!-- 主区：聊天中心 -->
+  <main class="main glass">
+    <div class="toolbar">
+      <div class="t">AI 工作台 <span class="sub">自然语言指挥 · AI 路由全部套件</span></div>
+      <button class="btn" id="btn-clear">清空对话</button>
     </div>
-
-    <div class="content">
-      <!-- 对话视图 -->
-      <div class="view active" id="view-chat">
-        <div class="chat" style="height:calc(100vh - 130px)">
-          <div class="chat-box" id="chat-box">
-            <div class="msg solo">👋 你好，我是 solo — 你的 FDE 全栈助手。<br>问我一件事，或让我处理一份工厂数据、建一个本体、写一段代码。</div>
-          </div>
-          <div class="chat-input">
-            <input id="chat-text" placeholder="输入任务… 例如：清洗 factory_sensor.csv 并分析温度异常">
-            <button class="btn primary" id="chat-send">发送</button>
-          </div>
-        </div>
+    <div class="chat">
+      <div class="chat-scroll" id="chat-scroll">
+        <div class="msg ai">👋 我是 solo —— 你的 FDE 全栈 AI 助手。<br>
+          用自然语言指挥我，我会调用全部套件能力：<br>
+          <span style="color:var(--blue)">工厂</span>：数据清洗 / 分析 / 本体建模 · <span style="color:var(--orange)">个人</span>：记忆 / 技能 / 写作 / 代码 / 生成</div>
       </div>
-
-      <!-- 总览视图 -->
-      <div class="view" id="view-dashboard">
-        <div class="view-title">套件总览</div>
-        <div class="grid">
-          <div class="card" data-goto="factory-clean"><h3>数据清洗</h3><p>缺失/重复/异常值/类型推断，喂干净数据给分析建模</p><span class="tag blue">工厂套件</span></div>
-          <div class="card" data-goto="factory-stats"><h3>数据分析</h3><p>描述统计/趋势/SPC控制图/相关性，判断设备状态</p><span class="tag blue">工厂套件</span></div>
-          <div class="card" data-goto="factory-onto"><h3>本体建模</h3><p>设备/工单 → 实体关系本体，结构化查询</p><span class="tag blue">工厂套件</span></div>
-          <div class="card" data-goto="memory"><h3>记忆</h3><p>三层两域记忆，语义检索，跨会话持久</p><span class="tag orange">个人套件</span></div>
-          <div class="card" data-goto="skill"><h3>技能</h3><p>从任务提取可复用经验，带版本/触发</p><span class="tag orange">个人套件</span></div>
-          <div class="card" data-goto="writing"><h3>写作</h3><p>六维中文写作检查 D1-D6</p><span class="tag orange">个人套件</span></div>
-          <div class="card" data-goto="code"><h3>代码</h3><p>生成/审查/库理解，影响分析</p><span class="tag orange">个人套件</span></div>
-        </div>
+      <div class="quick">
+        <span class="qc blue" data-q="清洗 examples/data/factory_sensor.csv 并去重">清洗传感器数据</span>
+        <span class="qc blue" data-q="分析 temp_c 的趋势和控制图">分析温度</span>
+        <span class="qc blue" data-q="用 factory_equipment.csv 建本体">建设备本体</span>
+        <span class="qc orange" data-q="查记忆：本体">查记忆</span>
+        <span class="qc orange" data-q="检查这段文本的文风：通过这个赋能闭环很关键">写作检查</span>
+        <span class="qc orange" data-q="写一个 README 给这个工具">生成 README</span>
       </div>
-
-      <!-- 工厂：数据清洗 -->
-      <div class="view" id="view-factory-clean">
-        <div class="view-title">数据清洗 — 缺失/重复/异常值处理</div>
-        <div class="card" style="cursor:default">
-          <h3>运行方式</h3>
-          <p style="font-family:monospace;font-size:12px">solo factory-clean &lt;data.csv&gt; [--method drop|zero|mean] [--outlier iqr|zscore]</p>
-          <p style="margin-top:8px;color:var(--text-dim)">从 CSV 数据文件出发，去重、处理缺失、识别异常值，产出干净数据 + 清洗报告。</p>
-          <span class="tag blue">工厂套件 · clean.py</span>
-        </div>
-      </div>
-
-      <!-- 工厂：数据分析 -->
-      <div class="view" id="view-factory-stats">
-        <div class="view-title">数据分析 — 描述/趋势/SPC/相关</div>
-        <div class="card" style="cursor:default">
-          <h3>运行方式</h3>
-          <p style="font-family:monospace;font-size:12px">solo factory-stats &lt;data.csv&gt; [--col 列名]</p>
-          <p style="margin-top:8px;color:var(--text-dim)">描述性统计（均值/中位数/标准差）、趋势方向、异常检测、SPC 控制图（UCL/LCL）、相关性。</p>
-          <span class="tag blue">工厂套件 · stats.py</span>
-        </div>
-      </div>
-
-      <!-- 工厂：本体建模 -->
-      <div class="view" id="view-factory-onto">
-        <div class="view-title">本体建模 — 实体关系</div>
-        <div class="card" style="cursor:default">
-          <h3>运行方式</h3>
-          <p style="font-family:monospace;font-size:12px">solo factory-onto &lt;data.csv&gt; [--entity 名] [--id 主键] [--relations rel.json]</p>
-          <p style="margin-top:8px;color:var(--text-dim)">CSV → 实体-关系-属性本体。relations.json 声明对象属性（外键→目标实体），生成可导航的实体关系图。</p>
-          <span class="tag blue">工厂套件 · ontology.py</span>
-        </div>
-      </div>
-
-      <!-- 个人：记忆 -->
-      <div class="view" id="view-memory">
-        <div class="view-title">记忆 — 三层两域</div>
-        <div class="grid">
-          <div class="card"><h3>热域·画像</h3><p>高频关键事实，每轮注入</p><span class="tag orange">profile</span></div>
-          <div class="card"><h3>温域·事实</h3><p>散点事实/决策，语义检索</p><span class="tag orange">facts</span></div>
-          <div class="card"><h3>温域·场景</h3><p>项目完整上下文，整包恢复</p><span class="tag orange">scenarios</span></div>
-          <div class="card"><h3>冷域·会话</h3><p>留底/文档，自动</p><span class="tag orange">sessions</span></div>
-        </div>
-      </div>
-
-      <!-- 个人：技能 -->
-      <div class="view" id="view-skill">
-        <div class="view-title">技能 — 可复用经验</div>
-        <div class="card" style="cursor:default">
-          <h3>技能提取</h3>
-          <p style="font-family:monospace;font-size:12px">solo skill-add "经验内容"</p>
-          <p style="margin-top:8px;color:var(--text-dim)">把踩过的坑/验证过的流程固化为可复用 skill，带触发词/版本/步骤。</p>
-          <span class="tag orange">个人套件 · skill.py</span>
-        </div>
-      </div>
-
-      <!-- 个人：写作 -->
-      <div class="view" id="view-writing">
-        <div class="view-title">写作 — 六维检查 D1-D6</div>
-        <div class="card" style="cursor:default">
-          <h3>写作质量把关</h3>
-          <p style="color:var(--text-dim)">D1错字 / D2标点(fail) / D3语病(fail) / D4数字 / D5去AI味 / D6活人感</p>
-          <p style="margin-top:8px;font-size:12px;color:var(--text-dim)">正确性 fail 必改，风格 warn 建议，保活人感。</p>
-          <span class="tag orange">个人套件 · writing.py</span>
-        </div>
-      </div>
-
-      <!-- 个人：代码 -->
-      <div class="view" id="view-code">
-        <div class="view-title">代码 — 生成/审查/库理解</div>
-        <div class="grid">
-          <div class="card"><h3>代码生成</h3><p>极简原则写代码</p><span class="tag orange">gen</span></div>
-          <div class="card"><h3>代码审查</h3><p>找真实 bug / 过度工程</p><span class="tag orange">gen</span></div>
-          <div class="card"><h3>库理解</h3><p>overview / explain 符号导航</p><span class="tag orange">code</span></div>
-          <div class="card"><h3>影响分析</h3><p>改代码前 impact()</p><span class="tag orange">code</span></div>
-        </div>
-      </div>
-
-      <!-- 系统：部署 -->
-      <div class="view" id="view-setup">
-        <div class="view-title">部署检查</div>
-        <div class="card" style="cursor:default">
-          <h3>运行方式</h3>
-          <p style="font-family:monospace;font-size:12px">solo setup</p>
-          <p style="margin-top:8px;color:var(--text-dim)">检查 Python 版本 / 本地 Ollama / provider.yaml 配置 / 记忆库状态。</p>
-          <span class="tag blue">系统</span>
-        </div>
-      </div>
-
-      <!-- 系统：配置 -->
-      <div class="view" id="view-config">
-        <div class="view-title">配置</div>
-        <div class="card" style="cursor:default">
-          <h3>运行方式</h3>
-          <p style="font-family:monospace;font-size:12px">solo config</p>
-          <p style="margin-top:8px;color:var(--text-dim)">查看 provider.yaml（本地/远端/嵌入分层），API key 从环境变量读，脱敏显示。</p>
-          <span class="tag blue">系统</span>
-        </div>
+      <div class="chat-input">
+        <input id="chat-input" placeholder="输入任务… 如：清洗 examples/data/factory_sensor.csv" autofocus>
+        <button class="btn pri" id="btn-send">发送</button>
       </div>
     </div>
   </main>
 
-  <!-- ===== 右侧上下文面板 ===== -->
-  <aside class="context glass">
-    <div class="ctx-title">系统状态</div>
-    <div class="stat"><span class="num blue" id="s-facts">0</span><br>记忆事实</div>
-    <div class="stat"><span class="num orange" id="s-skills">0</span><br>技能</div>
-    <div class="stat"><span class="num green" id="s-modules">11</span><br>核心模块</div>
-    <div class="stat"><span class="num" id="s-factory">3</span><br>工厂套件</div>
-
-    <div class="ctx-title">套件标签</div>
+  <!-- 右侧：能力面板 -->
+  <aside class="ctx glass">
+    <div class="lbl">系统状态</div>
+    <div class="stat"><span class="num blue" id="s-facts">0</span> 记忆事实</div>
+    <div class="stat"><span class="num orange" id="s-skills">0</span> 技能</div>
+    <div class="stat"><span class="num green" id="s-api">—</span> 后端状态</div>
+    <div class="lbl">套件能力</div>
+    <div id="cap-list"></div>
+    <div class="lbl">方法论</div>
     <div class="tag-row">
-      <span class="tag blue">clean</span>
-      <span class="tag blue">stats</span>
-      <span class="tag blue">ontology</span>
-      <span class="tag orange">memory</span>
-      <span class="tag orange">skill</span>
-      <span class="tag orange">writing</span>
-      <span class="tag orange">gen</span>
-      <span class="tag orange">code</span>
-    </div>
-
-    <div class="ctx-title">方法论</div>
-    <div class="tag-row">
-      <span class="tag blue">本体优先</span>
-      <span class="tag blue">三层两域</span>
-      <span class="tag orange">SSoT</span>
-      <span class="tag orange">反过度工程</span>
-      <span class="tag blue">轻 ≠ 不行</span>
+      <span class="tag blue">本体优先</span><span class="tag blue">三层两域</span>
+      <span class="tag orange">SSoT</span><span class="tag orange">轻≠不行</span>
     </div>
   </aside>
 </div>
 
 <script>
-// 视图切换
-document.querySelectorAll('.nav-item').forEach(item => {
-  item.addEventListener('click', () => {
-    document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
-    item.classList.add('active');
-    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-    const target = document.getElementById('view-' + item.dataset.view);
-    if (target) target.classList.add('active');
-    // 更新工具栏标题
-    document.querySelector('.toolbar .title').innerHTML =
-      item.textContent.trim() + ' <span class="sub">' + (item.dataset.view) + '</span>';
-  });
-});
-// 总览卡片跳转
-document.querySelectorAll('[data-goto]').forEach(card => {
-  card.addEventListener('click', () => {
-    const nav = document.querySelector(`.nav-item[data-view="${card.dataset.goto}"]`);
-    if (nav) nav.click();
-  });
-});
-// 对话发送
-document.getElementById('chat-send').addEventListener('click', sendChat);
-document.getElementById('chat-text').addEventListener('keydown', e => { if (e.key === 'Enter') sendChat(); });
-function sendChat() {
-  const box = document.getElementById('chat-box');
-  const input = document.getElementById('chat-text');
-  const text = input.value.trim();
-  if (!text) return;
-  box.insertAdjacentHTML('beforeend', `<div class="msg user">${escapeHtml(text)}</div>`);
-  input.value = '';
-  // 模拟 solo 响应（CLI 是真实后端；前端展示工作流提示）
-  box.insertAdjacentHTML('beforeend',
-    `<div class="msg solo">📋 已收到：记忆装载 → 推理 → 行动 → 记忆提交。<br>真实执行：<code style="font-size:11px;background:rgba(255,255,255,0.06);padding:2px 6px;border-radius:4px">solo run "${escapeHtml(text)}"</code><br><span style="color:var(--text-mute);font-size:11px">后端 CLI 驱动 · JSON 输出 · 分级退出码</span></div>`);
-  box.scrollTop = box.scrollHeight;
+// ===== 常量 =====
+const INTENT_NAME = {chat:'对话',clean:'数据清洗',stats:'数据分析',ontology:'本体建模',memory_search:'记忆检索',writing:'写作检查',code_overview:'代码库理解',gen:'生成',setup:'部署',config:'配置',skill:'技能'};
+
+// ===== API =====
+async function api(path,opts={}){const r=await fetch(path,{headers:{'Content-Type':'application/json'},...opts});return r.json();}
+
+// ===== 对话发送（AI 原生：前端把意图+参数传给后端 agent 路由）=====
+const input=document.getElementById('chat-input'), scroll=document.getElementById('chat-scroll');
+function addMsg(text,cls,intent){scroll.insertAdjacentHTML('beforeend',`<div class="msg ${cls}">${intent?`<div class="intent">⚡ <b>${intent}</b></div>`:''}${esc(text)}</div>`);scroll.scrollTop=scroll.scrollHeight;}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function pretty(o){return JSON.stringify(o,null,2).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function addData(msg,cls,o,intent){scroll.insertAdjacentHTML('beforeend',`<div class="msg ${cls}">${intent?`<div class="intent">⚡ <b>${INTENT_NAME[intent]||intent}</b></div>`:''}${esc(msg)}<div class="data">${pretty(o)}</div></div>`);scroll.scrollTop=scroll.scrollHeight;}
+
+async function send(){
+  const text=input.value.trim(); if(!text)return;
+  addMsg(text,'user'); input.value='';
+  addMsg('⏳ 处理中…','ai','');
+  const loading=scroll.lastElementChild;
+  try{
+    // 提取 csv/col 参数（若任务提到文件）
+    const csvMatch=text.match(/[\w\-/\\:]+\.csv/);
+    const colMatch=text.match(/(?:分析|看|查)\s+(\w+)/);
+    const res=await api('/api/agent',{method:'POST',body:JSON.stringify({task:text,csv:csvMatch?csvMatch[0]:null,col:colMatch?colMatch[1]:null})});
+    loading.remove();
+    if(res.intent==='chat'&&res.suggestion){addMsg(res.suggestion,'ai','chat');}
+    else{
+      const brief={};
+      if(res.intent==='clean')brief.summary=res.summary,brief.report=res.report;
+      else if(res.intent==='stats')brief.column=res.column,brief.describe=res.describe,brief.anomalies=res.anomalies,brief.control_chart=res.control_chart;
+      else if(res.intent==='ontology')brief.entities=res.entities,brief.triples=res.triples;
+      else if(res.intent==='memory_search')brief.results=res.results;
+      else if(res.intent==='writing')brief=res;
+      else if(res.intent==='code_overview')brief.indexed=res.indexed,brief.overview=res.overview;
+      else brief=res;
+      addData('完成', 'ai', brief, res.intent);
+    }
+    loadOverview();
+  }catch(e){loading.remove();addMsg('请求失败: '+e.message,'ai','error');}
 }
-function escapeHtml(s) {
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+document.getElementById('btn-send').addEventListener('click',send);
+input.addEventListener('keydown',e=>{if(e.key==='Enter')send();});
+document.getElementById('btn-clear').addEventListener('click',()=>{scroll.innerHTML='';});
+document.querySelectorAll('.qc').forEach(q=>q.addEventListener('click',()=>{input.value=q.dataset.q;send();}));
+
+// 导航（跳转到对话 + 暗示能力）
+document.querySelectorAll('.ni').forEach(n=>n.addEventListener('click',()=>{
+  document.querySelectorAll('.ni').forEach(x=>x.classList.remove('on'));n.classList.add('on');
+  input.placeholder='输入任务… 如：'+({clean:'清洗 examples/data/factory_sensor.csv',stats:'分析 temp_c 趋势',ontology:'建设备本体',memory:'查记忆：本体',skill:'沉淀技能：X',writing:'检查文风：文本',code:'代码库概览',gen:'写一个 README',setup:'部署检查',config:'查看配置'}[n.dataset.cap]||'自然语言任务');
+}));
+
+// ===== 能力面板 =====
+async function loadCapabilities(){
+  const res=await api('/api/capabilities');
+  const el=document.getElementById('cap-list');el.innerHTML='';
+  [...Object.entries(res.factory),...Object.entries(res.personal)].forEach(([name,meta])=>{
+    el.insertAdjacentHTML('beforeend',`<div class="cap"><input type="checkbox" ${meta.enabled?'checked':''} onchange="toggleCap('${meta.suite||(Object.keys(res.factory).includes(name)?'factory':'personal')}','${name}',this.checked)"><span>${name}</span></div>`);
+  });
 }
-// 新任务按钮
-document.getElementById('btn-new').addEventListener('click', () => {
-  document.querySelector('.nav-item[data-view="chat"]').click();
-  document.getElementById('chat-text').focus();
-});
+async function toggleCap(s,c,e){await api('/api/toggle',{method:'POST',body:JSON.stringify({suite:s,capability:c,enabled:e})});}
+async function loadOverview(){
+  try{const m=await api('/api/memory'),s=await api('/api/skills');
+    document.getElementById('s-facts').textContent=m.facts||0;
+    document.getElementById('s-skills').textContent=(s.skills||[]).length;
+    document.getElementById('s-api').textContent='在线';document.getElementById('s-api').style.color='var(--green)';
+  }catch(e){document.getElementById('s-api').textContent='离线';document.getElementById('s-api').style.color='var(--red)';}
+}
+loadCapabilities();loadOverview();
 </script>
 </body>
 </html>

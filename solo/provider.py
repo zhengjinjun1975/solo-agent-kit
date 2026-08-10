@@ -99,7 +99,7 @@ class Provider:
 
     # ---- 本地 Ollama ----
     def _ollama_generate(self, cfg, prompt: str) -> str:
-        url = cfg["base_url"].rstrip("/") + "/api/generate"
+        url = cfg.get("base_url", "http://127.0.0.1:11434").rstrip("/") + "/api/generate"
         payload = {"model": cfg.get("model"), "prompt": prompt, "stream": False}
         try:
             req = urllib.request.Request(url, data=json.dumps(payload).encode(),
@@ -111,7 +111,7 @@ class Provider:
             raise ProviderError(f"本地模型不可用（{reason}）", EXIT_NETWORK)
 
     def _ollama_embed(self, cfg, text: str) -> list:
-        url = cfg["base_url"].rstrip("/") + "/api/embeddings"
+        url = cfg.get("base_url", "http://127.0.0.1:11434").rstrip("/") + "/api/embeddings"
         payload = {"model": cfg.get("model"), "prompt": text}
         try:
             req = urllib.request.Request(url, data=json.dumps(payload).encode(),
