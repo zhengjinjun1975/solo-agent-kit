@@ -458,8 +458,11 @@ async function loadColumns(mod, source){
     : {csv:source};
   const res=await api('/api/datasource-columns',{method:'POST',body:JSON.stringify(body)});
   if(res.error){box.innerHTML='❌ '+res.error;return;}
+  // 默认选中第一个数值列（避免选中非数值列如timestamp导致分析失败）
+  const firstNumIdx = (res.columns||[]).findIndex(c => (res.types[c]==='float'||res.types[c]==='integer'));
+  const defaultIdx = firstNumIdx >= 0 ? firstNumIdx : 0;
   box.innerHTML='<b>选择分析列：</b> '+(res.columns||[]).map((c,i)=>
-    `<label style="margin-right:10px;font-size:12px"><input type="radio" name="${mod}-col" value="${c}" ${i===0?'checked':''}> ${c} <span style="color:var(--mute)">(${res.types[c]})</span></label>`).join('')
+    `<label style="margin-right:10px;font-size:12px"><input type="radio" name="${mod}-col" value="${c}" ${i===defaultIdx?'checked':''}> ${c} <span style="color:var(--mute)">(${res.types[c]})</span></label>`).join('')
     +`<div style="color:var(--mute);font-size:11px;margin-top:4px">共 ${res.total_rows} 行</div>`;
 }
 async function dsConnectDb(){

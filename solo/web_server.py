@@ -309,10 +309,17 @@ class SoloHandler(BaseHTTPRequestHandler):
                             break
                     if col:
                         break
-            if not col:
-                self._json({"error": "未找到数值列"}, 400)
-                return
             vals = [float(r[col]) for r in rows if col and r.get(col, "").strip() and _num(r.get(col))]
+            # 若指定列无数值，自动回退找第一个数值列（避免 400）
+            if not vals and col:
+                for r in rows:
+                    for k in r:
+                        if k != col and r.get(k, "").strip() and _num(r.get(k)):
+                            col = k
+                            break
+                    if col and any(_num(r.get(col, "")) for r in rows[:5]):
+                        break
+                vals = [float(r[col]) for r in rows if col and r.get(col, "").strip() and _num(r.get(col))]
             if not vals:
                 self._json({"error": "column not found or no numeric data"}, 400)
                 return
