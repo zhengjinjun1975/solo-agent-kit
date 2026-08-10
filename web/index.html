@@ -38,7 +38,7 @@ body{font-family:-apple-system,"Segoe UI","Microsoft YaHei",system-ui,sans-serif
 .logo-icon:hover{transform:rotate(-6deg) scale(1.05)}
 .logo-icon .l-s{font-size:18px;font-weight:800;color:#fff;letter-spacing:-1px;line-height:1}
 .logo-icon .l-dot{width:5px;height:5px;border-radius:50%;background:var(--orange);position:relative;top:11px;left:-2px;box-shadow:0 0 6px var(--orange)}
-.logo-text h1{font-size:19px;font-weight:800;letter-spacing:-.5px;color:var(--text)}
+.logo-text h1{font-size:22px;font-weight:800;letter-spacing:-.5px;color:var(--text)}
 .logo-text h1{background:linear-gradient(90deg,#1e3a8a 0%,#2563eb 60%,#f59e0b 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 .logo-text span{font-size:12px;color:#64748b;display:block;margin-top:3px}
 .logo .dot{width:10px;height:10px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--orange));box-shadow:0 0 12px rgba(108,140,255,.6)}
@@ -192,9 +192,10 @@ body{font-family:-apple-system,"Segoe UI","Microsoft YaHei",system-ui,sans-serif
     <!-- 数据分析工作区 -->
     <div id="ws-stats" style="display:none">
       <div class="lbl">数据分析 — 浏览文件→选择→分析</div>
-      <button class="btn" onclick="browseFile('stats')">📂 浏览数据文件</button>
+      <button class="btn" onclick="openDsModal('stats')">📂 浏览数据文件</button>
       <div id="browse-stats" style="font-size:11px;margin-top:6px"></div>
       <input type="text" id="ds-stats-path" placeholder="已选文件" readonly>
+      <div id="stats-cols" style="font-size:11px;margin-top:6px"></div>
       <div style="margin-top:6px"><button class="btn pri" onclick="runStatsDS()">分析</button></div>
       <div id="stats-result" style="font-size:11px;margin-top:8px"></div>
       <div id="stats-chart" style="margin-top:6px"></div>
@@ -203,9 +204,10 @@ body{font-family:-apple-system,"Segoe UI","Microsoft YaHei",system-ui,sans-serif
     <!-- 数据清洗工作区 -->
     <div id="ws-clean" style="display:none">
       <div class="lbl">数据清洗 — 浏览文件→选择→清洗</div>
-      <button class="btn" onclick="browseFile('clean')">📂 浏览数据文件</button>
+      <button class="btn" onclick="openDsModal('clean')">📂 浏览数据文件</button>
       <div id="browse-clean" style="font-size:11px;margin-top:6px"></div>
       <input type="text" id="ds-clean-path" placeholder="已选文件" readonly>
+      <div id="clean-cols" style="font-size:11px;margin-top:6px"></div>
       <div style="margin-top:6px"><button class="btn pri" onclick="runCleanDS()">清洗</button></div>
       <div id="clean-result" style="font-size:11px;margin-top:8px"></div>
       <div id="clean-preview" style="font-size:11px;margin-top:6px"></div>
@@ -214,7 +216,7 @@ body{font-family:-apple-system,"Segoe UI","Microsoft YaHei",system-ui,sans-serif
     <!-- 本体建模工作区 -->
     <div id="ws-ontology" style="display:none">
       <div class="lbl">本体建模 — 浏览文件→选择→建本体</div>
-      <button class="btn" onclick="browseFile('ontology')">📂 浏览数据文件</button>
+      <button class="btn" onclick="openDsModal('ontology')">📂 浏览数据文件</button>
       <div id="browse-ontology" style="font-size:11px;margin-top:6px"></div>
       <input type="text" id="ds-onto-path" placeholder="已选文件" readonly>
       <div style="margin-top:6px"><button class="btn pri" onclick="runOntoDS()">建本体</button></div>
@@ -490,32 +492,49 @@ function selectFile(mod, path){
   document.getElementById('browse-'+mod).innerHTML=`✅ 已选择：${path}`;
 }
 
-// ===== 数据清洗工作区（含预览）=====
+// ===== 数据源 → 请求体（支持 csv 或 db::table 数据库表）=====
+function dsBody(source){
+  if(source.includes('::')){
+    const [db,table]=source.split('::');
+    return {db,table};
+  }
+  return {csv:source};
+}
+
+// ===== 数据清洗工作区（动态列 + 数据源）=====
 async function runCleanDS(){
   const out=document.getElementById('clean-result');
   const prev=document.getElementById('clean-preview');
   out.innerHTML='⏳ 清洗中…'; prev.innerHTML='';
-  const csv=document.getElementById('ds-clean-path').value.trim();
-  if(!csv){out.innerHTML='⚠️ 请先浏览选择数据文件';return;}
-  const res=await api('/api/clean',{method:'POST',body:JSON.stringify({csv:csv})});
+  const source=document.getElementById('ds-clean-path').value.trim();
+  if(!source){out.innerHTML='⚠️ 请先浏览选择数据文件';return;}
+  // 用选定的数值列（若用户选了一个数值列做异常检测）
+  const selCol=document.querySelector('input[name="clean-col"]:checked');
+  const res=await api('/api/clean',{method:'POST',body:JSON.stringify({
+    ...dsBody(source),
+    numeric_cols: selCol?[selCol.value]:null
+  })});
+  if(res.error){out.innerHTML='❌ '+res.error;return;}
   const r=res.report||{};
   out.innerHTML=`<b>清洗完成 ${res.input}→${res.output} 行</b><br>
-    · 去重 ${r.dropped_dup||0} · 剔异常 ${r.dropped_outlier||0} · 补缺失 ${r.filled_missing||0}<br>
-    <span style="color:var(--mute)">类型：${Object.entries(r.types||{}).map(([k,v])=>`${k}=${v}`).join(', ')}</span>`;
-  // 清洗后数据预览(前5行)
-  if(res.sample){
+    · 去重 ${r.dropped_dup||0} · 剔异常 ${r.dropped_outlier||0} · 补缺失 ${r.filled_missing||0}`;
+  if(res.sample&&res.sample.length){
     prev.innerHTML='<b>清洗后数据预览（前5行）：</b><br>'+renderTable(res.sample);
   }
 }
 
-// ===== 数据分析工作区（含完整报告）=====
+// ===== 数据分析工作区（动态列 + 数据源）=====
 async function runStatsDS(){
   const out=document.getElementById('stats-result');
   const chart=document.getElementById('stats-chart');
   out.innerHTML='⏳ 分析中…'; chart.innerHTML='';
-  const csv=document.getElementById('ds-stats-path').value.trim();
-  if(!csv){out.innerHTML='⚠️ 请先浏览选择数据文件';return;}
-  const res=await api('/api/stats?csv='+encodeURIComponent(csv)+'&col=temp_c');
+  const source=document.getElementById('ds-stats-path').value.trim();
+  if(!source){out.innerHTML='⚠️ 请先浏览选择数据文件';return;}
+  const selCol=document.querySelector('input[name="stats-col"]:checked');
+  const col=selCol?selCol.value:null;
+  const body=dsBody(source);
+  const res=await api('/api/stats',{method:'POST',body:JSON.stringify({...body,col})});
+  if(res.error){out.innerHTML='❌ '+res.error;return;}
   const d=res.describe||{}, cc=res.control_chart||{};
   out.innerHTML=`<b>分析报告 — 列「${res.column}」</b><br>
     · 均值 ${d.mean} · 中位数 ${d.median} · 标准差 ${d.std}<br>
@@ -542,13 +561,15 @@ function drawControlChart(col, cc){
   </svg>`;
 }
 
-// ===== 本体建模工作区（SVG 关系图）=====
+// ===== 本体建模工作区（动态数据源 + SVG 关系图）=====
 async function runOntoDS(){
   const out=document.getElementById('onto-result');
   const graph=document.getElementById('onto-graph');
   out.innerHTML='⏳ 建模中…'; graph.innerHTML='';
-  const csv=document.getElementById('ds-onto-path').value.trim();
-  const res=await api('/api/ontology',{method:'POST',body:JSON.stringify({csv:csv||'examples/data/factory_equipment.csv',entity:'equip',id:'id'})});
+  const source=document.getElementById('ds-onto-path').value.trim();
+  if(!source){out.innerHTML='⚠️ 请先浏览选择数据文件';return;}
+  const res=await api('/api/ontology',{method:'POST',body:JSON.stringify({...dsBody(source)})});
+  if(res.error){out.innerHTML='❌ '+res.error;return;}
   out.innerHTML=`<b>${res.entities.length} 实体 · ${res.triples} 关系</b><br>${(res.entities||[]).join(' · ')}`;
   graph.innerHTML=drawOntoGraph(res.entities||[]);
 }
@@ -652,6 +673,100 @@ async function loadOverview(){
   }catch(e){document.getElementById('s-api').textContent='离线';document.getElementById('s-api').style.color='var(--red)';}
 }
 loadOverview();
+
+// ===== 数据源选择 Modal（文件浏览 + 数据库对接）=====
+let dsModalTarget='', dsCurrentDir='', dsSelectedSource='';
+function openDsModal(mod){
+  dsModalTarget=mod; dsSelectedSource='';
+  document.getElementById('ds-modal').style.display='flex';
+  document.getElementById('ds-selected-info').textContent='';
+  browseDir('');
+}
+function closeDsModal(){document.getElementById('ds-modal').style.display='none';}
+async function browseDir(dir){
+  dsCurrentDir=dir;
+  const box=document.getElementById('ds-file-list');
+  box.innerHTML='⏳ 加载…';
+  const res=await api('/api/browse?dir='+encodeURIComponent(dir));
+  let html='';
+  if(res.parent!==''&&res.parent!==undefined) html+=`<div class="ds-item dir" onclick="browseDir('${res.parent}')">📁 .. (上级)</div>`;
+  (res.dirs||[]).forEach(d=>{html+=`<div class="ds-item dir" onclick="browseDir('${d.path}')">📁 ${d.name}</div>`;});
+  (res.files||[]).forEach(f=>{html+=`<div class="ds-item file" onclick="dsSelectFile('${f.path}')">📄 ${f.name}</div>`;});
+  box.innerHTML=html||'<div style="color:var(--mute)">此目录无数据文件</div>';
+}
+function dsSelectFile(path){
+  dsSelectedSource=path;
+  document.getElementById('ds-selected-info').textContent='✅ 已选文件：'+path;
+  document.getElementById('ds-confirm').disabled=false;
+}
+function dsConfirm(){
+  if(!dsSelectedSource)return;
+  const map={clean:'ds-clean-path',stats:'ds-stats-path',ontology:'ds-onto-path'};
+  document.getElementById(map[dsModalTarget]).value=dsSelectedSource;
+  document.getElementById('browse-'+dsModalTarget).innerHTML=`✅ 已选择：${dsSelectedSource}`;
+  closeDsModal();
+  // 选择数据源后加载列（清洗/分析需要选列）
+  if(dsModalTarget==='clean'||dsModalTarget==='stats'){
+    loadColumns(dsModalTarget, dsSelectedSource);
+  }
+}
+// 动态加载列（清洗/分析选列）
+async function loadColumns(mod, source){
+  const box=document.getElementById(mod+'-cols');
+  if(!box)return;
+  box.innerHTML='⏳ 检测列…';
+  const body = source.includes('::')
+    ? (()=>{const [db,table]=source.split('::');return {db,table};})()
+    : {csv:source};
+  const res=await api('/api/datasource-columns',{method:'POST',body:JSON.stringify(body)});
+  if(res.error){box.innerHTML='❌ '+res.error;return;}
+  box.innerHTML='<b>选择列：</b> '+(res.columns||[]).map((c,i)=>
+    `<label style="margin-right:10px;font-size:12px"><input type="radio" name="${mod}-col" value="${c}" ${i===0?'checked':''}> ${c} <span style="color:var(--mute)">(${res.types[c]})</span></label>`).join('')
+    +`<div style="color:var(--mute);font-size:11px;margin-top:4px">共 ${res.total_rows} 行</div>`;
+}
+async function dsConnectDb(){
+  const out=document.getElementById('ds-db-result');
+  out.innerHTML='⏳ 连接测试中…';
+  const db=document.getElementById('ds-db-path').value.trim();
+  if(!db){out.innerHTML='⚠️ 请输入数据库文件路径';return;}
+  const res=await api('/api/db-connect',{method:'POST',body:JSON.stringify({db})});
+  if(!res.ok){out.innerHTML='❌ '+res.error;return;}
+  out.innerHTML='✅ 连接成功，表：<br>'+(res.tables||[]).map(t=>
+    `<div class="ds-item file" onclick="dsSelectTable('${db}','${t}')">🗄️ ${t}</div>`).join('');
+}
+function dsSelectTable(db,table){
+  dsSelectedSource=db+'::'+table;
+  document.getElementById('ds-selected-info').textContent=`✅ 已选数据库表：${table}`;
+  document.getElementById('ds-confirm').disabled=false;
+}
+
 </script>
+
+<!-- 数据源选择 Modal -->
+<div id="ds-modal" style="display:none;position:fixed;inset:0;background:rgba(17,24,39,.5);z-index:1000;align-items:center;justify-content:center">
+ <div style="background:#fff;border-radius:16px;width:560px;max-height:80vh;overflow:auto;padding:20px;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+     <b style="font-size:16px">选择数据源</b>
+     <button class="btn" onclick="closeDsModal()">✕</button>
+   </div>
+   <div style="display:flex;gap:8px;margin-bottom:14px">
+     <button class="btn" onclick="document.getElementById('ds-tab-file').style.display='block';document.getElementById('ds-tab-db').style.display='none'">📁 浏览文件</button>
+     <button class="btn" onclick="document.getElementById('ds-tab-file').style.display='none';document.getElementById('ds-tab-db').style.display='block'">🗄️ 对接数据库</button>
+   </div>
+   <div id="ds-tab-file">
+     <div id="ds-file-list" style="max-height:280px;overflow:auto;border:1px solid var(--border);border-radius:10px;padding:8px"></div>
+   </div>
+   <div id="ds-tab-db" style="display:none">
+     <input type="text" id="ds-db-path" placeholder="输入 .db/.sqlite 数据库文件路径" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px">
+     <button class="btn pri" onclick="dsConnectDb()">连接并列出表</button>
+     <div id="ds-db-result" style="font-size:12px;margin-top:8px"></div>
+   </div>
+   <div id="ds-selected-info" style="font-size:12px;color:var(--green);margin-top:12px;min-height:18px"></div>
+   <div style="margin-top:12px;display:flex;justify-content:flex-end;gap:8px">
+     <button class="btn" onclick="closeDsModal()">取消</button>
+     <button class="btn pri" id="ds-confirm" disabled onclick="dsConfirm()">确认选择</button>
+   </div>
+ </div>
+</div>
 </body>
 </html>

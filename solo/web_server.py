@@ -195,17 +195,48 @@ class SoloHandler(BaseHTTPRequestHandler):
                                           "exists": bool(sp and _os.path.exists(sp))})
             self._json(result)
         elif path == "/api/browse":
-            # 浏览可选数据文件（项目内 CSV/DB，供选择确认）
+            # 完整文件遍历：目录树导航（带 dir 参数，返回目录+文件，可上下级）
             import os as _os
             root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            files = []
-            for dp, dirs, fn in _os.walk(root):
-                dirs[:] = [d for d in dirs if d not in (".git", "__pycache__", "node_modules", ".venv")]
-                for f in fn:
-                    if f.endswith((".csv", ".db", ".sqlite", ".xlsx")):
-                        rel = _os.path.relpath(_os.path.join(dp, f), root).replace("\\", "/")
-                        files.append({"path": rel, "name": f})
-            self._json({"files": sorted(files, key=lambda x: x["name"])[:30]})
+            cur = _safe_path(qs.get("dir", [""])[0]) or root
+            cur = cur if _os.path.isdir(cur) else root
+            dirs, files = [], []
+            try:
+                for name in sorted(_os.listdir(cur)):
+                    full = _os.path.join(cur, name)
+                    rel = _os.path.relpath(full, root).replace("\\", "/")
+                    if _os.path.isdir(full):
+                        if name not in (".git", "__pycache__", "node_modules", ".venv", ".solo"):
+                            dirs.append({"path": rel, "name": name, "dir": True})
+                    else:
+                        if name.endswith((".csv", ".db", ".sqlite", ".xlsx", ".json")):
+                            files.append({"path": rel, "name": name, "dir": False})
+            except Exception:
+                pass
+            parent = "" if cur == root else _os.path.relpath(_os.path.dirname(cur), root).replace("\\", "/")
+            self._json({"dir": _os.path.relpath(cur, root).replace("\\", "/") or "/",
+                        "parent": parent, "dirs": dirs, "files": files})
+        elif path == "/api/db-connect":
+            # 数据库对接：连接→测试→列出表
+            from solo import data_connector as dc
+            body = self._read_body()
+            db = _safe_path(body.get("db", ""))
+            if not db or not os.path.exists(db):
+                self._json({"ok": False, "error": "数据库文件不存在"}, 400)
+                return
+            tables = dc.list_tables(db)
+            if not tables:
+                self._json({"ok": False, "error": "无法连接或库中无表"}, 400)
+                return
+            self._json({"ok": True, "db": db, "tables": tables})
+        elif path == "/api/db-preview":
+            # 数据库表预览（前几行）
+            from solo import data_connector as dc
+            body = self._read_body()
+            db = _safe_path(body.get("db", ""))
+            table = body.get("table", "")
+            rows = dc.connect({"type": "sqlite", "path": db, "table": table})[:5]
+            self._json({"rows": rows})
         else:
             self._json({"error": "unknown api"}, 404)
 
@@ -214,6 +245,32 @@ class SoloHandler(BaseHTTPRequestHandler):
             body = self._read_body()
             ok = _write_config(body.get("config", {}))
             self._json({"saved": ok})
+        elif path == "/api/stats":
+            # POST 数据分析（数据源对象：csv 或 db+table）
+            body = self._read_body()
+            rows = _load_rows(body)
+            col = body.get("col")
+            if not rows:
+                self._json({"error": "数据源无效或为空"}, 400)
+                return
+            if not col:
+                for r in rows:
+                    for k in r:
+                        if r.get(k, "").strip() and _num(r.get(k)):
+                            col = k
+                            break
+                    if col:
+                        break
+            if not col:
+                self._json({"error": "未找到数值列"}, 400)
+                return
+            vals = [float(r[col]) for r in rows if col and r.get(col, "").strip() and _num(r.get(col))]
+            if not vals:
+                self._json({"error": "column not found or no numeric data"}, 400)
+                return
+            self._json({"column": col, "describe": stats_mod.describe(vals),
+                        "anomalies": stats_mod.detect_anomaly(vals, method="iqr"),
+                        "control_chart": stats_mod.control_chart(vals)})
         elif path == "/api/run":
             body = self._read_body()
             from solo import agent as agent_mod
@@ -252,14 +309,29 @@ class SoloHandler(BaseHTTPRequestHandler):
                            outlier_method=body.get("outlier", "iqr"))
             self._json({"input": len(rows), "output": len(out), "report": cl.report,
                         "sample": out[:5]})
+        elif path == "/api/datasource-columns":
+            # 数据源列检测：读数据源返回列名+类型+预览（供清洗/分析选列）
+            body = self._read_body()
+            rows = _load_rows(body)
+            if not rows:
+                self._json({"error": "数据源无效或为空"}, 400)
+                return
+            cols = list(rows[0].keys()) if rows else []
+            types = {}
+            for c in cols:
+                vals = [r.get(c, "") for r in rows[:50] if r.get(c, "") != ""]
+                types[c] = _guess_col_type(vals)
+            self._json({"columns": cols, "types": types, "total_rows": len(rows),
+                        "preview": rows[:3]})
         elif path == "/api/ontology":
             from solo.factory import ontology as onto_mod
             body = self._read_body()
             o = onto_mod.Ontology()
             relations = None
-            csv_path = _safe_path(body.get("csv", ""))
-            if not csv_path or not os.path.exists(csv_path):
-                self._json({"error": "csv not found or outside project"}, 400)
+            # 数据源：csv 或 db+table
+            rows = _load_rows(body)
+            if not rows:
+                self._json({"error": "数据源无效或为空（CSV路径或数据库表）"}, 400)
                 return
             if body.get("relations"):
                 import json as _json
@@ -277,8 +349,8 @@ class SoloHandler(BaseHTTPRequestHandler):
                     if ent not in relations:
                         ent = next(iter(relations))
                     relations = relations[ent].get("object_properties", relations[ent])
-            o.from_csv(csv_path, entity_name=body.get("entity"),
-                       id_col=body.get("id"), relations=relations)
+            o.from_rows(rows, entity_name=body.get("entity"),
+                        id_col=body.get("id"), relations=relations)
             o.build()
             self._json({"entities": list(o.entities.keys()), "triples": len(o.triples),
                         "summary": o.entity_summary()})
@@ -380,6 +452,14 @@ def _load_rows(body: dict) -> list:
         if body.get("query"):
             return dc.connect({"type": "sql", "path": p, "query": body["query"]}) if p else []
     return []
+
+
+def _guess_col_type(vals: list) -> str:
+    """推断列类型（复用 clean 的逻辑）。"""
+    from solo.factory.clean import guess_type
+    if not vals:
+        return "empty"
+    return guess_type(str(vals[0]))
 
 
 def _write_config(config: dict) -> bool:

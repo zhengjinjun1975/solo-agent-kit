@@ -111,6 +111,35 @@ class Ontology:
                         self.triples.append((subj, pred, val))
         return len(self.entities)
 
+    def from_rows(self, rows: list, entity_name: str = None, id_col: str = None,
+                  relations: dict = None) -> None:
+        """从行列表(list[dict])建本体（支持 CSV/数据库表）。"""
+        if not rows:
+            return
+        entity = entity_name or "entity"
+        id_col = id_col or list(rows[0].keys())[0]
+        self.entity = entity
+        obj_props = relations or {}
+        # 参照类：对象属性 target_class
+        self.ref_classes = {v.get("target_class") for v in obj_props.values() if v.get("target_class")}
+        self.entities = {entity: {"cols": list(rows[0].keys()), "rows": rows}}
+        for rc in self.ref_classes:
+            self.entities[rc] = {"cols": [], "rows": []}
+        for i, r in enumerate(rows):
+            id_val = str(r.get(id_col, i))
+            self.triples.append((f"{entity}:{id_val}", "rdf:type", f"owl:{entity}"))
+            for k, v in r.items():
+                if v is None or str(v).strip() == "":
+                    continue
+                if k in obj_props:
+                    p = obj_props[k].get("rel", NS + local_name(k))
+                    t = obj_props[k].get("target_class", "Entity")
+                    self.triples.append((f"{entity}:{id_val}", p, f"{t}:{v}"))
+                    if v not in [x for x in self.entities[t]["rows"]]:
+                        self.entities[t]["rows"].append(v)
+                else:
+                    self.triples.append((f"{entity}:{id_val}", NS + local_name(k), str(v)))
+
     def build(self) -> None:
         """构建后处理：为对象属性补 target_class 的类声明（幂等）。"""
         # 收集所有被引用的目标类
