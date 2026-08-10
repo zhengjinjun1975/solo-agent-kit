@@ -206,6 +206,50 @@ class SoloHandler(BaseHTTPRequestHandler):
             # 环境监控（FDE 现场资源看板）
             from solo.factory import monitor as mon_mod
             self._json(mon_mod.system_stats())
+        elif path == "/api/monitor/devices":
+            # 厂区设备批量巡检（复用 monitor_devices）
+            try:
+                from solo.factory import monitor as mon_mod
+                self._json({"devices": mon_mod.monitor_devices()})
+            except Exception as e:
+                self._json({"error": str(e)}, 500)
+        elif path == "/api/site/devices":
+            # 厂区设备台账
+            try:
+                from solo.site import Site
+                s = Site()
+                devs = s.devices() if callable(getattr(s, "devices", None)) else []
+                cur = s.current_site if isinstance(s.current_site, str) else (s.current_site() if callable(s.current_site) else "")
+                self._json({"devices": devs, "site": cur})
+            except Exception as e:
+                self._json({"error": str(e)}, 500)
+        elif path == "/api/data/fetch":
+            # 从厂区设备远程拉数据（data_connector 设备数据源）
+            try:
+                body = self._read_body()
+                from solo import data_connector as dc
+                src = {"type": "device", "device": body.get("device", ""),
+                       "remote_path": body.get("remote_path", ""),
+                       "path_type": body.get("path_type", "csv")}
+                rows = dc.connect(src, limit=body.get("limit", 10))
+                self._json({"rows": rows[:body.get("limit", 10)], "count": len(rows)})
+            except Exception as e:
+                self._json({"error": str(e)}, 500)
+        elif path == "/api/charts/spc":
+            # SPC 控制图（visualize 插件）
+            try:
+                from urllib.parse import parse_qs, urlparse
+                from solo.plugins import visualize as viz
+                qs = parse_qs(urlparse(self.path).query)
+                values = [float(v) for v in qs.get("values", [""])[0].split(",") if v]
+                title = qs.get("title", ["SPC 控制图"])[0]
+                if not values:
+                    self._json({"error": "需要 values 参数(逗号分隔数值)"}, 400)
+                    return
+                r = viz.spc_chart(values, title=title, filename="web_spc")
+                self._json(r)
+            except Exception as e:
+                self._json({"error": str(e)}, 500)
         elif path == "/api/logs":
             # 日志诊断（FDE 排障第一动作）
             from solo.base import get_logs

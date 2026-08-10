@@ -26,6 +26,16 @@ _REGISTRY = {
         "dep": "matplotlib",       # 本机已装
         "desc": "数据可视化：SPC控制图/趋势图/异常标记",
     },
+    "excel_report": {
+        "module": "solo.plugins.excel_report",
+        "dep": "openpyxl",         # 本机已装
+        "desc": "Excel交付报告：清洗/分析/本体导出",
+    },
+    "netscan": {
+        "module": "solo.plugins.netscan",
+        "dep": "",                 # 零依赖
+        "desc": "局域网设备扫描：主机存活/端口/服务识别",
+    },
 }
 
 

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "solo-agent-kit"
-version = "0.8.3"
+version = "0.8.4"
 description = "本体优先、方法论驱动、轻量独立的一人公司 Agent —— 记忆/写作/代码/开源，一个人干完整活。"
 readme = "README.md"
 requires-python = ">=3.9"

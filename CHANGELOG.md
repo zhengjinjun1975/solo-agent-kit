@@ -2,6 +2,22 @@
 
 所有显著变更记录在此。格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [0.8.4] - 2026-08-11
+
+### 新增(插件P1 + 协议探针 + 前端厂区面板 + 竞品分析)
+- plugins/excel_report.py: Excel交付报告(清洗/分析/本体导出, openpyxl)
+- plugins/netscan.py: 局域网设备扫描(主机存活/端口/服务识别, 零依赖)
+- factory/probe.py: 工业协议探针(Modbus/TCP手写, HTTP, SNMPv1, 服务发现)
+- 前端厂区运维面板(site-panel): 设备台账/实时状态/SPC图
+- web_server 新增API: /api/site/devices /api/monitor/devices /api/data/fetch /api/charts/spc
+- docs/comparison.md: 竞品对比与覆盖率分析
+- 前端 logo 下方增加版本号显示
+
+### 验证
+- excel/netscan/probe 语法+功能(Modbus mock解析[4660,22136])
+- 前端厂区面板端到端(浏览器渲染通过)
+- 43 pytest 全绿
+
 ## [0.8.3] - 2026-08-10
 
 ### 新增(外部插件体系 — 增强综合能力)

@@ -14,6 +14,7 @@
   <div class="logo-icon"><span class="l-s">S</span><span class="l-dot"></span></div>
   <div class="logo-text"><h1>SoloAgentKit</h1><span>FDE 全栈套件 · AI 原生工作台</span></div>
 </div>
+<div style="padding:0 14px 10px;font-size:10px;color:var(--mute);text-align:center">v0.8.4</div>
     <nav>
       <div class="ng"><div class="lbl">工作台</div>
         <div class="ni s on" data-cap="chat">
@@ -54,6 +55,9 @@
         <div class="ni o" data-cap="monitor">
           <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 3v18h18"/><path d="M7 14l3-4 3 2 4-6 4 3"/></svg>
           监控</div>
+        <div class="ni o" data-cap="site-panel">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h.01M15 9h.01M9 13h.01M15 13h.01"/></svg>
+          厂区</div>
         <div class="ni o" data-cap="logs">
           <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
           日志</div>
@@ -218,6 +222,11 @@
       <div class="lbl">环境监控 — FDE 资源看板</div>
       <button class="btn pri run" onclick="runMonitor()">📈 刷新监控</button>
       <div id="monitor-result" style="font-size:12px;margin-top:10px"></div>
+    </div>
+
+    <!-- 厂区运维面板 -->
+    <div id="ws-site-panel" style="display:none">
+      <div class="lbl">厂区运维面板 — 设备台账 / 实时状态 / SPC</div>
     </div>
 
     <!-- 日志工作区（FDE 日志诊断） -->

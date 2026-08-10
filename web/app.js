@@ -184,7 +184,7 @@ async function selectDataSource(cap, ex){
 
 // ===== 工作区切换：导航点击在右侧渲染对应工作区 =====
 function showWorkspace(ws){
-  ['status','clean','stats','ontology','decisions','writing','code','skill','config','setup','monitor','logs','remote','issue'].forEach(id=>{
+  ['status','clean','stats','ontology','decisions','writing','code','skill','config','setup','monitor','logs','remote','issue','site-panel'].forEach(id=>{
     const el=document.getElementById('ws-'+id);
     if(el) el.style.display = (id===ws)?'block':'none';
   });
@@ -226,7 +226,7 @@ document.querySelectorAll('.ni').forEach(n=>n.addEventListener('click',()=>{
   // 非写作能力 → 移除 Canvas 模式（回到三栏对话布局）
   document.querySelector('.app').classList.remove('writing');
   // 数据模块 + 工作区 → 右侧面板
-  if(['clean','stats','ontology','decisions','code','skill','config','setup','monitor','logs','remote','issue'].includes(cap)){
+  if(['clean','stats','ontology','decisions','code','skill','config','setup','monitor','logs','remote','issue','site-panel'].includes(cap)){
     showWorkspace(cap);
     // 数据工作区：恢复已选文件显示（不自动执行）
     if(['clean','stats','ontology','decisions'].includes(cap)){
@@ -246,6 +246,7 @@ document.querySelectorAll('.ni').forEach(n=>n.addEventListener('click',()=>{
     if(cap==='config')loadConfigPanel();
     if(cap==='setup')loadSetupPanel();
     if(cap==='code')runCodeOverview();
+    if(cap==='site-panel')loadSitePanel();
     return;
   }
   input.placeholder='输入任务…';
@@ -573,6 +574,67 @@ async function runCodeGen(){
   if(res.summary)txt+='\n'+res.summary;
   txt+='\n\n'+ (res.output||'（无输出）');
   out.textContent=txt;
+}
+
+// ===== 厂区运维面板 =====
+async function loadSitePanel(){
+  const box=document.getElementById('ws-site-panel');
+  if(!box) return;
+  box.innerHTML=`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+      <button class="btn pri" onclick="refreshSitePanel()">🔄 刷新</button>
+      <button class="btn" onclick="siteSPC()">📈 SPC演示</button>
+      <span style="font-size:11px;color:var(--mute)" id="site-msg"></span></div>
+    <div id="site-devices" style="margin-bottom:12px"></div>
+    <div id="site-status" style="margin-bottom:12px"></div>
+    <div id="site-chart" style="width:100%;height:260px"></div>`;
+  await refreshSitePanel();
+}
+
+async function refreshSitePanel(){
+  const msg=document.getElementById('site-msg');
+  if(msg) msg.textContent='⏳ 加载…';
+  try{
+    // 1. 设备台账
+    const devs=await api('/api/site/devices');
+    const dbox=document.getElementById('site-devices');
+    if(devs.devices && devs.devices.length){
+      dbox.innerHTML=`<div style="font-size:11px;color:var(--mute);margin-bottom:4px">设备台账（${devs.site||''}）</div>
+        <table style="width:100%;font-size:11px;border-collapse:collapse">
+        <tr style="color:var(--mute)"><th style="text-align:left;padding:3px">设备</th><th>IP</th><th>端口</th><th>用户</th></tr>
+        ${devs.devices.map(d=>`<tr><td style="padding:3px">${esc(d.name||'')}</td><td style="text-align:center">${esc(d.host||'')}</td><td style="text-align:center">${d.port||''}</td><td style="text-align:center">${esc(d.user||'')}</td></tr>`).join('')}</table>`;
+    } else {
+      dbox.innerHTML=`<div style="font-size:11px;color:var(--mute)">暂无设备台账，请先 <code>solo site add-device</code> 添加</div>`;
+    }
+    // 2. 实时状态
+    const st=await api('/api/monitor/devices');
+    const sbox=document.getElementById('site-status');
+    if(st.devices && st.devices.length){
+      sbox.innerHTML=st.devices.map(d=>{
+        const nm=d.name||d.device||'设备';
+        const cpu=d.cpu!=null?`CPU ${d.cpu}%`:''; const mem=d.mem!=null?`MEM ${d.mem}%`:'';
+        return `<div style="font-size:11px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:6px 8px;margin-bottom:4px">
+          <b>${esc(nm)}</b> ${cpu} ${mem} ${d.ok?'' : (d.error?'<span style="color:#e74c3c"> ⚠ '+esc(d.error)+'</span>':'')}</div>`;
+      }).join('');
+    } else {
+      sbox.innerHTML=`<div style="font-size:11px;color:var(--mute)">无设备状态</div>`;
+    }
+    if(msg) msg.textContent='✅ 已刷新 '+new Date().toLocaleTimeString();
+  }catch(e){ if(msg) msg.textContent='✗ '+e; }
+}
+
+async function siteSPC(){
+  const box=document.getElementById('site-chart');
+  if(!box) return;
+  box.innerHTML='⏳ 生成SPC…';
+  // 演示数据（正态 + 一个失控点）
+  const vals=Array.from({length:20},(_,i)=> 50 + Math.round(8*Math.sin(i/2)) + (i===15?40:0));
+  try{
+    const r=await api('/api/charts/spc?values='+vals.join(','));
+    if(r.ok){
+      box.innerHTML=`<div style="font-size:11px;color:var(--mute);margin-bottom:4px">SPC 控制图（均值${r.mean} UCL${r.ucl} LCL${r.lcl} 失控${r.out_of_control}点）</div>
+        <img src="file:///${r.path.replace(/\\\\/g,'/')}" style="width:100%;border-radius:8px"/>`;
+    } else { box.innerHTML='✗ 出图失败: '+ (r.error||''); }
+  }catch(e){ box.innerHTML='✗ '+e; }
 }
 
 // ===== 技能工作区 =====
