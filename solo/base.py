@@ -12,6 +12,27 @@ import tempfile
 import threading
 
 # ---- 日志（P0-2）----
+# 内存日志缓冲（供前端日志诊断查看器）
+_LOG_BUFFER = []
+_LOG_BUFFER_LOCK = threading.Lock()
+_LOG_BUFFER_MAX = 500
+
+
+class MemoryLogHandler(logging.Handler):
+    """收集最近 N 条日志到内存缓冲（前端日志诊断用）。"""
+
+    def emit(self, record):
+        try:
+            msg = self.format(record)
+            with _LOG_BUFFER_LOCK:
+                _LOG_BUFFER.append({"ts": record.asctime, "level": record.levelname,
+                                    "name": record.name, "msg": msg})
+                if len(_LOG_BUFFER) > _LOG_BUFFER_MAX:
+                    del _LOG_BUFFER[:len(_LOG_BUFFER) - _LOG_BUFFER_MAX]
+        except Exception:
+            pass
+
+
 def get_logger(name: str) -> logging.Logger:
     """获取带统一格式的 logger。"""
     logger = logging.getLogger(name)
@@ -22,7 +43,21 @@ def get_logger(name: str) -> logging.Logger:
         logger.addHandler(handler)
         logger.setLevel(logging.INFO)
         logger.propagate = False
+        # 加内存缓冲（日志诊断）
+        mh = MemoryLogHandler()
+        mh.setFormatter(logging.Formatter(
+            "%(asctime)s %(levelname)s %(name)s: %(message)s"))
+        logger.addHandler(mh)
     return logger
+
+
+def get_logs(limit: int = 100, level: str = None) -> list:
+    """返回最近日志（供前端日志查看器）。level 过滤：INFO/WARN/ERROR。"""
+    with _LOG_BUFFER_LOCK:
+        logs = list(_LOG_BUFFER)
+    if level:
+        logs = [l for l in logs if l["level"] == level.upper()]
+    return logs[-limit:]
 
 
 # ---- 原子写（P0-1）----

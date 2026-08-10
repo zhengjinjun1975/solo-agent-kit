@@ -131,6 +131,57 @@ def _warranty(data, rule, thr):
     return out
 
 
+@_metric("forecast")
+def _forecast(data, rule, thr):
+    from collections import defaultdict
+    out = []
+    window = int(thr.get("forecast_window", 4))
+    drop = float(thr.get("forecast_drop", 0.3))
+    sales = data.get("sales", [])
+    by_p = defaultdict(list)
+    for s in sales:
+        by_p[s.get("product_id")].append(s)
+    for pid, rows in by_p.items():
+        rows.sort(key=lambda x: x.get("date", ""))
+        if len(rows) < 2:
+            continue
+        half = max(1, len(rows) // 2)
+        recent = sum(float(r.get("qty", 0)) for r in rows[-half:])
+        earlier = sum(float(r.get("qty", 0)) for r in rows[:half])
+        if earlier > 0 and (earlier - recent) / earlier > drop:
+            out.append({"entity": pid, "action": "销售下滑预警",
+                        "reason": f"近期销量比前期降{(earlier-recent)/earlier*100:.0f}%", "level": "预警"})
+    return out
+
+
+@_metric("price_compare")
+def _price_compare(data, rule, thr):
+    out = []
+    for p in data.get("products", []):
+        sid = p.get("supplier")
+        sup = next((s for s in data.get("suppliers", []) if s.get("id") == sid), None)
+        if sup:
+            out.append({"entity": p.get("id"), "action": "比价提示",
+                        "reason": f"产品{p.get('id')} 供应商{sup.get('name')} 价格{sup.get('price_rank','')}",
+                        "level": "建议"})
+    return out
+
+
+@_metric("supplier_score")
+def _supplier_score(data, rule, thr):
+    out = []
+    score_thr = float(thr.get("supplier_score", 70))
+    for s in data.get("suppliers", []):
+        on_time = float(s.get("on_time_pct", 100))
+        quality = float(s.get("quality_pct", 100))
+        score = on_time * 0.5 + quality * 0.5
+        if score < score_thr:
+            out.append({"entity": s.get("id"), "action": "供应商绩效预警",
+                        "reason": f"评分{score:.1f}<阈值{score_thr:g}(准时{on_time:g}/合格{quality:g})",
+                        "level": "预警"})
+    return out
+
+
 def run_decisions(data: dict, rules_path: str = None) -> dict:
     """执行声明式决策规则，返回可解释行动清单。
 

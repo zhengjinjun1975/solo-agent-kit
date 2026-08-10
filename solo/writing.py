@@ -11,6 +11,46 @@ import re
 
 VERSION = "1.0"
 
+# 风格模板（对标 OpenClaw 写作）：不同场景的写作风格约束
+STYLES = {
+    "tweet": {"name": "推文", "hint": "短小精悍，一句观点+一句佐证+一句行动，无破折号，口语化有活人感",
+              "max_len": 280, "rules": ["避免堆砌形容词", "结尾用洞察或反问"]},
+    "report": {"name": "报告", "hint": "冷静扎实，句长方差大，数据锚定，结论先行，结尾用洞察不用总结",
+               "max_len": 3000, "rules": ["前100字出矛盾不交代结论", "无破折号", "每条观点带证据"]},
+    "wechat": {"name": "公众号", "hint": "开头抓人，结构清晰，小标题分段，有故事感，结尾引导互动",
+               "max_len": 5000, "rules": ["避免教科书式开头", "多用具体案例"]},
+    "paper": {"name": "论文", "hint": "严谨客观，术语准确，逻辑链完整，论证有层次",
+              "max_len": 8000, "rules": ["避免口语化", "观点有出处"]},
+}
+
+def list_styles() -> dict:
+    """返回可用风格模板清单。"""
+    return {k: {"name": v["name"], "hint": v["hint"]} for k, v in STYLES.items()}
+
+def rewrite(text: str, style: str = "tweet", provider=None) -> dict:
+    """按风格模板改写文本（对标 OpenClaw 写作）。
+
+    style: tweet/report/wechat/paper
+    provider: 可选 LLM provider；无则用规则提示（返回风格指导）。
+    """
+    s = STYLES.get(style, STYLES["tweet"])
+    # 用 LLM 改写（若有 provider）
+    if provider:
+        prompt = (f"请把下面文本改写成{s['name']}风格。\n"
+                  f"风格要求：{s['hint']}\n规则：{'；'.join(s['rules'])}\n"
+                  f"保持原意，输出改写后的中文，不要解释。\n\n原文：\n{text}")
+        try:
+            out = provider.complete(prompt, tier="local")
+            return {"style": style, "style_name": s["name"], "rewritten": out,
+                    "original_len": len(text), "rewritten_len": len(out or "")}
+        except Exception:
+            pass
+    # 无 LLM：返回风格指导 + 字数提示
+    return {"style": style, "style_name": s["name"], "rewritten": "",
+            "hint": s["hint"], "rules": s["rules"],
+            "original_len": len(text), "max_len": s["max_len"],
+            "note": "未配置 LLM，返回风格指导；配置 provider 后可自动改写"}
+
 # D1 常见错别字对
 TYPO = {"寒喧": "寒暄", "幅射": "辐射", "决窍": "诀窍", "松驰": "松弛",
         "挖墙角": "挖墙脚", "言简意骇": "言简意赅", "世外桃园": "世外桃源"}

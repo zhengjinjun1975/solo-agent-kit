@@ -191,6 +191,16 @@ class SoloHandler(BaseHTTPRequestHandler):
             self._json(diag_mod.check_environment())
         elif path == "/api/deploy":
             self._json(_deploy())
+        elif path == "/api/monitor":
+            # 环境监控（FDE 现场资源看板）
+            from solo.factory import monitor as mon_mod
+            self._json(mon_mod.system_stats())
+        elif path == "/api/logs":
+            # 日志诊断（FDE 排障第一动作）
+            from solo.base import get_logs
+            qs_level = qs.get("level", [None])[0]
+            qs_limit = int(qs.get("limit", ["100"])[0])
+            self._json({"logs": get_logs(limit=qs_limit, level=qs_level)})
         elif path == "/api/config-test":
             # 测试模型连接（本地 Ollama + 远端 API）
             from solo import provider as provider_mod2
@@ -538,7 +548,21 @@ class SoloHandler(BaseHTTPRequestHandler):
         elif path == "/api/writing":
             from solo import writing as writing_mod
             body = self._read_body()
-            self._json(writing_mod.scan(body.get("text", "")))
+            if body.get("action") == "styles":
+                self._json({"styles": writing_mod.list_styles()})
+            elif body.get("action") == "rewrite":
+                from solo import provider as provider_mod2
+                p = provider_mod2.Provider.from_file()
+                self._json(writing_mod.rewrite(body.get("text", ""), body.get("style", "tweet"), provider=p))
+            else:
+                self._json(writing_mod.scan(body.get("text", "")))
+        elif path == "/api/code-review":
+            # 代码审查（对标 CodeAgent）
+            from solo import code as code_mod
+            body = self._read_body()
+            cg = code_mod.CodeGraph()
+            cg.index(body.get("dir") or "solo")
+            self._json(cg.review(body.get("file", "")))
         elif path == "/api/gen":
             from solo import gen as gen_mod
             body = self._read_body()

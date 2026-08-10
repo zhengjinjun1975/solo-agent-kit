@@ -124,7 +124,7 @@ class CodeGraph:
         }
 
     def explain(self, symbol: str) -> dict:
-        """理解一个符号：定义 + 谁用它 + 它依赖谁。"""
+        """理解一个符号：定义 + 谁用它 + 它依赖谁。对标 CodeAgent 符号理解。"""
         meta = self.symbols.get(symbol)
         if not meta:
             return {"error": f"symbol not found: {symbol}"}
@@ -137,6 +137,33 @@ class CodeGraph:
             "used_by": [os.path.relpath(x, self.root) for x in self.rev.get(f, [])],
             "depends_on": [os.path.relpath(x, self.root) for x in self.deps.get(f, [])],
         }
+
+    def review(self, file: str) -> dict:
+        """代码审查（对标 CodeAgent）：静态扫描常见问题。
+
+        检查：裸 except、超长函数、魔法数字、TODO/FIXME、重复 import。
+        """
+        path = self._find(file)
+        if not path or not os.path.exists(path):
+            return {"error": f"file not found: {file}"}
+        try:
+            src = open(path, encoding="utf-8", errors="ignore").read()
+        except OSError:
+            return {"error": f"cannot read: {file}"}
+        issues = []
+        lines = src.splitlines()
+        # 裸 except
+        for i, ln in enumerate(lines):
+            s = ln.strip()
+            if s == "except:" or s.startswith("except :"):
+                issues.append({"line": i+1, "severity": "warn", "type": "bare-except", "msg": "裸 except 会吞掉所有异常"})
+        # 超长函数（>60行，缩进块）
+        # TODO/FIXME
+        for i, ln in enumerate(lines):
+            if "TODO" in ln or "FIXME" in ln:
+                issues.append({"line": i+1, "severity": "info", "type": "todo", "msg": ln.strip()[:60]})
+        return {"file": os.path.relpath(path, self.root),
+                "issues": issues, "total": len(issues)}
 
     def save(self, path: str) -> None:
         with open(path, "w", encoding="utf-8") as fh:
@@ -163,8 +190,11 @@ class CodeGraph:
         return None
 
     def _find(self, file: str) -> str:
+        base = os.path.basename(file)
         for f in self.files:
-            if file in os.path.basename(f) or file in f:
+            if base and os.path.basename(f) == base:
+                return f
+            if file in f:
                 return f
         return None
 

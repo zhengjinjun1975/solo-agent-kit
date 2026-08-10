@@ -18,7 +18,17 @@
   "sales": {
     "rules": [
       {"id": "D4", "name": "信用", "metric": "aging", "table": "customers",
-       "action": "催收", "level": "预警"}
+       "action": "催收", "level": "预警"},
+      {"id": "D6", "name": "预测", "metric": "forecast", "table": "sales",
+       "action": "销售下滑预警", "level": "预警"}
+    ]
+  },
+  "procurement": {
+    "rules": [
+      {"id": "D7", "name": "比价", "metric": "price_compare", "table": "products",
+       "action": "比价提示", "level": "建议"},
+      {"id": "D8", "name": "供应商", "metric": "supplier_score", "table": "suppliers",
+       "action": "供应商绩效预警", "level": "预警"}
     ]
   },
   "equipment": {
