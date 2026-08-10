@@ -75,6 +75,9 @@ function addData(msg,cls,o,intent){
 
 async function send(){
   const text=input.value.trim(); if(!text)return;
+  // 聊天开始：隐藏居中的欢迎卡片 + 恢复消息流布局
+  const wc=document.getElementById('chat-welcome');
+  if(wc){ wc.style.display='none'; scroll.style.justifyContent='flex-start'; scroll.style.alignItems='stretch'; }
   addMsg(text,'user'); input.value='';
   addMsg('⏳ 处理中…','ai','');
   const loading=scroll.lastElementChild;

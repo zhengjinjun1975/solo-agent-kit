@@ -61,7 +61,15 @@ body{font-family:-apple-system,"Segoe UI","Microsoft YaHei",system-ui,sans-serif
 
 /* 聊天中心（OpenClaw 式）*/
 .chat{flex:1;display:flex;flex-direction:column;overflow:hidden}
-.chat-scroll{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:14px}
+.chat-scroll{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:14px;align-items:center;justify-content:center}
+.chat-welcome{text-align:center;max-width:560px;padding:20px;display:flex;flex-direction:column;align-items:center}
+.welcome-badge{font-size:56px;margin-bottom:14px}
+.welcome-title{font-size:28px;font-weight:800;color:var(--text);margin-bottom:10px}
+.welcome-sub{font-size:17px;color:var(--mute);margin-bottom:24px}
+.welcome-caps{display:flex;flex-direction:column;gap:12px;align-items:center}
+.wcap{padding:12px 20px;border-radius:12px;font-size:15px;font-weight:600;border:1px solid var(--border)}
+.wcap.blue{background:rgba(59,110,246,.08);color:var(--blue)}
+.wcap.orange{background:rgba(232,137,12,.08);color:var(--orange)}
 .msg{max-width:76%;padding:14px 18px;border-radius:16px;font-size:16px;line-height:1.7}
 .msg.user{align-self:flex-end;background:linear-gradient(135deg,var(--blue-bg),#dbe8ff);border:1px solid var(--blue-border);color:#102a4a;font-weight:500;box-shadow:0 2px 8px rgba(47,94,240,.08)}
 .msg.ai{align-self:flex-start;background:#fff;border:1px solid var(--border);box-shadow:0 2px 12px rgba(30,40,70,.07)}

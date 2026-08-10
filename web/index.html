@@ -64,9 +64,15 @@
     </div>
     <div class="chat">
       <div class="chat-scroll" id="chat-scroll">
-        <div class="msg ai">👋 我是 solo —— 你的 FDE 全栈 AI 助手。<br>
-          用自然语言指挥我，我会调用全部套件能力：<br>
-          <span style="color:var(--blue)">工厂</span>：数据清洗 / 分析 / 本体建模 · <span style="color:var(--orange)">个人</span>：记忆 / 技能 / 写作 / 代码 / 生成</div>
+        <div class="chat-welcome" id="chat-welcome">
+          <div class="welcome-badge">👋</div>
+          <h2 class="welcome-title">我是 <span style="color:var(--blue)">solo</span> —— 你的 FDE 全栈 AI 助手</h2>
+          <p class="welcome-sub">用自然语言指挥我，我会调用全部套件能力</p>
+          <div class="welcome-caps">
+            <span class="wcap blue">🏭 工厂：数据清洗 / 分析 / 本体建模</span>
+            <span class="wcap orange">🧠 个人：记忆 / 技能 / 写作 / 代码 / 生成</span>
+          </div>
+        </div>
       </div>
       <div class="quick">
         <span class="qc blue" data-q="清洗 examples/data/factory_sensor.csv 并去重">清洗传感器数据</span>
