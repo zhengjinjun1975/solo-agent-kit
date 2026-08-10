@@ -109,33 +109,51 @@
     <!-- 数据分析工作区 -->
     <div id="ws-stats" style="display:none">
       <div class="lbl">数据分析</div>
-      <div class="ds-picker" onclick="openDsModal('stats')">＋ 选择数据文件</div>
-      <div id="browse-stats" style="font-size:11px;margin-top:6px"></div>
-      <div id="stats-cols" style="font-size:11px;margin-top:6px"></div>
-      <div style="margin-top:6px"><button class="btn pri" onclick="runStatsDS()">分析</button></div>
-      <div id="stats-result" style="font-size:11px;margin-top:8px"></div>
-      <div id="stats-chart" style="margin-top:6px"></div>
+      <div class="ds-card" onclick="openDsModal('stats')">
+        <div class="ds-card-icon">📊</div>
+        <div class="ds-card-body">
+          <div class="ds-card-title">选择数据文件</div>
+          <div class="ds-card-sub" id="browse-stats">点击选择 CSV / 数据库文件</div>
+        </div>
+        <div class="ds-card-arrow">→</div>
+      </div>
+      <div id="stats-cols" style="font-size:12px;margin-top:8px"></div>
+      <button class="btn pri run" onclick="runStatsDS()">📊 开始分析</button>
+      <div id="stats-result" style="font-size:12px;margin-top:10px"></div>
+      <div id="stats-chart" style="margin-top:8px"></div>
     </div>
 
     <!-- 数据清洗工作区 -->
     <div id="ws-clean" style="display:none">
       <div class="lbl">数据清洗</div>
-      <div class="ds-picker" onclick="openDsModal('clean')">＋ 选择数据文件</div>
-      <div id="browse-clean" style="font-size:11px;margin-top:6px"></div>
-      <div id="clean-cols" style="font-size:11px;margin-top:6px"></div>
-      <div style="margin-top:6px"><button class="btn pri" onclick="runCleanDS()">清洗</button></div>
-      <div id="clean-result" style="font-size:11px;margin-top:8px"></div>
-      <div id="clean-preview" style="font-size:11px;margin-top:6px"></div>
+      <div class="ds-card" onclick="openDsModal('clean')">
+        <div class="ds-card-icon">🧹</div>
+        <div class="ds-card-body">
+          <div class="ds-card-title">选择数据文件</div>
+          <div class="ds-card-sub" id="browse-clean">点击选择 CSV / 数据库文件</div>
+        </div>
+        <div class="ds-card-arrow">→</div>
+      </div>
+      <div id="clean-cols" style="font-size:12px;margin-top:8px"></div>
+      <button class="btn pri run" onclick="runCleanDS()">🧹 开始清洗</button>
+      <div id="clean-result" style="font-size:12px;margin-top:10px"></div>
+      <div id="clean-preview" style="font-size:12px;margin-top:8px"></div>
     </div>
 
     <!-- 本体建模工作区（企业级多选） -->
     <div id="ws-ontology" style="display:none">
-      <div class="lbl">本体建模 — 添加多个数据文件，建企业级本体</div>
-      <div class="ds-picker" onclick="openDsModal('ontology')">＋ 添加数据文件</div>
-      <div id="browse-ontology" style="font-size:11px;margin-top:6px"></div>
-      <div style="margin-top:6px"><button class="btn pri" onclick="runOntoDS()">建企业级本体</button></div>
-      <div id="onto-result" style="font-size:11px;margin-top:8px"></div>
-      <div id="onto-graph" style="margin-top:6px"></div>
+      <div class="lbl">本体建模 — 企业级多实体</div>
+      <div class="ds-card" onclick="openDsModal('ontology')">
+        <div class="ds-card-icon">🕸️</div>
+        <div class="ds-card-body">
+          <div class="ds-card-title">添加数据文件（可多选）</div>
+          <div class="ds-card-sub" id="browse-ontology">点击选择，Ctrl 多选多个文件</div>
+        </div>
+        <div class="ds-card-arrow">→</div>
+      </div>
+      <button class="btn pri run" onclick="runOntoDS()">🕸️ 建企业级本体</button>
+      <div id="onto-result" style="font-size:12px;margin-top:10px"></div>
+      <div id="onto-graph" style="margin-top:8px"></div>
     </div>
 
     <!-- 决策工作区（企业决策：规则引擎→行动清单） -->

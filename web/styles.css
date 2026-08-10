@@ -94,7 +94,15 @@ body{font-family:-apple-system,"Segoe UI","Microsoft YaHei",system-ui,sans-serif
 .ctx .stat .num{font-size:16px;font-weight:600}
 .ctx .stat .num.blue{color:var(--blue)}.ctx .stat .num.orange{color:var(--orange)}.ctx .stat .num.green{color:var(--green)}
 .tag-row{display:flex;flex-wrap:wrap;gap:5px}
-.ds-picker{display:inline-block;padding:8px 14px;border:1px dashed var(--blue-border);border-radius:8px;color:var(--blue);font-size:12px;cursor:pointer;transition:all .2s var(--ease);background:var(--blue-bg)}
+.ds-card{display:flex;align-items:center;gap:14px;padding:14px 16px;border:1.5px dashed var(--blue-border);border-radius:14px;background:var(--blue-bg);cursor:pointer;transition:all .25s var(--ease)}
+.ds-card:hover{border-color:var(--blue);background:#eef4ff;transform:translateY(-1px);box-shadow:0 4px 16px rgba(47,94,240,.08)}
+.ds-card-icon{font-size:26px;flex-shrink:0}
+.ds-card-body{flex:1;min-width:0}
+.ds-card-title{font-size:14px;font-weight:700;color:var(--text)}
+.ds-card-sub{font-size:12px;color:var(--mute);margin-top:3px;line-height:1.5}
+.ds-card-arrow{font-size:18px;color:var(--blue);opacity:.6}
+.btn.pri.run{width:100%;margin-top:12px;padding:12px;font-size:15px;font-weight:700;border-radius:12px;background:linear-gradient(135deg,var(--blue),#4a7dff);box-shadow:0 4px 14px rgba(59,110,246,.25)}
+.btn.pri.run:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(59,110,246,.35)}
 .ds-picker:hover{background:var(--blue-border);transform:translateY(-1px)}
 .ds-file{display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:12px;color:var(--text)}
 .ds-item.file.selected{background:var(--blue-border);color:var(--blue);font-weight:600;border-color:var(--blue)}
