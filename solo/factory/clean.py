@@ -125,23 +125,26 @@ class DataCleaner:
 
     # ---- 异常值 ----
     def _outlier_iqr(self, rows: list, num_cols: list) -> list:
-        """IQR 法：Q1-1.5*IQR 以下 / Q3+1.5*IQR 以上为异常。"""
-        out = []
+        """IQR 法：Q1-1.5*IQR 以下 / Q3+1.5*IQR 以上为异常。
+
+        每列基于原始全量数据独立算界限，收集应删行，最后统一过滤一次——
+        避免逐列串行重算导致统计量被上一步删除污染。
+        """
+        to_drop = set()
         for c in num_cols:
             vals = [float(r[c]) for r in rows if _isnum(r.get(c))]
             if len(vals) < 4:
                 continue
             q1, q3 = _quantile(vals, 0.25), _quantile(vals, 0.75)
             iqr = q3 - q1
+            if iqr == 0:  # 数据太集中，无异常可判
+                continue
             lo, hi = q1 - 1.5 * iqr, q3 + 1.5 * iqr
-            dropped = 0
-            for r in rows:
+            for idx, r in enumerate(rows):
                 if _isnum(r.get(c)) and not (lo <= float(r[c]) <= hi):
-                    dropped += 1
-            self.report["dropped_outlier"] += dropped
-            out = [r for r in rows if not (_isnum(r.get(c)) and not (lo <= float(r[c]) <= hi))]
-            rows = out
-        return rows
+                    to_drop.add(idx)
+        self.report["dropped_outlier"] += len(to_drop)
+        return [r for i, r in enumerate(rows) if i not in to_drop]
 
     def _outlier_zscore(self, rows: list, num_cols: list) -> list:
         for c in num_cols:
