@@ -94,20 +94,18 @@ body{font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
   <div class="logo-text"><h1>SoloAgentKit</h1><span>FDE 全栈套件 · AI 原生工作台</span></div>
 </div>
     <nav>
-      <div class="ng"><div class="lbl">对话</div>
+      <div class="ng"><div class="lbl">工作台</div>
         <div class="ni s on" data-cap="chat"><span class="ic"></span> AI 工作台</div>
       </div>
-      <div class="ng"><div class="lbl">工厂套件</div>
+      <div class="ng"><div class="lbl">工厂数据</div>
         <div class="ni f" data-cap="clean"><span class="ic"></span> 数据清洗</div>
         <div class="ni f" data-cap="stats"><span class="ic"></span> 数据分析</div>
         <div class="ni f" data-cap="ontology"><span class="ic"></span> 本体建模</div>
       </div>
-      <div class="ng"><div class="lbl">个人套件</div>
-        <div class="ni p" data-cap="memory"><span class="ic"></span> 记忆</div>
-        <div class="ni p" data-cap="skill"><span class="ic"></span> 技能</div>
+      <div class="ng"><div class="lbl">工作区</div>
         <div class="ni p" data-cap="writing"><span class="ic"></span> 写作</div>
         <div class="ni p" data-cap="code"><span class="ic"></span> 代码</div>
-        <div class="ni p" data-cap="gen"><span class="ic"></span> 生成</div>
+        <div class="ni p" data-cap="skill"><span class="ic"></span> 技能</div>
       </div>
       <div class="ng"><div class="lbl">系统</div>
         <div class="ni s" data-cap="setup"><span class="ic"></span> 部署</div>
@@ -143,18 +141,63 @@ body{font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
     </div>
   </main>
 
-  <!-- 右侧：能力面板 -->
+  <!-- 右侧：工作区容器（点击导航渲染对应工作区面板） -->
   <aside class="ctx glass">
-    <div class="lbl">系统状态</div>
-    <div class="stat"><span class="num blue" id="s-facts">0</span> 记忆事实</div>
-    <div class="stat"><span class="num orange" id="s-skills">0</span> 技能</div>
-    <div class="stat"><span class="num green" id="s-api">—</span> 后端状态</div>
-    <div class="lbl">套件能力</div>
-    <div id="cap-list"></div>
-    <div class="lbl">方法论</div>
-    <div class="tag-row">
-      <span class="tag blue">本体优先</span><span class="tag blue">三层两域</span>
-      <span class="tag orange">SSoT</span><span class="tag orange">轻≠不行</span>
+    <!-- 系统状态（默认视图） -->
+    <div id="ws-status">
+      <div class="lbl">系统状态</div>
+      <div class="stat"><span class="num blue" id="s-facts">0</span> 记忆事实</div>
+      <div class="stat"><span class="num orange" id="s-skills">0</span> 技能</div>
+      <div class="stat"><span class="num green" id="s-api">—</span> 后端状态</div>
+      <div class="lbl">方法论</div>
+      <div class="tag-row">
+        <span class="tag blue">本体优先</span><span class="tag blue">三层两域</span>
+        <span class="tag orange">SSoT</span><span class="tag orange">轻≠不行</span>
+      </div>
+    </div>
+
+    <!-- 写作工作区 -->
+    <div id="ws-writing" style="display:none">
+      <div class="lbl">写作工作区 — 六维检查</div>
+      <textarea id="wr-text" rows="10" style="width:100%;background:#fff;border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;padding:10px;outline:none;resize:vertical" placeholder="在这里写作或粘贴文本，实时检查六维（错字/标点/语病/数字/去AI味/活人感）"></textarea>
+      <button class="btn pri" style="margin-top:8px;width:100%" onclick="runWritingCheck()">检查写作质量</button>
+      <div id="wr-result" style="margin-top:10px;font-size:12px"></div>
+    </div>
+
+    <!-- 代码工作区 -->
+    <div id="ws-code" style="display:none">
+      <div class="lbl">代码工作区 — 库理解/生成/审查</div>
+      <div class="stat" style="cursor:pointer" onclick="runCodeOverview()">📁 项目概览</div>
+      <div id="code-result" style="font-size:11px;max-height:200px;overflow:auto;white-space:pre-wrap;background:#f1f3f8;border:1px solid var(--border);border-radius:8px;padding:8px;margin-top:6px"></div>
+      <div class="lbl" style="margin-top:14px">代码生成</div>
+      <textarea id="code-prompt" rows="3" style="width:100%;background:#fff;border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12px;padding:8px;outline:none" placeholder="描述要生成的代码…"></textarea>
+      <button class="btn pri" style="margin-top:6px;width:100%" onclick="runCodeGen()">生成代码</button>
+      <div id="gen-result" style="font-size:11px;margin-top:8px;max-height:150px;overflow:auto;white-space:pre-wrap;background:#f1f3f8;border:1px solid var(--border);border-radius:8px;padding:8px"></div>
+    </div>
+
+    <!-- 技能工作区 -->
+    <div id="ws-skill" style="display:none">
+      <div class="lbl">技能库 — 可复用经验管理</div>
+      <div id="skill-list" style="font-size:12px"></div>
+      <div class="lbl" style="margin-top:14px">添加技能</div>
+      <input type="text" id="sk-name" placeholder="技能名" style="margin-bottom:4px">
+      <input type="text" id="sk-trigger" placeholder="触发词,逗号分隔" style="margin-bottom:4px">
+      <textarea id="sk-steps" rows="3" placeholder="执行步骤,换行分隔" style="width:100%;background:#fff;border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12px;padding:8px;outline:none"></textarea>
+      <button class="btn pri" style="margin-top:6px;width:100%" onclick="addSkill()">添加技能</button>
+    </div>
+
+    <!-- 配置工作区 -->
+    <div id="ws-config" style="display:none">
+      <div class="lbl">配置 — 工具必需配置项</div>
+      <div id="config-result" style="font-size:11px;max-height:280px;overflow:auto;white-space:pre-wrap;background:#f1f3f8;border:1px solid var(--border);border-radius:8px;padding:8px"></div>
+      <button class="btn" style="margin-top:8px;width:100%" onclick="loadConfigPanel()">刷新配置</button>
+    </div>
+
+    <!-- 部署工作区 -->
+    <div id="ws-setup" style="display:none">
+      <div class="lbl">部署 — 系统环境检查</div>
+      <div id="setup-result" style="font-size:11px;max-height:280px;overflow:auto;white-space:pre-wrap;background:#f1f3f8;border:1px solid var(--border);border-radius:8px;padding:8px"></div>
+      <button class="btn" style="margin-top:8px;width:100%" onclick="loadSetupPanel()">重新检查</button>
     </div>
   </aside>
 </div>
@@ -266,39 +309,179 @@ input.addEventListener('keydown',e=>{if(e.key==='Enter')send();});
 document.getElementById('btn-clear').addEventListener('click',()=>{scroll.innerHTML='';});
 document.querySelectorAll('.qc').forEach(q=>q.addEventListener('click',()=>{input.value=q.dataset.q;send();}));
 
-// 导航（所有项点击即调用对应模块, 走 agent 路由真实执行）
-const NAV_TASK = {
-  chat:'',
-  clean:'清洗 examples/data/factory_sensor.csv',
-  stats:'分析 temp_c 趋势和异常',
-  ontology:'用 examples/data/factory_equipment.csv 建本体',
-  memory:'查记忆：最近的事',
-  skill:'技能清单',
-  writing:'写作检查：这是测试文本，检查文风',
-  code:'代码库概览',
-  gen:'写一个 README 给这个工具',
-  setup:'部署检查',
-  config:'查看配置',
-  capabilities:'能力清单'
+// ===== 导航：每个按钮绑定确定性专用API(不走LLM路由,秒回可靠) =====
+// 各模块的执行映射：cap → {fn: 专用执行函数}
+async function runClean(csv){ return api('/api/clean',{method:'POST',body:JSON.stringify({csv:csv})}); }
+async function runStats(csv, col){ return api('/api/stats?csv='+encodeURIComponent(csv)+(col?'&col='+encodeURIComponent(col):'')); }
+async function runOnto(csv, entity, id){ return api('/api/ontology',{method:'POST',body:JSON.stringify({csv:csv,entity:entity||'equip',id:id||'id'})}); }
+async function runMemory(){ return api('/api/memory-search?q='+encodeURIComponent('最近')); }
+async function runSkill(){ return api('/api/skills'); }
+async function runCode(){ return api('/api/code-overview?dir='+encodeURIComponent('solo')); }
+async function runSetup(){ return api('/api/setup'); }
+async function runConfig(){ return api('/api/config'); }
+
+// 专用执行器（确定性模块，非LLM）
+const NAV_EXEC = {
+  clean: {intent:'clean', label:'数据清洗', needsData:true},
+  stats: {intent:'stats', label:'数据分析', needsData:true},
+  ontology:{intent:'ontology', label:'本体建模', needsData:true},
+  memory: {fn: runMemory, intent:'memory_search', label:'记忆'},
+  skill:  {fn: runSkill, intent:'skill', label:'技能'},
+  code:   {fn: runCode, intent:'code_overview', label:'代码库'},
+  setup:  {fn: runSetup, intent:'setup', label:'部署'},
+  config: {fn: runConfig, intent:'config', label:'配置'},
 };
+
+// 执行专用能力并友好显示（确定性, 秒回）
+async function execCap(cap){
+  const ex=NAV_EXEC[cap]; if(!ex) return;
+  // 数据类模块：需先激活(选择数据源)
+  if(ex.needsData){ return selectDataSource(cap, ex); }
+  addMsg(ex.label,'user');
+  addMsg('⏳ 处理中…','ai','');
+  const loading=scroll.lastElementChild;
+  try{
+    const res=await ex.fn();
+    loading.remove();
+    addData('完成','ai',res,ex.intent);
+  }catch(e){
+    loading.remove();
+    addMsg('❌ 请求失败: '+e.message,'ai','error');
+  }
+}
+
+// 数据源激活：选择数据文件 → 执行对应模块
+async function selectDataSource(cap, ex){
+  // 默认示例数据路径
+  const defaults={
+    clean:'examples/data/factory_sensor.csv',
+    stats:'examples/data/factory_sensor.csv',
+    ontology:'examples/data/factory_equipment.csv'
+  };
+  let csv=prompt(`${ex.label} — 输入 CSV 数据文件路径：`, defaults[cap]);
+  if(csv===null||csv.trim()==='')return;
+  addMsg(`${ex.label}（数据：${csv}）`,'user');
+  addMsg('⏳ 处理中…','ai','');
+  const loading=scroll.lastElementChild;
+  try{
+    let res;
+    if(cap==='clean') res=await runClean(csv);
+    else if(cap==='stats'){
+      const col=prompt('选择要分析的数值列（留空自动检测）：','');
+      res=await runStats(csv, col||null);
+    }else if(cap==='ontology'){
+      const ent=prompt('实体名（留空默认）：','equip');
+      const idc=prompt('主键列（留空默认id）：','id');
+      res=await runOnto(csv, ent, idc);
+    }
+    loading.remove();
+    addData('完成','ai',res,ex.intent);
+  }catch(e){
+    loading.remove();
+    addMsg('❌ 请求失败: '+e.message+'（检查数据文件路径）','ai','error');
+  }
+}
+
+// ===== 工作区切换：导航点击在右侧渲染对应工作区 =====
+function showWorkspace(ws){
+  ['status','writing','code','skill','config','setup'].forEach(id=>{
+    document.getElementById('ws-'+id).style.display = (id===ws)?'block':'none';
+  });
+}
+// 导航点击：工作台=对话区; 工厂数据=对话区(选数据执行); 工作区=右侧面板
 document.querySelectorAll('.ni').forEach(n=>n.addEventListener('click',()=>{
   document.querySelectorAll('.ni').forEach(x=>x.classList.remove('on'));n.classList.add('on');
   const cap=n.dataset.cap;
-  const task=NAV_TASK[cap];
-  if(cap==='chat'){ document.getElementById('chat-input').focus(); return; }
-  if(task){ input.value=task; send(); }
-  else input.placeholder='输入任务…';
+  if(cap==='chat'){ showWorkspace('status'); input.placeholder='自然语言指挥，AI路由全部套件'; input.focus(); return; }
+  // 工作区按钮 → 右侧面板
+  if(['writing','code','skill','config','setup'].includes(cap)){
+    showWorkspace(cap);
+    if(cap==='skill')loadSkillPanel();
+    if(cap==='config')loadConfigPanel();
+    if(cap==='setup')loadSetupPanel();
+    if(cap==='code')runCodeOverview();
+    return;
+  }
+  // 工厂数据按钮 → 对话区(选数据源执行)
+  if(NAV_EXEC[cap]){ showWorkspace('status'); execCap(cap); return; }
+  input.placeholder='输入任务…';
 }));
 
-// ===== 能力面板 =====
-async function loadCapabilities(){
-  const res=await api('/api/capabilities');
-  const el=document.getElementById('cap-list');el.innerHTML='';
-  [...Object.entries(res.factory),...Object.entries(res.personal)].forEach(([name,meta])=>{
-    el.insertAdjacentHTML('beforeend',`<div class="cap"><input type="checkbox" ${meta.enabled?'checked':''} onchange="toggleCap('${meta.suite||(Object.keys(res.factory).includes(name)?'factory':'personal')}','${name}',this.checked)"><span>${name}</span></div>`);
-  });
+// ===== 写作工作区 =====
+async function runWritingCheck(){
+  const text=document.getElementById('wr-text').value.trim();
+  const out=document.getElementById('wr-result');
+  if(!text){out.textContent='请先输入文本';return;}
+  out.textContent='⏳ 检查中…';
+  const res=await api('/api/writing',{method:'POST',body:JSON.stringify({text})});
+  const st=res.dimension_status||{};
+  out.innerHTML=`<b>${res.passed?'✅ 通过':'⚠️ 需修正'}</b>（${res.total_issues} 处提示，${res.fail_count} 处必修）<br>`
+    +Object.entries(st).map(([d,s])=>`${d}: <span style="color:${s==='pass'?'var(--green)':s==='fail'?'var(--red)':'var(--orange)'}">${s}</span>`).join(' · ')
+    +(res.issues&&res.issues.length?`<br><br>${res.issues.map(i=>`<span style="color:${i.severity==='fail'?'var(--red)':'var(--orange)'}">[${i.dim}]</span> ${i.msg}`).join('<br>')}`:'');
 }
-async function toggleCap(s,c,e){await api('/api/toggle',{method:'POST',body:JSON.stringify({suite:s,capability:c,enabled:e})});}
+
+// ===== 代码工作区 =====
+async function runCodeOverview(){
+  const out=document.getElementById('code-result');
+  out.textContent='⏳ 分析中…';
+  const res=await api('/api/code-overview?dir='+encodeURIComponent('solo'));
+  const ov=res.overview||{};
+  out.innerHTML=`📁 ${res.indexed} 文件，${res.symbols} 符号<br>核心模块：${(ov.top_core_modules||[]).map(m=>m.file).join(', ')||'—'}<br>目录：${Object.entries(ov.files_by_dir||{}).map(([d,n])=>`${d}(${n})`).join(' · ')}`;
+}
+async function runCodeGen(){
+  const prompt=document.getElementById('code-prompt').value.trim();
+  const out=document.getElementById('gen-result');
+  if(!prompt){out.textContent='请描述要生成的代码';return;}
+  out.textContent='⏳ 生成中（本地模型，稍候）…';
+  const res=await api('/api/gen',{method:'POST',body:JSON.stringify({kind:'code',topic:prompt})});
+  out.textContent=res.output||res.error||'完成';
+}
+
+// ===== 技能工作区 =====
+async function loadSkillPanel(){
+  const res=await api('/api/skills');
+  const el=document.getElementById('skill-list');
+  const sk=res.skills||[];
+  el.innerHTML = sk.length
+    ? sk.map(s=>`<div class="stat">🎯 ${s}</div>`).join('')
+    : '<div class="stat" style="color:var(--mute)">暂无技能，添加一个可复用经验</div>';
+}
+async function addSkill(){
+  const name=document.getElementById('sk-name').value.trim();
+  const trig=document.getElementById('sk-trigger').value.split(',').map(x=>x.trim()).filter(Boolean);
+  const steps=document.getElementById('sk-steps').value.split('\n').map(x=>x.trim()).filter(Boolean);
+  if(!name||!steps.length){alert('技能名和步骤必填');return;}
+  const res=await api('/api/skill-add',{method:'POST',body:JSON.stringify({name,trigger:trig,steps})});
+  document.getElementById('sk-name').value='';document.getElementById('sk-trigger').value='';document.getElementById('sk-steps').value='';
+  loadSkillPanel(); loadOverview();
+}
+
+// ===== 配置工作区 =====
+async function loadConfigPanel(){
+  const res=await api('/api/config');
+  const el=document.getElementById('config-result');
+  if(!res.configured){el.textContent=res.hint||'未配置';return;}
+  const p=res.config?.provider||{};
+  let html='⚙️ 模型分层配置：';
+  for(const [tier,meta] of Object.entries(p)){
+    html+=`\n【${tier}】\n`;
+    for(const [k,v] of Object.entries(meta))html+=`  ${k}: ${v}\n`;
+  }
+  el.textContent=html;
+}
+
+// ===== 部署工作区 =====
+async function loadSetupPanel(){
+  const res=await api('/api/setup');
+  const el=document.getElementById('setup-result');
+  const c=res.checks||{};
+  el.innerHTML=`<b>部署检查 ${res.all_ok?'✅ 全部就绪':'⚠️ 有项未就绪'}</b><br>`
+    +`· Python ${c.python?.version||'?'} ${c.python?.ok?'✅':'❌'}<br>`
+    +`· Ollama ${c.ollama?.ok?'✅ '+(c.ollama.models||[]).join(', '):'❌ 未运行'}<br>`
+    +`· 配置 ${c.config?.ok?'✅':'❌'}<br>`
+    +`· 记忆 ${c.memory?.facts||0} 条事实`;
+}
+
 async function loadOverview(){
   try{const m=await api('/api/memory'),s=await api('/api/skills');
     document.getElementById('s-facts').textContent=m.facts||0;
@@ -306,7 +489,7 @@ async function loadOverview(){
     document.getElementById('s-api').textContent='在线';document.getElementById('s-api').style.color='var(--green)';
   }catch(e){document.getElementById('s-api').textContent='离线';document.getElementById('s-api').style.color='var(--red)';}
 }
-loadCapabilities();loadOverview();
+loadOverview();
 </script>
 </body>
 </html>
