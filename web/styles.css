@@ -119,3 +119,51 @@ body{font-family:-apple-system,"Segoe UI","Microsoft YaHei",system-ui,sans-serif
 .tag.blue{background:rgba(108,140,255,.15);color:var(--blue)}.tag.orange{background:rgba(255,184,108,.15);color:var(--orange)}
 .cap{display:flex;align-items:center;gap:7px;padding:5px 9px;background:rgba(255,255,255,.05);border-radius:7px;font-size:11px;margin-bottom:5px}
 .cap input{accent-color:var(--blue)}
+
+/* ============================================================
+   写作工作台（Canvas 式，占主区）— 方向B
+   写作从右侧窄栏提升为主区编辑器，ChatGPT Canvas 式
+   ============================================================ */
+.app.writing{grid-template-columns:300px 1fr 300px}  /* 写作时右侧变写作辅助 */
+.app.writing .chat-view{display:none}                /* 隐藏对话主区 */
+.app.writing #writing-canvas{display:flex}           /* 显示写作画布 */
+
+/* 写作画布（主区编辑器） */
+#writing-canvas{display:none;flex:1;flex-direction:column;overflow:hidden;
+  background:
+    radial-gradient(600px 300px at 80% 0%, rgba(217,119,6,0.05), transparent 60%),
+    linear-gradient(180deg,rgba(255,255,255,0.94),rgba(248,250,253,0.9))}
+#writing-canvas .canvas-toolbar{padding:14px 22px;display:flex;align-items:center;gap:14px;flex-shrink:0;border-bottom:1px solid rgba(217,119,6,0.12);background:linear-gradient(90deg,rgba(254,240,220,0.5),rgba(255,255,255,0))}
+#writing-canvas .canvas-toolbar .ct-title{font-size:20px;font-weight:700;letter-spacing:-.02em}
+#writing-canvas .canvas-toolbar .ct-title .sub{font-size:14px;color:var(--mute);margin-left:8px;font-weight:500}
+#writing-canvas .canvas-toolbar .spacer{flex:1}
+#writing-canvas .canvas-toolbar select{padding:8px 12px;border-radius:10px;border:1px solid var(--border);background:#fff;color:var(--text);font-size:14px;outline:none;cursor:pointer}
+#writing-canvas .canvas-toolbar select:focus{border-color:var(--orange)}
+/* 编辑区 */
+#wc-edit-wrap{flex:1;display:flex;flex-direction:column;overflow:hidden;padding:18px 22px;gap:12px}
+#wc-edit-wrap .wc-meta{display:flex;gap:8px;flex-wrap:wrap}
+#wc-edit-wrap .wc-meta input{padding:9px 14px;border-radius:10px;border:1px solid var(--border);background:#fff;font-size:15px;outline:none;color:var(--text);flex:1}
+#wc-edit-wrap .wc-meta input:focus{border-color:var(--orange);box-shadow:0 0 0 3px rgba(217,119,6,.08)}
+#wc-edit{flex:1;width:100%;border:1px solid var(--border);border-radius:14px;background:#fff;padding:18px;font-size:16px;line-height:1.9;color:var(--text);outline:none;resize:none;font-family:-apple-system,"Segoe UI","Microsoft YaHei",system-ui,sans-serif;box-shadow:var(--shadow)}
+#wc-edit:focus{border-color:var(--orange);box-shadow:0 4px 24px rgba(217,119,6,.12)}
+#wc-edit::placeholder{color:#9ca3af}
+/* 生成/动作按钮行 */
+#wc-actions{display:flex;gap:10px;flex-wrap:wrap;flex-shrink:0}
+#wc-actions .btn{font-size:15px;padding:10px 18px;font-weight:600}
+#wc-actions .btn.pri{background:linear-gradient(135deg,var(--orange),#f59e0b);box-shadow:0 3px 12px rgba(217,119,6,.3)}
+#wc-actions .btn.pri:hover{box-shadow:0 5px 18px rgba(217,119,6,.4)}
+/* 方案模板快捷按钮 */
+.wc-tpls{display:flex;gap:8px;flex-wrap:wrap;flex-shrink:0}
+.wc-tpls .wc-tpl{padding:7px 14px;border-radius:14px;border:1px solid rgba(217,119,6,.3);background:rgba(254,240,220,.5);font-size:13px;color:#b45309;cursor:pointer;transition:all .2s var(--ease);font-weight:500}
+.wc-tpls .wc-tpl:hover{background:#fff;box-shadow:var(--shadow);transform:translateY(-1px)}
+/* 输出/检查结果 */
+#wc-result{margin-top:2px}
+#wc-result .wc-check-card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px 18px;font-size:14px;line-height:1.8;box-shadow:var(--shadow)}
+#wc-result .wc-check-card .c-title{font-size:15px;font-weight:700;margin-bottom:8px;color:var(--text)}
+#wc-result .wc-check-card .c-detail{margin:6px 0;padding:8px 12px;border-radius:8px;background:#f8fafc;border-left:3px solid var(--border)}
+/* 右侧写作辅助面板 */
+.writing-panel .lbl{margin-top:0}
+.writing-panel .style-card{padding:10px 13px;background:#fff;border:1px solid var(--border);border-radius:10px;margin-bottom:6px;cursor:pointer;transition:all .2s var(--ease);font-size:14px}
+.writing-panel .style-card:hover{background:#fff8f0;border-color:var(--orange);box-shadow:var(--shadow)}
+.writing-panel .style-card.on{border-color:var(--orange);background:linear-gradient(90deg,rgba(254,240,220,.6),#fff);font-weight:600}
+.writing-panel .style-card .s-desc{font-size:11px;color:var(--mute);margin-top:3px;line-height:1.5}

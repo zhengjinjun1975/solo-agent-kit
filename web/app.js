@@ -214,9 +214,19 @@ initNavCollapse();
 document.querySelectorAll('.ni').forEach(n=>n.addEventListener('click',()=>{
   document.querySelectorAll('.ni').forEach(x=>x.classList.remove('on'));n.classList.add('on');
   const cap=n.dataset.cap;
-  if(cap==='chat'){ showWorkspace('status'); input.placeholder='自然语言指挥，AI路由全部套件'; input.focus(); return; }
+  if(cap==='chat'){ 
+    document.querySelector('.app').classList.remove('writing');
+    showWorkspace('status'); input.placeholder='自然语言指挥，AI路由全部套件'; input.focus(); return; }
+  // 写作 → 主区 Canvas 模式（方向B）
+  if(cap==='writing'){
+    document.querySelector('.app').classList.add('writing');
+    showWorkspace('writing');   // 显示右侧写作辅助面板
+    return;
+  }
+  // 非写作能力 → 移除 Canvas 模式（回到三栏对话布局）
+  document.querySelector('.app').classList.remove('writing');
   // 数据模块 + 工作区 → 右侧面板
-  if(['clean','stats','ontology','decisions','writing','code','skill','config','setup','monitor','logs','remote','issue'].includes(cap)){
+  if(['clean','stats','ontology','decisions','code','skill','config','setup','monitor','logs','remote','issue'].includes(cap)){
     showWorkspace(cap);
     // 数据工作区：恢复已选文件显示（不自动执行）
     if(['clean','stats','ontology','decisions'].includes(cap)){
@@ -462,16 +472,84 @@ function renderTable(rows){
 }
 
 // ===== 写作工作区 =====
-async function runWritingCheck(){
-  const text=document.getElementById('wr-text').value.trim();
-  const out=document.getElementById('wr-result');
-  if(!text){out.textContent='请先输入文本';return;}
-  out.textContent='⏳ 检查中…';
-  const res=await api('/api/writing',{method:'POST',body:JSON.stringify({text})});
-  const st=res.dimension_status||{};
-  out.innerHTML=`<b>${res.passed?'✅ 通过':'⚠️ 需修正'}</b>（${res.total_issues} 处提示，${res.fail_count} 处必修）<br>`
-    +Object.entries(st).map(([d,s])=>`${d}: <span style="color:${s==='pass'?'var(--green)':s==='fail'?'var(--red)':'var(--orange)'}">${s}</span>`).join(' · ')
-    +(res.issues&&res.issues.length?`<br><br>${res.issues.map(i=>`<span style="color:${i.severity==='fail'?'var(--red)':'var(--orange)'}">[${i.dim}]</span> ${i.msg}`).join('<br>')}`:'');
+// ===== 写作画布（主区，方向B）=====
+let wcStyle = 'report';
+function wcStyleChange(){ wcStyle = document.getElementById('wc-style').value; }
+function wcPickStyle(el, st){
+  document.querySelectorAll('.style-card').forEach(x=>x.classList.remove('on'));
+  el.classList.add('on');
+  wcStyle = st;
+  const sel = document.getElementById('wc-style');
+  sel.value = st;
+}
+function wcClear(){ document.getElementById('wc-edit').value=''; document.getElementById('wc-result').innerHTML=''; }
+
+// 方案模板 → 填入主题和要点
+function wcTpl(kind){
+  const t = document.getElementById('wc-topic');
+  const p = document.getElementById('wc-points');
+  const m = {
+    delivery: ['工厂数据采集与分析系统交付方案','需求分析,系统架构,部署计划,验收标准,培训交接'],
+    deploy: ['AI 推理环境部署方案','环境检查,模型部署,服务启动,验证,故障处理'],
+    diagnostic: ['设备运行诊断报告','数据采集,异常识别,根因分析,处置建议'],
+    report: ['车间运行数据周报','产量,能耗,设备状态,异常,趋势'],
+  }[kind] || [];
+  t.value = m[0]||''; p.value = m[1]||'';
+  // 用模板内容直接生成
+  wcGenerate();
+}
+
+// ===== 部署（真实部署：检查→启动Ollama→验证）=====
+async function runDeploy(){
+  const out = document.getElementById('setup-result');
+  out.innerHTML = '⏳ 部署中…（检查环境 → 启动 Ollama → 验证模型）';
+  const res = await api('/api/deploy');
+  const steps = res.steps || res.logs || [];
+  out.innerHTML = (res.ok?'✅ 部署成功':'⚠️ 部署完成（有告警）') + '<br>'
+    + (Array.isArray(steps)?steps.map(s=>esc(s)).join('<br>') : esc(JSON.stringify(res)));
+}
+
+// 生成方案（从主题 + 要点，走 /api/gen 文档生成）
+async function wcGenerate(){
+  const topic = document.getElementById('wc-topic').value.trim();
+  const points = document.getElementById('wc-points').value.trim();
+  const edit = document.getElementById('wc-edit');
+  const out = document.getElementById('wc-result');
+  const base = topic || (points? points.split(',')[0] : '');
+  if(!base){ out.innerHTML='<div class="wc-check-card">⚠️ 请先输入写作主题</div>'; return; }
+  out.innerHTML='<div class="wc-check-card">⏳ 正在生成方案（本地模型，稍候）…</div>';
+  try{
+    // 用 gen 文档生成（kind=guide），把主题+要点拼进去
+    const prompt = (topic?('主题：'+topic+'。'):'') + (points?('要点：'+points+'。'):'') + '请写一份结构完整的方案文档（含背景、目标、方案、步骤、预期效果）。';
+    const res = await api('/api/gen',{method:'POST',body:JSON.stringify({kind:'guide',topic:prompt})});
+    if(res.output){ edit.value = res.output; out.innerHTML='<div class="wc-check-card" style="color:var(--green)">✅ 已生成方案，可在编辑区继续修改</div>'; }
+    else out.innerHTML='<div class="wc-check-card">⚠️ 生成失败：'+(res.error||'无输出')+'</div>';
+  }catch(e){ out.innerHTML='<div class="wc-check-card">⚠️ 生成出错：'+esc(e.message||e)+'</div>'; }
+}
+
+// 六维自检（走 /api/writing scan）
+async function wcCheck(){
+  const text = document.getElementById('wc-edit').value.trim();
+  const out = document.getElementById('wr-result');
+  if(!text){ out.innerHTML='<div class="wc-check-card">⚠️ 请先写内容</div>'; return; }
+  out.innerHTML='<div class="wc-check-card">⏳ 检查中…</div>';
+  const res = await api('/api/writing',{method:'POST',body:JSON.stringify({text})});
+  const st = res.dimension_status||{};
+  out.innerHTML=`<div class="wc-check-card"><div class="c-title">${res.passed?'✅ 通过':'⚠️ 需修正'}</div>`
+    +`<div>${res.total_issues} 处提示，${res.fail_count} 处必修</div>`
+    +`<div style="margin-top:6px">${Object.entries(st).map(([d,s])=>`<span style="display:inline-block;padding:2px 8px;border-radius:12px;margin:2px;background:${s==='pass'?'rgba(21,128,61,.1)':s==='fail'?'rgba(220,38,38,.1)':'rgba(217,119,6,.1)'};color:${s==='pass'?'var(--green)':s==='fail'?'var(--red)':'var(--orange)'};font-size:12px">${d}:${s}</span>`).join('')}</div>`
+    +(res.issues&&res.issues.length?`<div style="margin-top:8px">${res.issues.map(i=>`<div class="c-detail"><span style="color:${i.severity==='fail'?'var(--red)':'var(--orange)'}">[${i.dim}]</span> ${esc(i.msg)}</div>`).join('')}</div>`:'')+'</div>';
+}
+
+// 按风格改写（走 /api/writing rewrite）
+async function wcRewrite(){
+  const text = document.getElementById('wc-edit').value.trim();
+  const out = document.getElementById('wc-result');
+  if(!text){ out.innerHTML='<div class="wc-check-card">⚠️ 请先写内容</div>'; return; }
+  out.innerHTML='<div class="wc-check-card">⏳ 按「'+wcStyle+'」风格改写中…</div>';
+  const res = await api('/api/writing',{method:'POST',body:JSON.stringify({text, action:'rewrite', style:wcStyle})});
+  if(res.rewritten){ document.getElementById('wc-edit').value = res.rewritten; out.innerHTML='<div class="wc-check-card" style="color:var(--green)">✅ 已按「'+wcStyle+'」风格改写</div>'; }
+  else out.innerHTML='<div class="wc-check-card">⚠️ 改写失败：'+(res.error||'无输出')+'</div>';
 }
 
 // ===== 代码工作区 =====

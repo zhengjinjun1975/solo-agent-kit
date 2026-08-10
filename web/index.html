@@ -72,8 +72,8 @@
     </nav>
   </aside>
 
-  <!-- 主区：聊天中心 -->
-  <main class="main glass">
+  <!-- 主区：聊天中心 / 写作画布 -->
+  <main class="main glass chat-view">
     <div class="toolbar">
       <div class="t">AI 工作台 <span class="sub">自然语言指挥 · AI 路由全部套件</span></div>
       <button class="btn" id="btn-clear">清空对话</button>
@@ -102,6 +102,40 @@
         <input id="chat-input" placeholder="输入任务… 如：清洗 examples/data/factory_sensor.csv" autofocus>
         <button class="btn pri" id="btn-send">发送</button>
       </div>
+    </div>
+  </main>
+
+  <!-- 写作画布（主区，方向B：写作占主区 Canvas 式） -->
+  <main id="writing-canvas">
+    <div class="canvas-toolbar">
+      <div class="ct-title">✍️ 写作工作台 <span class="sub">方案 · 报告 · 文档生成与六维自检</span></div>
+      <div class="spacer"></div>
+      <select id="wc-style" onchange="wcStyleChange()">
+        <option value="report">📄 报告风格</option>
+        <option value="wechat">📱 公众号风格</option>
+        <option value="paper">📚 论文风格</option>
+        <option value="tweet">🐦 短推风格</option>
+      </select>
+    </div>
+    <div id="wc-edit-wrap">
+      <div class="wc-meta">
+        <input id="wc-topic" placeholder="写作主题/场景（如：工厂设备数据采集与分析方案）" style="flex:2">
+        <input id="wc-points" placeholder="要点（逗号分隔，选填）" style="flex:1">
+      </div>
+      <div class="wc-tpls">
+        <span class="wc-tpl" onclick="wcTpl('delivery')">📦 交付方案</span>
+        <span class="wc-tpl" onclick="wcTpl('deploy')">🚀 部署方案</span>
+        <span class="wc-tpl" onclick="wcTpl('diagnostic')">🩺 诊断报告</span>
+        <span class="wc-tpl" onclick="wcTpl('report')">📄 数据报告</span>
+      </div>
+      <textarea id="wc-edit" placeholder="在这里写作，或输入主题后点「✨ 生成方案」，再点「🛡 六维自检」检查质量…"></textarea>
+      <div id="wc-actions">
+        <button class="btn pri" onclick="wcGenerate()">✨ 生成方案</button>
+        <button class="btn" onclick="wcCheck()">🛡 六维自检</button>
+        <button class="btn" onclick="wcRewrite()">🎨 按风格改写</button>
+        <button class="btn" onclick="wcClear()">🗑 清空</button>
+      </div>
+      <div id="wc-result"></div>
     </div>
   </main>
 
@@ -224,12 +258,17 @@
       <div id="issue-result" style="font-size:12px;margin-top:10px"></div>
     </div>
 
-    <!-- 写作工作区 -->
-    <div id="ws-writing" style="display:none">
-      <div class="lbl">写作工作区 — 六维检查</div>
-      <textarea id="wr-text" rows="10" style="width:100%;background:#fff;border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;padding:10px;outline:none;resize:vertical" placeholder="在这里写作或粘贴文本，实时检查六维（错字/标点/语病/数字/去AI味/活人感）"></textarea>
-      <button class="btn pri" style="margin-top:8px;width:100%" onclick="runWritingCheck()">检查写作质量</button>
-      <div id="wr-result" style="margin-top:10px;font-size:12px"></div>
+    <!-- 写作辅助面板（主区画布的右侧辅助：风格 + 六维自检） -->
+    <div id="ws-writing" style="display:none" class="writing-panel">
+      <div class="lbl">写作风格</div>
+      <div class="style-card on" data-st="report" onclick="wcPickStyle(this,'report')">📄 报告 <div class="s-desc">冷静扎实 · 数据锚定 · 结论先行</div></div>
+      <div class="style-card" data-st="wechat" onclick="wcPickStyle(this,'wechat')">📱 公众号 <div class="s-desc">自然 · 无AI味 · 有活人感</div></div>
+      <div class="style-card" data-st="paper" onclick="wcPickStyle(this,'paper')">📚 论文 <div class="s-desc">严谨规范 · 逻辑严密</div></div>
+      <div class="style-card" data-st="tweet" onclick="wcPickStyle(this,'tweet')">🐦 短推 <div class="s-desc">简短有力 · 观点鲜明</div></div>
+      <div class="lbl" style="margin-top:14px">六维自检结果</div>
+      <div id="wr-result" style="font-size:12px"></div>
+      <div class="lbl" style="margin-top:14px">说明</div>
+      <div style="font-size:12px;color:var(--mute);line-height:1.7">写作主区支持「✨ 生成方案」（从主题写完整方案/报告）、「🎨 按风格改写」、「🛡 六维自检」（错字/标点/语病/数字/去AI味/活人感）。适合 FDE 现场写交付方案、部署方案、诊断报告、数据报告。</div>
     </div>
 
     <!-- 代码工作区 -->
