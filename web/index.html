@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>solo-agent-kit — AI 原生套件工作台</title>
+<title>SoloAgentKit — AI 原生套件工作台</title>
 <style>
 /* ============================================================
    solo-agent-kit — AI 原生设计（类似 OpenClaw 聊天对话框为中心）
@@ -11,21 +11,29 @@
    对话是主入口：自然语言 → AI 路由到全部套件能力
    ============================================================ */
 :root{
-  --bg:#f4f6fa; --panel:rgba(255,255,255,0.7); --panel-h:rgba(255,255,255,0.9);
-  --border:rgba(60,70,100,0.12); --text:#1c2333; --dim:#5c6478; --mute:#8a90a0;
-  --blue:#3b6ef6; --orange:#e8890c; --green:#1f9d55; --red:#d64541;
-  --glass:blur(16px) saturate(140%); --r:14px;
+  --bg:#eef1f7; --panel:rgba(255,255,255,0.85); --panel-h:#ffffff;
+  --border:rgba(45,55,85,0.18); --text:#111827; --dim:#4b5563; --mute:#6b7280;
+  --blue:#2f5ef0; --orange:#d97706; --green:#15803d; --red:#dc2626;
+  --blue-bg:#dbe6ff; --blue-border:#b3c8ff; --orange-bg:#fef0dc;
+  --glass:blur(16px) saturate(140%); --r:14px; --shadow:0 2px 12px rgba(30,40,70,0.08);
 }
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
   background:linear-gradient(135deg,#eef2fb 0%,#f8fafc 50%,#f3f6fa 100%);
   color:var(--text);height:100vh;overflow:hidden}
 .app{display:grid;grid-template-columns:200px 1fr 240px;gap:12px;padding:12px;height:100vh}
-.glass{background:var(--panel);border:1px solid var(--border);border-radius:var(--r);backdrop-filter:var(--glass);-webkit-backdrop-filter:var(--glass)}
+.glass{background:var(--panel);border:1px solid var(--border);border-radius:var(--r);backdrop-filter:var(--glass);-webkit-backdrop-filter:var(--glass);box-shadow:var(--shadow)}
 
 /* 左导航 */
 .sidebar{padding:16px 12px;display:flex;flex-direction:column;gap:14px;overflow-y:auto}
-.logo{display:flex;align-items:center;gap:9px}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-icon{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--blue),#7a5bf0);display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(47,94,240,.35);flex-shrink:0}
+.logo-icon .l-s{font-size:18px;font-weight:800;color:#fff;letter-spacing:-1px;line-height:1}
+.logo-icon .l-dot{width:5px;height:5px;border-radius:50%;background:var(--orange);position:relative;top:11px;left:-2px;box-shadow:0 0 6px var(--orange)}
+.logo-text h1{font-size:18px;font-weight:800;letter-spacing:-.5px;color:var(--text)}
+.logo-text .l-accent{color:var(--blue)}
+.logo-text .l-accent2{color:var(--orange)}
+.logo-text span{font-size:10px;color:var(--mute);display:block;margin-top:2px}
 .logo .dot{width:10px;height:10px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--orange));box-shadow:0 0 12px rgba(108,140,255,.6)}
 .logo h1{font-size:14px;font-weight:600}
 .logo span{font-size:9px;color:var(--mute);display:block}
@@ -40,7 +48,7 @@ body{font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
 /* 主区：聊天中心 */
 .main{display:flex;flex-direction:column;overflow:hidden}
 .toolbar{padding:10px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
-.toolbar .t{font-size:14px;font-weight:600}
+.toolbar .t{font-size:15px;font-weight:700}
 .toolbar .t .sub{font-size:11px;color:var(--mute);margin-left:8px}
 .btn{padding:6px 14px;border-radius:8px;border:1px solid var(--border);background:var(--panel);color:var(--text);font-size:12px;cursor:pointer}
 .btn:hover{background:var(--panel-h)}
@@ -50,8 +58,8 @@ body{font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
 .chat{flex:1;display:flex;flex-direction:column;overflow:hidden}
 .chat-scroll{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:14px}
 .msg{max-width:76%;padding:12px 16px;border-radius:14px;font-size:13px;line-height:1.7}
-.msg.user{align-self:flex-end;background:#dbe6ff;border:1px solid #b8ccff}
-.msg.ai{align-self:flex-start;background:#fff;border:1px solid var(--border)}
+.msg.user{align-self:flex-end;background:var(--blue-bg);border:1px solid var(--blue-border);color:#102a4a;font-weight:500}
+.msg.ai{align-self:flex-start;background:#fff;border:1px solid var(--border);box-shadow:0 1px 6px rgba(30,40,70,.06)}
 .msg .intent{font-size:10px;color:var(--mute);margin-bottom:6px;letter-spacing:.05em}
 .msg .intent b{color:var(--blue)}
 .msg .data{font-family:Consolas,monospace;font-size:11px;background:#f1f3f8;border:1px solid var(--border);border-radius:8px;padding:8px;margin-top:8px;max-height:220px;overflow:auto;white-space:pre-wrap}
@@ -82,7 +90,10 @@ body{font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
 <div class="app">
   <!-- 左导航 -->
   <aside class="sidebar glass">
-    <div class="logo"><div class="dot"></div><div><h1>solo-agent-kit</h1><span>AI 原生 · FDE 套件</span></div></div>
+    <div class="logo">
+  <div class="logo-icon"><span class="l-s">S</span><span class="l-dot"></span></div>
+  <div class="logo-text"><h1>Solo<span class="l-accent">Agent</span><span class="l-accent2">Kit</span></h1><span>FDE 全栈套件 · AI 原生工作台</span></div>
+</div>
     <nav>
       <div class="ng"><div class="lbl">对话</div>
         <div class="ni s on" data-cap="chat"><span class="ic"></span> AI 工作台</div>
