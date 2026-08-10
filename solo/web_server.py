@@ -394,7 +394,22 @@ class SoloHandler(BaseHTTPRequestHandler):
         elif path == "/api/datasource-columns":
             # 数据源列检测：读数据源返回列名+类型+预览（供清洗/分析选列）
             body = self._read_body()
-            rows = _load_rows(body)
+            # 支持多文件 csvs（合并多表列）
+            if body.get("csvs"):
+                all_rows = []
+                for cp in body["csvs"][:10]:
+                    p = _data_path(cp) or _safe_path(cp)
+                    if p:
+                        from solo import data_connector as dc
+                        try:
+                            rows = dc.connect({"type": "csv", "path": p})
+                            if rows:
+                                all_rows.extend(rows)
+                        except Exception:
+                            pass
+                rows = all_rows
+            else:
+                rows = _load_rows(body)
             if not rows:
                 self._json({"error": "数据源无效或为空"}, 400)
                 return

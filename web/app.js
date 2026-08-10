@@ -604,9 +604,17 @@ async function loadColumns(mod, source){
   // 清洗=整表处理(不选列); 只有分析需要选数值列
   if(mod==='clean'){ box.innerHTML=''; return; }
   box.innerHTML='⏳ 检测列…';
-  const body = source.includes('::')
-    ? (()=>{const [db,table]=source.split('::');return {db,table};})()
-    : {csv:source};
+  // 支持多文件（分号分隔 → csvs 数组）
+  let body;
+  if(source.includes(';')){
+    const csvs=source.split(';').map(s=>s.trim()).filter(Boolean);
+    body={csvs:csvs};
+  } else if(source.includes('::')){
+    const [db,table]=source.split('::');
+    body={db,table};
+  } else {
+    body={csv:source};
+  }
   const res=await api('/api/datasource-columns',{method:'POST',body:JSON.stringify(body)});
   if(res.error){box.innerHTML='❌ '+res.error;return;}
   // 默认选中第一个数值列（避免选中非数值列如timestamp导致分析失败）
