@@ -96,9 +96,9 @@ class Provider:
                                          headers={"Content-Type": "application/json"})
             with urllib.request.urlopen(req, timeout=120) as r:
                 return json.load(r).get("response", "")
-        except urllib.error.URLError as e:
-            # 远端已降级到本地仍失败 → 明确报错
-            raise ProviderError(f"本地模型不可用（{e.reason}）", EXIT_NETWORK)
+        except (urllib.error.URLError, ConnectionError, OSError) as e:
+            reason = getattr(e, "reason", e)
+            raise ProviderError(f"本地模型不可用（{reason}）", EXIT_NETWORK)
 
     def _ollama_embed(self, cfg, text: str) -> list:
         url = cfg["base_url"].rstrip("/") + "/api/embeddings"
@@ -108,8 +108,9 @@ class Provider:
                                          headers={"Content-Type": "application/json"})
             with urllib.request.urlopen(req, timeout=60) as r:
                 return json.load(r).get("embedding", [])
-        except urllib.error.URLError as e:
-            raise ProviderError(f"嵌入模型不可用（{e.reason}）", EXIT_NETWORK)
+        except (urllib.error.URLError, ConnectionError, OSError) as e:
+            reason = getattr(e, "reason", e)
+            raise ProviderError(f"嵌入模型不可用（{reason}）", EXIT_NETWORK)
 
     # ---- 远端 OpenAI 兼容 ----
     def _remote_generate(self, cfg, prompt: str) -> str:
@@ -128,5 +129,6 @@ class Provider:
             if e.code == 401:
                 raise ProviderError("远端认证失败（API key 无效）", EXIT_AUTH)
             raise ProviderError(f"远端请求失败 HTTP {e.code}", EXIT_NETWORK)
-        except urllib.error.URLError as e:
-            raise ProviderError(f"远端不可用（{e.reason}）", EXIT_NETWORK)
+        except (urllib.error.URLError, ConnectionError, OSError) as e:
+            reason = getattr(e, "reason", e)
+            raise ProviderError(f"远端不可用（{reason}）", EXIT_NETWORK)

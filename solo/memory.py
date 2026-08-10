@@ -60,7 +60,7 @@ class Memory:
         h = self._hash(text)
         if any(f.get("h") == h for f in facts):
             return False
-        facts.append({"text": text, "tags": tags or [], "ts": _now()})
+        facts.append({"text": text, "tags": tags or [], "h": h, "ts": _now()})
         self._save(self._facts_path, facts)
         return True
 
