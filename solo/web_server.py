@@ -143,13 +143,33 @@ class SoloHandler(BaseHTTPRequestHandler):
             n = cg.index(d or "solo")
             self._json({"indexed": n, "symbols": len(cg.symbols), "overview": cg.overview()})
         elif path == "/api/stats":
-            csv_path = _safe_path(qs.get("csv", [""])[0])
-            col = qs.get("col", [None])[0]
-            if not csv_path or not os.path.exists(csv_path):
-                self._json({"error": "csv not found or outside project"}, 400)
+            # GET: csv+col 兼容；POST: 数据源对象
+            if self.command == "POST":
+                body = self._read_body()
+                rows = _load_rows(body)
+                col = body.get("col")
+            else:
+                csv_path = _safe_path(qs.get("csv", [""])[0])
+                col = qs.get("col", [None])[0]
+                if not csv_path or not os.path.exists(csv_path):
+                    self._json({"error": "csv not found or outside project"}, 400)
+                    return
+                from solo import data_connector as dc
+                rows = dc.connect({"type": "csv", "path": csv_path})
+            if not rows:
+                self._json({"error": "数据源无效或为空"}, 400)
                 return
-            cl = clean_mod.DataCleaner()
-            rows = cl.load_csv(csv_path)
+            if not col:
+                for r in rows:
+                    for k in r:
+                        if r.get(k, "").strip() and _num(r.get(k)):
+                            col = k
+                            break
+                    if col:
+                        break
+            if not col:
+                self._json({"error": "未找到数值列，用 --col 指定"}, 400)
+                return
             vals = [float(r[col]) for r in rows if col and r.get(col, "").strip() and _num(r.get(col))]
             if not vals:
                 self._json({"error": "column not found or no numeric data"}, 400)
@@ -159,6 +179,21 @@ class SoloHandler(BaseHTTPRequestHandler):
                         "control_chart": stats_mod.control_chart(vals)})
         elif path == "/api/setup":
             self._json(_setup_checks())
+        elif path == "/api/datasource":
+            # 列出数据源信息：SQLite 表 / 检查 CSV
+            from solo import data_connector as dc
+            db_path = qs.get("db", [""])[0]
+            csv_path = qs.get("csv", [""])[0]
+            result = {"sources": []}
+            if db_path:
+                result["sources"].append({"type": "sqlite", "path": db_path,
+                                          "tables": dc.list_tables(_safe_path(db_path))})
+            if csv_path:
+                sp = _safe_path(csv_path)
+                import os as _os
+                result["sources"].append({"type": "csv", "path": sp,
+                                          "exists": bool(sp and _os.path.exists(sp))})
+            self._json(result)
         else:
             self._json({"error": "unknown api"}, 404)
 
@@ -195,12 +230,12 @@ class SoloHandler(BaseHTTPRequestHandler):
                 self._json({"error": "invalid capability"}, 400)
         elif path == "/api/clean":
             body = self._read_body()
-            cl = clean_mod.DataCleaner()
-            csv_path = _safe_path(body.get("csv", ""))
-            if not csv_path or not os.path.exists(csv_path):
-                self._json({"error": "csv not found or outside project"}, 400)
+            from solo import data_connector as dc
+            rows = _load_rows(body)
+            if not rows:
+                self._json({"error": "数据源无效或为空（CSV路径或数据库表）"}, 400)
                 return
-            rows = cl.load_csv(csv_path)
+            cl = clean_mod.DataCleaner()
             out = cl.clean(rows, fill_missing=body.get("method", "drop"),
                            outlier_method=body.get("outlier", "iqr"))
             self._json({"input": len(rows), "output": len(out), "report": cl.report})
@@ -305,6 +340,33 @@ def _safe_path(p: str) -> str:
     if full.startswith(os.path.normpath(root)):
         return full
     return ""
+
+
+def _load_rows(body: dict) -> list:
+    """从请求体解析数据源并读取为行列表。
+
+    body 支持:
+      {"csv": "路径"}                      CSV 文件
+      {"db": "路径", "table": "表名"}       SQLite 表
+      {"db": "路径", "query": "SQL"}        SQL 查询
+      {"source": {...}}                     data_connector.connect 格式
+    """
+    from solo import data_connector as dc
+    if "source" in body:
+        src = dict(body["source"])
+        if "path" in src:
+            src["path"] = _safe_path(src["path"])
+        return dc.connect(src)
+    if body.get("csv"):
+        p = _safe_path(body["csv"])
+        return dc.connect({"type": "csv", "path": p}) if p else []
+    if body.get("db"):
+        p = _safe_path(body["db"])
+        if body.get("table"):
+            return dc.connect({"type": "sqlite", "path": p, "table": body["table"]}) if p else []
+        if body.get("query"):
+            return dc.connect({"type": "sql", "path": p, "query": body["query"]}) if p else []
+    return []
 
 
 def _write_config(config: dict) -> bool:

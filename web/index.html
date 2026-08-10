@@ -11,23 +11,27 @@
    对话是主入口：自然语言 → AI 路由到全部套件能力
    ============================================================ */
 :root{
-  --bg:#eef1f7; --panel:rgba(255,255,255,0.85); --panel-h:#ffffff;
-  --border:rgba(45,55,85,0.18); --text:#111827; --dim:#4b5563; --mute:#6b7280;
-  --blue:#2f5ef0; --orange:#d97706; --green:#15803d; --red:#dc2626;
-  --blue-bg:#dbe6ff; --blue-border:#b3c8ff; --orange-bg:#fef0dc;
-  --glass:blur(16px) saturate(140%); --r:14px; --shadow:0 2px 12px rgba(30,40,70,0.08);
+  --bg:#eef1f7; --panel:rgba(255,255,255,0.88); --panel-h:#ffffff;
+  --border:rgba(45,55,85,0.12); --text:#111827; --dim:#4b5563; --mute:#6b7280;
+  --blue:#2f5ef0; --blue-soft:#5b7cf5; --orange:#d97706; --green:#15803d; --red:#dc2626;
+  --blue-bg:#e6edff; --blue-border:#c3d4ff; --orange-bg:#fef0dc;
+  --glass:blur(20px) saturate(150%); --r:16px; --shadow:0 4px 20px rgba(30,40,70,0.06);
+  --shadow-hover:0 8px 30px rgba(30,40,70,0.12);
+  --ease:cubic-bezier(.4,0,.2,1);
 }
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
-  background:linear-gradient(135deg,#eef2fb 0%,#f8fafc 50%,#f3f6fa 100%);
+body{font-family:-apple-system,"Segoe UI","Microsoft YaHei",system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+  background:linear-gradient(160deg,#eef2fb 0%,#f8fafc 45%,#f1f5fb 100%);
   color:var(--text);height:100vh;overflow:hidden}
 .app{display:grid;grid-template-columns:200px 1fr 240px;gap:12px;padding:12px;height:100vh}
-.glass{background:var(--panel);border:1px solid var(--border);border-radius:var(--r);backdrop-filter:var(--glass);-webkit-backdrop-filter:var(--glass);box-shadow:var(--shadow)}
+.glass{background:var(--panel);border:1px solid var(--border);border-radius:var(--r);backdrop-filter:var(--glass);-webkit-backdrop-filter:var(--glass);box-shadow:var(--shadow);transition:box-shadow .3s var(--ease),transform .3s var(--ease)}
 
 /* 左导航 */
 .sidebar{padding:16px 12px;display:flex;flex-direction:column;gap:14px;overflow-y:auto}
 .logo{display:flex;align-items:center;gap:10px}
-.logo-icon{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--blue),#7a5bf0);display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(47,94,240,.35);flex-shrink:0}
+.logo-icon{width:38px;height:38px;border-radius:12px;background:linear-gradient(135deg,var(--blue),var(--blue-soft),#7a5bf0);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(47,94,240,.35);flex-shrink:0;transition:transform .3s var(--ease)}
+.logo-icon:hover{transform:rotate(-6deg) scale(1.05)}
 .logo-icon .l-s{font-size:18px;font-weight:800;color:#fff;letter-spacing:-1px;line-height:1}
 .logo-icon .l-dot{width:5px;height:5px;border-radius:50%;background:var(--orange);position:relative;top:11px;left:-2px;box-shadow:0 0 6px var(--orange)}
 .logo-text h1{font-size:18px;font-weight:800;letter-spacing:-.5px;color:var(--text)}
@@ -38,45 +42,48 @@ body{font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
 .logo span{font-size:9px;color:var(--mute);display:block}
 .ng{margin-bottom:10px}
 .ng .lbl{font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:var(--mute);margin-bottom:5px;padding:0 8px}
-.ni{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:8px;font-size:12px;color:var(--dim);cursor:pointer;transition:.15s}
-.ni:hover{background:var(--panel-h);color:var(--text)}
-.ni.on{background:#e3ecff;color:var(--blue);border-left:2px solid var(--blue)}
+.ni{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:10px;font-size:12px;color:var(--dim);cursor:pointer;transition:all .2s var(--ease)}
+.ni:hover{background:var(--panel-h);color:var(--text);transform:translateX(2px)}
+.ni.on{background:linear-gradient(90deg,var(--blue-bg),rgba(230,237,255,.5));color:var(--blue);box-shadow:inset 0 0 0 1px var(--blue-border);font-weight:600}
 .ni .ic{width:16px;height:16px;flex-shrink:0;color:var(--dim)}
 .ni.f .ic{color:var(--blue)}.ni.p .ic{color:var(--orange)}.ni.s .ic{color:#7a8699}
 .ni.on .ic{color:var(--blue)}
 
 /* 主区：聊天中心 */
 .main{display:flex;flex-direction:column;overflow:hidden}
-.toolbar{padding:10px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
-.toolbar .t{font-size:15px;font-weight:700}
+.toolbar{padding:12px 18px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.toolbar .t{font-size:15px;font-weight:700;letter-spacing:-.02em}
 .toolbar .t .sub{font-size:11px;color:var(--mute);margin-left:8px}
-.btn{padding:6px 14px;border-radius:8px;border:1px solid var(--border);background:var(--panel);color:var(--text);font-size:12px;cursor:pointer}
-.btn:hover{background:var(--panel-h)}
-.btn.pri{background:linear-gradient(135deg,var(--blue),#5a7ae0);border:none;color:#fff}
+.btn{padding:7px 15px;border-radius:10px;border:1px solid var(--border);background:var(--panel);color:var(--text);font-size:12px;cursor:pointer;transition:all .2s var(--ease)}
+.btn:hover{background:var(--panel-h);box-shadow:var(--shadow-hover);transform:translateY(-1px)}
+.btn:active{transform:translateY(0)}
+.btn.pri{background:linear-gradient(135deg,var(--blue),var(--blue-soft));border:none;color:#fff;box-shadow:0 2px 10px rgba(47,94,240,.25)}
 
 /* 聊天中心（OpenClaw 式）*/
 .chat{flex:1;display:flex;flex-direction:column;overflow:hidden}
 .chat-scroll{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:14px}
-.msg{max-width:76%;padding:12px 16px;border-radius:14px;font-size:13px;line-height:1.7}
-.msg.user{align-self:flex-end;background:var(--blue-bg);border:1px solid var(--blue-border);color:#102a4a;font-weight:500}
-.msg.ai{align-self:flex-start;background:#fff;border:1px solid var(--border);box-shadow:0 1px 6px rgba(30,40,70,.06)}
+.msg{max-width:76%;padding:13px 17px;border-radius:16px;font-size:13px;line-height:1.7}
+.msg.user{align-self:flex-end;background:linear-gradient(135deg,var(--blue-bg),#dbe8ff);border:1px solid var(--blue-border);color:#102a4a;font-weight:500;box-shadow:0 2px 8px rgba(47,94,240,.08)}
+.msg.ai{align-self:flex-start;background:#fff;border:1px solid var(--border);box-shadow:0 2px 12px rgba(30,40,70,.07)}
 .msg .intent{font-size:10px;color:var(--mute);margin-bottom:6px;letter-spacing:.05em}
 .msg .intent b{color:var(--blue)}
 .msg .data{font-family:Consolas,monospace;font-size:11px;background:#f1f3f8;border:1px solid var(--border);border-radius:8px;padding:8px;margin-top:8px;max-height:220px;overflow:auto;white-space:pre-wrap}
-.chat-input{padding:12px;background:#fff;border-top:1px solid var(--border);display:flex;gap:10px;align-items:center;flex-shrink:0}
+.chat-input{padding:13px 15px;background:#fff;border-top:1px solid var(--border);display:flex;gap:10px;align-items:center;flex-shrink:0;box-shadow:0 -2px 12px rgba(30,40,70,.03)}
+.chat-input:focus-within{box-shadow:0 -2px 16px rgba(47,94,240,.1)}
 .chat-input input{flex:1;background:transparent;border:none;outline:none;color:var(--text);font-size:14px}
 .chat-input input::placeholder{color:var(--mute)}
 .chat-input .hint{font-size:10px;color:var(--mute)}
 .quick{display:flex;gap:6px;padding:0 16px 10px;flex-wrap:wrap;flex-shrink:0}
-.qc{padding:4px 10px;border-radius:14px;background:var(--panel);border:1px solid var(--border);font-size:11px;color:var(--dim);cursor:pointer}
-.qc:hover{background:var(--panel-h);color:var(--text)}
+.qc{padding:5px 12px;border-radius:16px;background:var(--panel);border:1px solid var(--border);font-size:11px;color:var(--dim);cursor:pointer;transition:all .2s var(--ease)}
+.qc:hover{background:#fff;color:var(--text);box-shadow:var(--shadow);transform:translateY(-1px)}
 .qc.blue{border-color:rgba(108,140,255,.3);color:var(--blue)}
 .qc.orange{border-color:rgba(255,184,108,.3);color:var(--orange)}
 
 /* 右侧能力面板 */
 .ctx{padding:14px;overflow-y:auto}
-.ctx .lbl{font-size:10px;color:var(--mute);margin:10px 0 6px;letter-spacing:.05em}
-.ctx .stat{padding:7px 10px;background:var(--panel);border:1px solid var(--border);border-radius:8px;margin-bottom:5px;font-size:12px}
+.ctx .lbl{font-size:10px;color:var(--mute);margin:12px 0 7px;letter-spacing:.08em;font-weight:600}
+.ctx .stat{padding:9px 12px;background:var(--panel);border:1px solid var(--border);border-radius:10px;margin-bottom:6px;font-size:12px;transition:all .2s var(--ease)}
+.ctx .stat:hover{background:#fff;box-shadow:var(--shadow);transform:translateY(-1px)}
 .ctx .stat .num{font-size:16px;font-weight:600}
 .ctx .stat .num.blue{color:var(--blue)}.ctx .stat .num.orange{color:var(--orange)}.ctx .stat .num.green{color:var(--green)}
 .tag-row{display:flex;flex-wrap:wrap;gap:5px}
