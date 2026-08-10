@@ -11,8 +11,20 @@
     分级退出码（0-5），云端无 key 明确报错
   - `memory.py`：三层两域记忆（热域画像/温域事实+场景/冷域会话），
     Obsidian Markdown 导入导出，零依赖
+  - `ontology.py`：本体建模（CSV→实体-关系-属性三元组，本体优先差异化核心）
+  - `skill.py`：可复用经验提取（触发词/版本/步骤，跨轨迹抽象浅层）
+  - `writing.py`：六维中文写作检查 D1-D6（正确性fail/风格warn）
+  - `code.py`：代码影响分析 impact()（符号/依赖/反向依赖）
+  - `task.py`：任务状态控制面（断点续跑/决策门/可证伪预期）
+  - `agent.py`：循环五态最小实现（记忆装载+skill注入+推理+记忆提交）
   - `cli.py`：solo init/run/skill-add/import-obsidian/export-markdown/version
 - `provider.yaml.example`：模型配置模板（key 从环境变量读，不入仓库）
+- `tests/`：pytest 冒烟套件（12 项，覆盖全部模块核心路径）
+
+### 修复
+- memory 去重失效：add_fact 未存 h 字段导致重复写入，现已存
+- provider 连接错误未分级：裸 ConnectionResetError 崩溃，统一捕获分级报 EXIT_NETWORK
+- code 影响分析 import 解析：`from x import b` 跨行贪婪吞名 + 未解析到被 import 模块
 
 ### 方法论
 - VISION.md：40 章节完整蓝图（本体优先 + 三层两域 + harness 工程 + 竞品定位）
