@@ -5,7 +5,7 @@
 
 [![License](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.9%2B-blue.svg)](pyproject.toml)
-[![Version](https://img.shields.io/badge/version-0.2.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.3.0-blue.svg)](CHANGELOG.md)
 
 ## 为什么是"本体优先"（不是又一个记忆库/RAG）
 
@@ -48,16 +48,26 @@ python examples/example_03_oss_preflight.py <项目目录>
 python examples/example_04_factory_ontology.py
 ```
 
-## 核心能力
+## 核心能力（两套分离）
+
+**个人套件**（`solo/`，一人公司日常）：
 
 | 模块 | 能力 | 说明 |
 |---|---|---|
-| `ontology.py` | 本体建模 | CSV→实体-关系-属性，语义锚点 |
 | `memory.py` | 三层两域记忆 | 热域画像/温域事实+场景/冷域归档，语义检索 |
 | `skill.py` | 可复用经验 | 从任务提取，带版本/触发边界 |
 | `writing.py` | 六维写作检查 | 错字/标点/语病/数字/去AI味/活人感 |
-| `code.py` | 代码影响分析 | 改代码前 impact() |
-| `task.py` | 任务状态 | 断点续跑 |
+| `gen.py` | 代码/文档/审查 | FDE 写代码、写文档、自查 |
+| `code.py` | 代码库理解 | impact 影响分析 + overview/explain |
+| `task.py` | 任务状态 | 断点续跑、决策门、可证伪预期 |
+
+**工厂套件**（`solo/factory/`，工厂现场 FDE）：
+
+| 模块 | 能力 | 说明 |
+|---|---|---|
+| `clean.py` | 数据清洗 | 缺失/重复/异常值/类型推断 |
+| `stats.py` | 数据分析 | 描述/趋势/异常检测/SPC控制图/相关性 |
+| `ontology.py` | 本体建模 | 设备/工单 → 实体关系本体，结构化查询 |
 
 ## 配置（本地/远端模型分层）
 

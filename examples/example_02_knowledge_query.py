@@ -13,7 +13,7 @@ import tempfile
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from solo import memory as memory_mod
-from solo import ontology as ontology_mod
+from solo.factory import ontology as ontology_mod
 
 
 def main(query: str):

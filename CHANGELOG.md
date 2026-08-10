@@ -2,6 +2,23 @@
 
 所有显著变更记录在此。格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [0.3.0] - 2026-08-10
+
+### 新增
+- **工厂现场数据套件**：`solo/factory/`（clean + stats + ontology 三件套）
+  - `clean.py`：数据清洗（缺失/重复/异常值 IQR-zscore/类型推断）
+  - `stats.py`：数据分析（描述统计/趋势/异常检测/SPC控制图/相关性）
+  - `ontology.py`：工厂本体建模（从 solo/ 根移入）
+- **个人套件 vs 工厂套件分离**：`solo/` 根保留个人能力（memory/skill/writing/gen/code/task/agent），工厂能力独立 `solo/factory/` 子包，可独立导入
+- `examples/example_06_factory_data.py`：工厂数据清洗→分析→异常检测闭环
+- 测试扩至 18 项（工厂数据清洗/分析）
+
+### 修复
+- stats 异常检测：IQR 法对单离群点比 zscore 稳健（zscore 会被离群点拉高 std）
+
+### 方法论
+- 套件分类：个人套件（一人公司日常）与工厂套件（工厂现场 FDE）解耦，各司其职
+
 ## [0.2.0] - 2026-08-10
 
 ### 新增

@@ -12,7 +12,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from solo.ontology import Ontology
+from solo.factory.ontology import Ontology
 
 DATA = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 

@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from solo import __version__
 from solo import memory as memory_mod
-from solo import ontology as ontology_mod
+from solo.factory import ontology as ontology_mod
 from solo import skill as skill_mod
 from solo import writing as writing_mod
 from solo import code as code_mod
@@ -201,6 +201,42 @@ def test_gen_signatures():
     assert callable(getattr(gen, "review_code", None))
     sig = inspect.signature(gen.generate_doc)
     assert "kind" in sig.parameters and "topic" in sig.parameters
+
+
+# ---- clean：工厂数据清洗 ----
+def test_clean_dedup_missing_outlier(tmp):
+    """清洗：去重/缺失/异常值处理。"""
+    from solo.factory import clean as clean_mod
+    rows = [
+        {"id": "1", "temp": "45.2", "status": "运行"},
+        {"id": "1", "temp": "45.2", "status": "运行"},  # 重复
+        {"id": "2", "temp": "", "status": "运行"},      # 缺失
+        {"id": "3", "temp": "45.3", "status": "运行"},
+        {"id": "4", "temp": "45.4", "status": "运行"},
+        {"id": "5", "temp": "45.1", "status": "运行"},
+        {"id": "6", "temp": "80.0", "status": "运行"},  # 异常值
+    ]
+    cl = clean_mod.DataCleaner()
+    out = cl.clean(rows, numeric_cols=["temp"], fill_missing="drop", outlier_method="iqr")
+    assert cl.report["dropped_dup"] == 1
+    assert cl.report["dropped_outlier"] == 1
+    # 7 - 1去重 - 1缺失 - 1异常 = 4
+    assert len(out) == 4
+
+
+# ---- stats：工厂数据分析 ----
+def test_stats_describe_and_anomaly():
+    """分析：描述性统计 + 异常检测(IQR稳健) + SPC。"""
+    from solo.factory import stats as stats_mod
+    data = [45.2, 45.5, 45.1, 45.3, 45.4, 45.2, 58.9, 45.3]  # 含异常 58.9
+    desc = stats_mod.describe(data)
+    assert desc["count"] == 8 and "mean" in desc and "median" in desc
+    # IQR 法稳健检测 58.9（zscore 会被离群点拉高 std 而不敏感）
+    anom = stats_mod.detect_anomaly(data, method="iqr")
+    assert any(abs(a["value"] - 58.9) < 0.1 for a in anom), f"anom={anom}"
+    cc = stats_mod.control_chart(data)
+    assert "ucl" in cc and "lcl" in cc
+    assert cc["ucl"] > cc["lcl"]
 
 
 # ---- task：状态控制面 ----
