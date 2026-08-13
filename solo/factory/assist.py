@@ -119,6 +119,66 @@ def lexicon_draft(headers, sample_rows=None):
     return draft
 
 
+def to_factory_lexicon(draft, table_name="数据", entity_cn=None):
+    """把 lexicon_draft 初稿转换为【工厂本体 lexicon 契约】格式。
+
+    对齐 factory-ontology-kit 的 lexicon.json 结构，使 solo 起草的词典初稿
+    能被工厂本体直接消费（attr_cn2en/type_cn2en/status_cn2en/entity_cn2en 等）。
+    返回 {description, attr_cn2en, attr_en2cn, type_cn2en, status_cn2en,
+          zone_cn2en, entity_cn2en, numeric_fields, field_aliases, value_fields}
+    """
+    attr_cn2en, attr_en2cn = {}, {}
+    type_cn2en, status_cn2en, zone_cn2en = {}, {}, {}
+    numeric_fields, value_fields, field_aliases = {}, {}, {}
+    # 枚举列: 值→值(中文值直接映射自身), 按列名归类
+    _TYPE_COLS = ("type", "类型", "category", "类别", "产品")
+    _STATUS_COLS = ("status", "状态")
+    _ZONE_COLS = ("workshop", "车间", "zone", "区域", "产线")
+    for col, e in (draft or {}).items():
+        cn = e.get("cn", "") or col
+        typ = e.get("type", "string")
+        enum = e.get("enum") or []
+        ename = local_name(col)
+        if enum:
+            low = str(col).lower()
+            # 跳过 id/编号/唯一标识 列(不是枚举类型)
+            if any(k in low for k in ("id", "udi", "编号", "序号", "码", "_id")):
+                continue
+            target = type_cn2en
+            if any(k in low for k in _STATUS_COLS):
+                target = status_cn2en
+            elif any(k in low for k in _ZONE_COLS):
+                target = zone_cn2en
+            elif any(k in low for k in _TYPE_COLS) or True:
+                target = type_cn2en
+            for v in enum:
+                target.setdefault(v, v)
+            value_fields[ename] = cn
+            field_aliases.setdefault(ename, []).extend([cn, col])
+        elif typ in ("integer", "decimal"):
+            attr_cn2en[cn] = ename
+            attr_en2cn[ename] = cn
+            numeric_fields.setdefault(cn, ename)
+        else:
+            attr_cn2en[cn] = ename
+            attr_en2cn[ename] = cn
+    # 实体映射
+    ent_cn = entity_cn or "设备"
+    entity_cn2en = {ent_cn: table_name}
+    return {
+        "description": f"由 solo lexicon_draft 起草 ({table_name}, 对齐工厂本体契约)",
+        "attr_cn2en": attr_cn2en,
+        "attr_en2cn": attr_en2cn,
+        "type_cn2en": type_cn2en,
+        "status_cn2en": status_cn2en,
+        "zone_cn2en": zone_cn2en,
+        "entity_cn2en": entity_cn2en,
+        "numeric_fields": numeric_fields,
+        "field_aliases": field_aliases,
+        "value_fields": value_fields,
+    }
+
+
 def to_review_items(draft):
     """把 lexicon_draft 词典初稿转成闭源 review.add 可消费的待确认项列表。
 
