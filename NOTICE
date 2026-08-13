@@ -1,9 +1,20 @@
 solo-agent-kit
 Copyright 2026 zhengjinjun1975
 
+This product includes software developed by zhengjinjun1975:
+- codeagent-minimal (https://github.com/zhengjinjun1975/codeagent-minimal)
+  Licensed under the Apache License, Version 2.0.
+
+Derived work notice:
+- `solo/code_review.py` — the code-review atomic capability is ported from
+  `codeagent-minimal/review.py` (same author, Apache-2.0). The scoring
+  methodology (syntax / cyclomatic complexity / security / 0-100 score) is
+  aligned with codeagent-minimal.
+
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
+
     http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
@@ -11,43 +22,3 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-
---------------------------------------------------------------------------
-NOTICE: Derived-work and methodology acknowledgments
---------------------------------------------------------------------------
-
-solo-agent-kit is a methodology-driven, lightweight personal agent for
-one-person companies. Its modules are independent, standard-library
-implementations of ideas the author validated in earlier projects. This
-project borrows METHODOLOGY (not code) from the following, which are
-acknowledged for transparency:
-
-1. OptMem (permanent agent memory, hierarchical summary tree + hybrid
-   semantic retrieval) — methodology source for solo/memory.py
-   Author: zhengjinjun1975 (local project)
-
-2. codegraph (code impact analysis) — methodology source for solo/code.py
-   Author: zhengjinjun1975 (local project)
-
-3. zh-writing-checker (six-dimension Chinese writing quality check) —
-   methodology source for solo/writing.py
-   Author: zhengjinjun1975 — https://github.com/zhengjinjun1975/zh-writing-checker
-
-4. factory-ontology-kit (ontology-driven data QA framework) — methodology
-   source for solo/ontology.py
-   Author: zhengjinjun1975 — https://github.com/zhengjinjun1975/factory-ontology
-
-5. Buzz (Block, Inc.) — Apache-2.0, https://github.com/block/buzz
-   Design ideas absorbed (not code): agent-first JSON CLI with graded exit
-   codes, "small enough to hold in your head" auditability, tool-calls-are-
-   the-output principle.
-
-6. AHE: Agentic Harness Engineering (arXiv 2604.25850) — design ideas for
-   observability-driven harness evolution (not code).
-
-7. MemGPT/Letta, Khoj, Mem0, nanobot — general design inspiration for
-   memory layering (not code).
-
-These are METHODOLOGY borrowings (concept/architecture), not source-code
-copies. Where any file is substantially derived from a specific project's
-code, that file carries its own header noting the source and license.
