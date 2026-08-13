@@ -198,15 +198,57 @@ class Ontology:
 
     # ---- 输出 ----
     def to_nt(self) -> str:
-        """导出 N-Triples（含类声明 + 对象/数据属性区分）。"""
+        """导出 N-Triples（对齐 factory-ontology-kit 格式）。
+
+        类声明 rdf:type owl:Class + label；实例三元组用标准 http URI；
+        数据属性声明 owl:DatatypeProperty，对象属性（外键引用）声明 owl:ObjectProperty，
+        使 solo 建模产出可被 factory 本体问答链路消费。
+        """
+        OWL = "http://www.w3.org/2002/07/owl#"
+        RDF = "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+        RDFS = "http://www.w3.org/2000/01/rdf-schema#"
+
+        def _inst(u):
+            # "实体:ID" / "实体_ID" → NS#实体_ID
+            u = str(u)
+            if ":" in u:
+                e, i = u.split(":", 1)
+                return f"{NS}{e}_{i}"
+            return f"{NS}{u}"
+
+        def _prop(p):
+            # NS+local_name / "实体:attr" → NS#local_name
+            p = str(p)
+            if ":" in p:
+                return f"{NS}{p.split(':', 1)[1]}"
+            return p if p.startswith(NS) else f"{NS}{p}"
+
         L = []
+        # 1. 类声明 + label
         for ent in self.entities:
-            L.append(f"<{NS}{ent}> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <{NS}{ent}> .")
+            e = f"{NS}{ent}"
+            L.append(f"<{e}> <{RDF}type> <{OWL}Class> .")
+            L.append(f"<{e}> <{RDFS}label> \"{ent}\" .")
+        # 2. 实例三元组 + 收集属性
+        datatype_props, object_props = set(), set()
         for s, p, o in self.triples:
-            if ":" in o and o.split(":")[0] in self.entities:  # 对象属性（指向实体）
-                L.append(f"<{s}> <{p}> <{o}> .")
-            else:  # 数据属性
-                L.append(f"<{s}> <{p}> \"{o}\" .")
+            s_uri = _inst(s)
+            p_uri = _prop(p)
+            o_str = str(o)
+            # 对象属性: 值含 ":" 且前缀是实体(引用其他实例)
+            is_obj = ":" in o_str and o_str.split(":", 1)[0] in self.entities
+            if is_obj:
+                o_uri = _inst(o_str)
+                object_props.add(p_uri)
+                L.append(f"<{s_uri}> <{p_uri}> <{o_uri}> .")
+            else:
+                datatype_props.add(p_uri)
+                L.append(f"<{s_uri}> <{p_uri}> \"{o_str}\" .")
+        # 3. 属性声明
+        for p in sorted(datatype_props):
+            L.append(f"<{p}> <{RDF}type> <{OWL}DatatypeProperty> .")
+        for p in sorted(object_props):
+            L.append(f"<{p}> <{RDF}type> <{OWL}ObjectProperty> .")
         return "\n".join(L)
 
     def to_dict(self) -> dict:
