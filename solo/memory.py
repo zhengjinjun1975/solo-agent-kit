@@ -145,6 +145,18 @@ class Memory:
             for f in facts:
                 fh.write("- " + f["text"] + "\n")
 
+    # ---- OptMem 互通(可选增强): 把经验/方法论沉淀进 OptMem 全局记忆 ----
+    def optmem_note(self, text: str):
+        """调 E:\\optmem\\memo note 沉淀一条全局记忆(经验/方法论)。
+
+        用于 FDE 工具箱经验/方法论跨项目、跨会话复用。失败静默返回, 不打断主流程。
+        """
+        return optmem_note(text)
+
+    def optmem_search(self, query: str, top_k: int = 5):
+        """调 E:\\optmem\\memo_search.py 语义检索 OptMem 记忆。返回匹配文本列表。"""
+        return optmem_search(query, top_k)
+
     # ---- 内部 ----
     @staticmethod
     def _hash(text: str) -> str:
@@ -191,3 +203,58 @@ def _cosine(a: list, b: list) -> float:
     if not na or not nb:
         return 0.0
     return dot / (na * nb)
+
+
+# ------------------------------------------------------------------ OptMem 互通（可选增强，零依赖）
+# 把 FDE 工具箱经验/方法论沉淀进 OptMem 全局记忆（E:\optmem），跨项目、跨会话复用。
+# 失败静默返回，绝不打断主流程；可用环境变量 OPTMEM_NOTE=0 关闭。
+_MEMO = os.environ.get("OPTMEM_MEMO", r"E:\optmem\memo")
+_MEMO_SEARCH = os.environ.get("OPTMEM_MEMO_SEARCH", r"E:\optmem\memo_search.py")
+_MEMORY_DIR = os.environ.get("OPTMEM_MEMORY_DIR", r"E:\optmem\memory")
+_OPTMEM_ENABLED = os.environ.get("OPTMEM_NOTE", "1").lower() not in ("0", "false", "no", "off")
+
+
+def optmem_note(text: str):
+    """调 E:\optmem\memo note 沉淀一条全局记忆。返回 (ok, 消息)。"""
+    if not _OPTMEM_ENABLED:
+        return False, "disabled(OPTMEM_NOTE=0)"
+    import subprocess
+    import sys as _sys
+    line = text.encode("utf-8")[:280].decode("utf-8", errors="ignore")
+    env = dict(os.environ)
+    env["MEMORY_DIR"] = _MEMORY_DIR
+    try:
+        r = subprocess.run(
+            [_sys.executable, _MEMO, "note", line],
+            capture_output=True, text=True, encoding="utf-8", env=env, timeout=30)
+        if r.returncode == 0:
+            first = (r.stdout or r.stderr or "").strip().splitlines()
+            return True, (first[0] if first else "ok")
+        return False, (r.stderr or r.stdout or "").strip()
+    except Exception as e:
+        return False, f"optmem 不可用: {e}"
+
+
+def optmem_search(query: str, top_k: int = 5):
+    """调 E:\optmem\memo_search.py 语义检索 OptMem 记忆。失败返回 []。"""
+    if not _OPTMEM_ENABLED:
+        return []
+    import subprocess
+    import sys as _sys
+    env = dict(os.environ)
+    env["MEMORY_DIR"] = _MEMORY_DIR
+    try:
+        r = subprocess.run(
+            [_sys.executable, _MEMO_SEARCH, query, str(top_k)],
+            capture_output=True, text=True, encoding="utf-8", env=env, timeout=60)
+        if r.returncode == 0:
+            return [ln for ln in r.stdout.splitlines() if ln.strip()]
+        return []
+    except Exception:
+        return []
+
+
+if __name__ == "__main__":
+    # 自检: 沉淀一条示例方法论并检索回看（可用 OPTMEM_NOTE=0 跳过）。
+    ok, msg = optmem_note("Solo FDE 工具箱: 交付前先跑 e2e 联调再打补丁, 避免返工")
+    print("note:", ok, msg)

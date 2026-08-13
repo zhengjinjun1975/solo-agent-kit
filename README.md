@@ -201,6 +201,24 @@ solo import-obsidian  <vault路径>   # 导入已有笔记为记忆
 solo export-markdown               # 导出记忆为 Markdown，可回写
 ```
 
+## OptMem 互通（可选增强）：FDE 经验/方法论 note 进全局记忆
+
+`Memory.optmem_note()/optmem_search()`（模块级 `solo.memory.optmem_note/optmem_search`）把
+**FDE 工具箱经验/方法论**固化进 [OptMem](E:\optmem)（跨项目、跨会话复用）。**不侵入主流程、零依赖**（纯标准库），失败静默。
+
+```python
+from solo.memory import Memory, optmem_note
+Memory().optmem_note("交付方法论: 验收前先自测 e2e 再交付, 少返工")   # 沉淀
+Memory().optmem_search("FDE 交付方法论 返工")                       # 语义检索
+```
+
+```bash
+python -m solo.memory        # 自检: 沉淀一条示例方法论并检索回看
+```
+
+可用 `OPTMEM_NOTE=0` 关闭。solo 自带的三层两域记忆（`~/.solo/memory`）仍是主存；OptMem 作为
+跨工具全局事实层的可选同步目标。
+
 ## 限制与诚实声明
 
 solo 不是通用 agent 框架，不试图替代 Claude Code、Cursor 等成熟工具。
