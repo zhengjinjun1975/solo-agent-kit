@@ -73,10 +73,11 @@ def draft_questions(rows, entity_name: str = "设备", limit: int = 12):
         t = guess_type(vals[0])
         col_cn = _col_cn(h)
         if t in ("integer", "decimal"):
-            questions.append(f"{_EXTREME_CN.get('最大', '最大')}的{col_cn}")
+            # 措辞对齐引擎极值模板 "最X的Y"(如"功率最大的设备"), 保证规则引擎能答出
+            questions.append(f"{col_cn}最大的{en}")
             if len(questions) >= limit:
                 break
-            questions.append(f"{_EXTREME_CN.get('最小', '最小')}的{col_cn}")
+            questions.append(f"{col_cn}最小的{en}")
         else:
             uniq = sorted(set(vals))
             if 1 < len(uniq) <= 8:
@@ -118,6 +119,30 @@ def lexicon_draft(headers, sample_rows=None):
     return draft
 
 
+def to_review_items(draft):
+    """把 lexicon_draft 词典初稿转成闭源 review.add 可消费的待确认项列表。
+
+    对齐闭源 orchestrator 的 review.add 调用: (item_type, item_key, item_value)
+      - attr_mapping: 数值/文本列 → (col_cn 中→英), value=引擎字段名建议
+      - type_enum / status_enum: 有限枚举值 → 待人在环确认的枚举词
+    返回 [(item_type, key, value), ...], 供闭源 ingest_lexicon 批量写入 review 队列。
+    """
+    items = []
+    for col, e in (draft or {}).items():
+        cn = e.get("cn", "") or col
+        typ = e.get("type", "string")
+        enum = e.get("enum") or []
+        if enum:
+            # 枚举列: 每条枚举值一条待确认(type_enum, 若含状态词则 status_enum)
+            for v in enum:
+                items.append(("type_enum", v, cn))
+        elif typ in ("integer", "decimal"):
+            items.append(("attr_mapping", cn, local_name(col)))
+        else:
+            items.append(("attr_mapping", cn, local_name(col)))
+    return items
+
+
 def report_draft(*, kb: str, industry: str, hit: float, questions_n: int, hits: int,
                  asset_versions: int = 0, health: dict = None, note: str = ""):
     """起草交付报告（markdown 初稿，FDE 补全后进闭源 deliver）。
@@ -147,3 +172,34 @@ def report_draft(*, kb: str, industry: str, hit: float, questions_n: int, hits: 
         "> 本报告为 FDE 起草初稿，最终版由闭源交付流程生成并归档。",
     ]
     return "\n".join(lines)
+
+
+def report_draft_dict(*, kb: str, industry: str, hit: float, questions_n: int, hits: int,
+                      asset_versions: int = 0, health: dict = None, baseline: float = None,
+                      note: str = "") -> dict:
+    """起草交付报告(结构化 dict, 对齐闭源 deliver.report 字段)。
+
+    闭源 deliver.report() 返回 {kb, industry, 命中率:{baseline,current,提升},
+    资产版本链, 资产版本数, 自进化健康度, 人在环审查, 遗留问题}。
+    solo 草稿给出其中的 命中率/资产版本数/自进化健康度 初稿，FDE 补全后进闭源 deliver 渲染。
+    """
+    import datetime
+    health = health or {}
+    return {
+        "kb": kb,
+        "industry": industry,
+        "generated_at": datetime.datetime.now().isoformat(timespec="seconds"),
+        "solo_draft": True,  # 标记 solo 草稿, 闭源 deliver 识别后可并入正式报告
+        "命中率": {
+            "baseline": baseline,
+            "current": round(float(hit), 4),
+            "提升": round(float(hit) - baseline, 4) if baseline is not None else None,
+        },
+        "资产版本数": asset_versions,
+        "自进化健康度": {
+            "hypotheses": health.get("hypotheses", 0),
+            "accepted": health.get("accepted", 0),
+            "rolled_back": health.get("rolled_back", 0),
+        },
+        "说明": note or "",
+    }
