@@ -10,6 +10,8 @@ import json
 import os
 import re
 
+from . import code_review  # 代码审查原子能力（对齐 codeagent-minimal）
+
 # 排除目录
 SKIP_DIRS = {"__pycache__", ".venv", "node_modules", ".git", "dist", "build"}
 
@@ -139,9 +141,10 @@ class CodeGraph:
         }
 
     def review(self, file: str) -> dict:
-        """代码审查（对标 CodeAgent）：静态扫描常见问题。
+        """代码审查（对齐 codeagent-minimal 口径）。
 
-        检查：裸 except、超长函数、魔法数字、TODO/FIXME、重复 import。
+        在原有轻量检查（裸 except、TODO/FIXME）之上，合并 codeagent 的全量静态分析
+        （语法/复杂度/安全/网络/BUG/架构/复用）与 0-100 评分，保证与 codeagent 得分一致。
         """
         path = self._find(file)
         if not path or not os.path.exists(path):
@@ -157,13 +160,16 @@ class CodeGraph:
             s = ln.strip()
             if s == "except:" or s.startswith("except :"):
                 issues.append({"line": i+1, "severity": "warn", "type": "bare-except", "msg": "裸 except 会吞掉所有异常"})
-        # 超长函数（>60行，缩进块）
         # TODO/FIXME
         for i, ln in enumerate(lines):
             if "TODO" in ln or "FIXME" in ln:
                 issues.append({"line": i+1, "severity": "info", "type": "todo", "msg": ln.strip()[:60]})
+        # 合并 codeagent 对齐的静态分析 + 0-100 评分
+        static = code_review.review_file(path)
         return {"file": os.path.relpath(path, self.root),
-                "issues": issues, "total": len(issues)}
+                "issues": issues, "total": len(issues),
+                "static_score": static["static_score"],
+                "static_issues": static["static_issues"]}
 
     def save(self, path: str) -> None:
         with open(path, "w", encoding="utf-8") as fh:

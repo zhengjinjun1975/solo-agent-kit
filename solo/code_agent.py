@@ -18,6 +18,8 @@ import subprocess
 import sys
 import tempfile
 
+from . import code_review  # 代码审查原子能力（对齐 codeagent-minimal：语法/复杂度/安全/0-100评分）
+
 # ── Karpathy / Ponytail 原则注入 ──────────────────────
 PONYTAIL_SYSTEM = """你是懒人高级开发者。写代码前爬这个阶梯：
 1. YAGNI → 不建
@@ -33,113 +35,37 @@ PONYTAIL_SYSTEM = """你是懒人高级开发者。写代码前爬这个阶梯�
 
 
 # ═══════════════════════════════════════════════
-# 静态分析工具（纯 AST/regex，零模型）
+# 静态分析工具（对齐 codeagent-minimal，统一到 code_review 单一事实来源）
+# 语法/未用import/圈复杂度/命名/软件BUG/架构/安全/网络/复用 + 0-100评分
 # ═══════════════════════════════════════════════
 
-def _static_check_syntax(content: str) -> list:
-    try:
-        ast.parse(content)
-        return []
-    except SyntaxError as e:
-        return [{"severity": "critical", "title": f"语法错误: {e.msg}",
-                 "line": e.lineno, "suggestion": str(e)}]
+# 兼容旧接口：solo 旧版 `_static_analyze` 返回 {issues, counts}；现改为委托
+# code_review._static_analyze（与 codeagent 同一套检查+评分口径），并保留 counts。
+def _static_analyze(content: str, max_complexity: int = 10, strict_undefined: bool = False) -> dict:
+    """综合静态分析（对齐 codeagent）。返回 {issues, counts, score, categories}。"""
+    r = code_review._static_analyze(content, max_complexity, strict_undefined)
+    issues = r["all_issues"]
+    counts = {
+        "syntax": len(r["syntax"]),
+        "imports": len(r["imports"]),
+        "complexity": len(r["complexity"]),
+        "naming": len(r["naming"]),
+        "security": len(r["security"]) + len(r["network"]),
+        "bugs": len(r["bugs"]),
+        "architecture": len(r["architecture"]),
+        "reuse": len(r["reuse"]),
+    }
+    return {"issues": issues, "counts": counts, "score": r["score"],
+            "categories": {k: r[k] for k in ("syntax", "imports", "complexity", "naming",
+                                             "security", "network", "bugs", "architecture", "reuse")}}
 
 
-def _static_check_imports(tree, content: str) -> list:
-    issues = []
-    imports = {}
-    used = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            for a in node.names:
-                imports[a.asname or a.name] = node.lineno
-        elif isinstance(node, ast.ImportFrom):
-            for a in node.names:
-                imports[a.asname or a.name] = node.lineno
-        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load):
-            used.add(node.id)
-        if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name):
-            used.add(node.value.id)
-    for name, ln in imports.items():
-        if name.split(".")[0] not in used:
-            issues.append({"severity": "minor", "title": f"未使用的 import: {name}",
-                           "line": ln, "suggestion": "删除未使用的 import"})
-    return issues
-
-
-def _static_check_complexity(tree) -> list:
-    issues = []
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            c = 1
-            for n in ast.walk(node):
-                if isinstance(n, (ast.If, ast.While, ast.For, ast.ExceptHandler,
-                                  ast.And, ast.Or, ast.Assert, ast.Try)):
-                    c += 1
-            if c > 10:
-                issues.append({"severity": "major",
-                               "title": f"圈复杂度 {c} > 10: {node.name}",
-                               "line": node.lineno, "suggestion": "考虑拆分函数"})
-    return issues
-
-
-def _static_check_naming(tree) -> list:
-    issues = []
-    for node in ast.walk(tree):
-        if isinstance(node, ast.FunctionDef) and not node.name.startswith("_"):
-            if not re.match(r"^[a-z_]\w*$", node.name):
-                issues.append({"severity": "minor", "title": f"函数名建议小写: {node.name}",
-                               "line": node.lineno, "suggestion": node.name.lower()})
-        elif isinstance(node, ast.ClassDef):
-            if not re.match(r"^[A-Z]\w*$", node.name):
-                issues.append({"severity": "minor", "title": f"类名建议大写: {node.name}",
-                               "line": node.lineno, "suggestion": node.name.capitalize()})
-    return issues
-
-
-def _static_check_security(content: str) -> list:
-    issues = []
-    if re.search(r"\b(SELECT|INSERT|UPDATE|DELETE)\b.*?(f[\"']|\+\s*[\"'\w]|%[\"']|\.format\(|\{[^}]*\})",
-                 content, re.I | re.S):
-        issues.append({"severity": "critical", "title": "SQL 注入风险",
-                       "suggestion": "用参数化查询，避免拼接变量进 SQL"})
-    if re.search(r"subprocess\.[a-z]+\([^)]*shell\s*=\s*True", content, re.I):
-        issues.append({"severity": "critical", "title": "命令注入(shell=True)",
-                       "suggestion": "避免 shell=True，用参数列表"})
-    if re.search(r"os\.system\s*\([^)]*[\+\{]", content, re.I):
-        issues.append({"severity": "major", "title": "命令拼接风险",
-                       "suggestion": "os.system 动态字符串易注入"})
-    if re.search(r"\beval\s*\(|\bexec\s*\(", content):
-        issues.append({"severity": "major", "title": "不安全的 eval/exec",
-                       "suggestion": "避免对不可信输入 eval/exec"})
-    if re.search(r"\b(password|passwd|secret|api_key|apikey|token)\s*=\s*[\"'][^\"']{6,}",
-                 content, re.I):
-        issues.append({"severity": "major", "title": "硬编码密钥/密码",
-                       "suggestion": "用环境变量/配置文件"})
-    return issues
-
-
-def _static_analyze(content: str) -> dict:
-    """综合静态分析，返回问题列表 + 各检查计数。"""
-    issues = []
-    try:
-        tree = ast.parse(content)
-    except SyntaxError as e:
-        return {"issues": [{"severity": "critical", "title": "语法错误",
-                            "line": e.lineno, "suggestion": str(e)}],
-                "counts": {"syntax": 1, "imports": 0, "complexity": 0,
-                           "naming": 0, "security": 0}}
-    issues += _static_check_syntax(content)
-    issues += _static_check_imports(tree, content)
-    issues += _static_check_complexity(tree)
-    issues += _static_check_naming(tree)
-    issues += _static_check_security(content)
-    counts = {"syntax": len(_static_check_syntax(content)),
-              "imports": sum(1 for i in issues if "import" in i["title"]),
-              "complexity": sum(1 for i in issues if "圈复杂度" in i["title"]),
-              "naming": sum(1 for i in issues if "命名" in i["title"] or "建议" in i["title"]),
-              "security": sum(1 for i in issues if "注入" in i["title"] or "eval" in i["title"] or "密钥" in i["title"])}
-    return {"issues": issues, "counts": counts}
+# 旧版静态函数保留为兼容别名（同 codeagent 口径，已统一到 code_review）
+_static_check_syntax = code_review._static_check_syntax
+_static_check_imports = code_review._static_check_imports
+_static_check_complexity = code_review._static_check_complexity
+_static_check_naming = code_review._static_check_naming
+_static_check_security = code_review._static_check_security
 
 
 # ═══════════════════════════════════════════════
@@ -312,11 +238,11 @@ class CodeAgent:
                                          "suggestion": out.strip()[:300]})
         except Exception:
             pass
-        crit = sum(1 for i in all_issues if i["severity"] == "critical")
-        maj = sum(1 for i in all_issues if i["severity"] == "major")
-        score = max(0, 100 - crit * 20 - maj * 8 - len(all_issues) * 2)
+        # 评分对齐 codeagent：score = max(0, 100 - Σ severity权重)
+        penalty = sum(code_review.SEVERITY_WEIGHTS.get(i["severity"], 5) for i in all_issues)
+        score = max(0, 100 - penalty)
         return {"score": score, "issues": all_issues, "model_issues": model_issues,
-                "summary": f"静态{len(all_issues)}条 + 模型审查，评分{score}"}
+                "summary": f"静态{len(all_issues)}条 + 模型审查，评分{score}（对齐codeagent口径）"}
 
     # ---- test/run_tests ----
     def test(self, code: dict) -> dict:
@@ -354,10 +280,8 @@ class CodeAgent:
         return _static_analyze(code)["issues"]
 
     def _score_code(self, code: str) -> int:
-        issues = _static_analyze(code)["issues"]
-        crit = sum(1 for i in issues if i["severity"] == "critical")
-        maj = sum(1 for i in issues if i["severity"] == "major")
-        return max(0, 100 - crit * 20 - maj * 8 - len(issues) * 2)
+        # 评分对齐 codeagent：直接取 code_review._static_analyze 的 score
+        return code_review._static_analyze(code)["score"]
 
     def _parse_json(self, text: str) -> dict:
         """从模型输出提取 JSON（markdown 代码块容错）。"""
