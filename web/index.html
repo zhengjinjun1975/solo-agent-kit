@@ -237,7 +237,7 @@
         <button class="btn" onclick="runLogs('ERROR')">🔴 错误</button>
         <button class="btn" onclick="runLogs('WARN')">🟠 警告</button>
       </div>
-      <div id="logs-result" style="font-size:11px;margin-top:10px;background:#f1f3f8;border:1px solid var(--border);border-radius:10px;padding:10px;max-height:400px;overflow:auto;font-family:Consolas,monospace"></div>
+      <div id="logs-result" style="font-size:11px;margin-top:10px;background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:10px;max-height:400px;overflow:auto;font-family:Consolas,monospace"></div>
     </div>
 
     <!-- 远程运维工作区（FDE SSH） -->
@@ -251,7 +251,7 @@
         <button class="btn" onclick="runRemote('exec')">⚡ 执行命令</button>
         <button class="btn" onclick="runRemote('logs')">📋 远程日志</button>
       </div>
-      <div id="remote-result" style="font-size:11px;margin-top:10px;background:#f1f3f8;border:1px solid var(--border);border-radius:10px;padding:10px;max-height:300px;overflow:auto;font-family:Consolas,monospace"></div>
+      <div id="remote-result" style="font-size:11px;margin-top:10px;background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:10px;max-height:300px;overflow:auto;font-family:Consolas,monospace"></div>
     </div>
 
     <!-- 工单工作区（FDE 问题闭环） -->
@@ -284,11 +284,11 @@
     <div id="ws-code" style="display:none">
       <div class="lbl">代码工作区 — 库理解/生成/审查</div>
       <div class="stat" style="cursor:pointer" onclick="runCodeOverview()">📁 项目概览</div>
-      <div id="code-result" style="font-size:11px;max-height:200px;overflow:auto;white-space:pre-wrap;background:#f1f3f8;border:1px solid var(--border);border-radius:8px;padding:8px;margin-top:6px"></div>
+      <div id="code-result" style="font-size:11px;max-height:200px;overflow:auto;white-space:pre-wrap;background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:8px;margin-top:6px"></div>
       <div class="lbl" style="margin-top:14px">代码生成</div>
       <textarea id="code-prompt" rows="3" style="width:100%;background:#fff;border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12px;padding:8px;outline:none" placeholder="描述要生成的代码…"></textarea>
       <button class="btn pri" style="margin-top:6px;width:100%" onclick="runCodeGen()">生成代码</button>
-      <div id="gen-result" style="font-size:11px;margin-top:8px;max-height:150px;overflow:auto;white-space:pre-wrap;background:#f1f3f8;border:1px solid var(--border);border-radius:8px;padding:8px"></div>
+      <div id="gen-result" style="font-size:11px;margin-top:8px;max-height:150px;overflow:auto;white-space:pre-wrap;background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:8px"></div>
     </div>
 
     <!-- 技能工作区 -->
@@ -305,7 +305,7 @@
     <!-- 配置工作区 -->
     <div id="ws-config" style="display:none">
       <div class="lbl">配置 — 工具必需配置项</div>
-      <div id="config-result" style="font-size:11px;max-height:280px;overflow:auto;white-space:pre-wrap;background:#f1f3f8;border:1px solid var(--border);border-radius:8px;padding:8px"></div>
+      <div id="config-result" style="font-size:11px;max-height:280px;overflow:auto;white-space:pre-wrap;background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:8px"></div>
       <button class="btn" style="margin-top:8px;width:100%" onclick="loadConfigPanel()">刷新配置</button>
     </div>
 
@@ -313,7 +313,7 @@
     <div id="ws-setup" style="display:none">
       <div class="lbl">部署 — 检查环境并启动服务</div>
       <button class="btn pri" style="width:100%" onclick="runDeploy()">🚀 开始部署</button>
-      <div id="setup-result" style="font-size:12px;max-height:300px;overflow:auto;white-space:pre-wrap;background:#f1f3f8;border:1px solid var(--border);border-radius:8px;padding:10px;margin-top:8px;line-height:1.8"></div>
+      <div id="setup-result" style="font-size:12px;max-height:300px;overflow:auto;white-space:pre-wrap;background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:10px;margin-top:8px;line-height:1.8"></div>
     </div>
   </aside>
 </div>

@@ -338,18 +338,18 @@ function drawControlChart(col, cc){
   let line='', dots='';
   if(pts.length>1){
     line=pts.map((p,i)=>`${i?'L':'M'}${x(p.index).toFixed(1)},${y(p.value).toFixed(1)}`).join(' ');
-    dots=pts.map(p=>`<circle cx="${x(p.index).toFixed(1)}" cy="${y(p.value).toFixed(1)}" r="2" fill="#2f5ef0"/>`).join('');
+    dots=pts.map(p=>`<circle cx="${x(p.index).toFixed(1)}" cy="${y(p.value).toFixed(1)}" r="2" fill="#0d9488"/>`).join('');
   }
   return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
-    <line x1="${P}" y1="${y(mean)}" x2="${W-P}" y2="${y(mean)}" stroke="#3b6ef6" stroke-width="1.2" stroke-dasharray="4,3"/>
-    <line x1="${P}" y1="${y(ucl)}" x2="${W-P}" y2="${y(ucl)}" stroke="#dc2626" stroke-width="1"/>
-    <line x1="${P}" y1="${y(lcl)}" x2="${W-P}" y2="${y(lcl)}" stroke="#dc2626" stroke-width="1"/>
-    <text x="${W-4}" y="${y(ucl)-2}" fill="#dc2626" font-size="7" text-anchor="end">UCL ${ucl}</text>
-    <text x="${W-4}" y="${y(lcl)+8}" fill="#dc2626" font-size="7" text-anchor="end">LCL ${lcl}</text>
-    <text x="2" y="${y(mean)-2}" fill="#3b6ef6" font-size="7">μ ${mean}</text>
-    ${line?`<path d="${line}" fill="none" stroke="#2f5ef0" stroke-width="1.5" opacity="0.7"/>`:''}
+    <line x1="${P}" y1="${y(mean)}" x2="${W-P}" y2="${y(mean)}" stroke="#0d9488" stroke-width="1.2" stroke-dasharray="4,3"/>
+    <line x1="${P}" y1="${y(ucl)}" x2="${W-P}" y2="${y(ucl)}" stroke="#ef4444" stroke-width="1"/>
+    <line x1="${P}" y1="${y(lcl)}" x2="${W-P}" y2="${y(lcl)}" stroke="#ef4444" stroke-width="1"/>
+    <text x="${W-4}" y="${y(ucl)-2}" fill="#ef4444" font-size="7" text-anchor="end">UCL ${ucl}</text>
+    <text x="${W-4}" y="${y(lcl)+8}" fill="#ef4444" font-size="7" text-anchor="end">LCL ${lcl}</text>
+    <text x="2" y="${y(mean)-2}" fill="#0d9488" font-size="7">μ ${mean}</text>
+    ${line?`<path d="${line}" fill="none" stroke="#0d9488" stroke-width="1.5" opacity="0.7"/>`:''}
     ${dots}
-    ${(cc.out_of_control||[]).map(o=>`<circle cx="${x(o.index).toFixed(1)}" cy="${y(o.value).toFixed(1)}" r="4" fill="#dc2626"/>`).join('')}
+    ${(cc.out_of_control||[]).map(o=>`<circle cx="${x(o.index).toFixed(1)}" cy="${y(o.value).toFixed(1)}" r="4" fill="#ef4444"/>`).join('')}
   </svg>`;
 }
 
@@ -386,15 +386,15 @@ async function runDecisionsDS(){
   const res=await api('/api/decisions',{method:'POST',body:JSON.stringify({csvs:csvs})});
   if(res.error){out.innerHTML='❌ '+res.error;return;}
   const ds=res.decisions||[];
-  const levelColor={告急:'#e74c3c',预警:'#e8890c',建议:'#3b6ef6'};
+  const levelColor={告急:'#ef4444',预警:'#f59e0b',建议:'#0d9488'};
   out.innerHTML=`<div style="margin-bottom:8px"><b style="font-size:13px">🧭 企业决策建议</b><span style="font-size:11px;color:var(--mute);margin-left:8px">${res.total} 条 · 确定性规则 · 可解释</span></div>
-    ${ds.length?ds.map(d=>`<div style="border-left:3px solid ${levelColor[d.level]||'#3b6ef6'};background:#f8fafc;border-radius:6px;padding:8px;margin-bottom:6px">
+    ${ds.length?ds.map(d=>`<div style="border-left:3px solid ${levelColor[d.level]||'#0d9488'};background:#f8fafc;border-radius:6px;padding:8px;margin-bottom:6px">
       <div style="font-size:12px"><b>[${d.level}] ${d.action}</b> <span style="color:var(--mute)">${d.module}·${d.name} · ${d.entity}</span></div>
       <div style="font-size:11px;color:var(--mute);margin-top:3px">${esc(d.reason)}</div>
     </div>`).join(''):'<div style="color:var(--green);font-size:12px">✅ 未触发任何决策规则，运营正常</div>'}`;
 }
 // 企业级本体可视化（ECharts 力导向网络图，融合 SME 方式）
-const ONTO_COLORS = ['#2f6bff','#27ae60','#f39c12','#e74c3c','#8e44ad','#16a085','#e67e22','#1abc9c','#c0392b','#7f8c8d'];
+const ONTO_COLORS = ['#0d9488','#10b981','#f59e0b','#ef4444','#7c3aed','#0d9488','#f59e0b','#14b8a6','#ef4444','#94a3b8'];
 function drawOntoGraph(model){
   const el=document.getElementById('onto-graph');
   if(!model || !model.graph || !model.graph.nodes || typeof echarts==='undefined'){
@@ -427,12 +427,12 @@ function drawOntoGraph(model){
       label:{show:true,fontSize:11,fontWeight:'bold',color:colorOf(et)}});
   });
   // 企业 hub
-  data.push({id:'__hub__',name:'企业',category:0,symbolSize:64,itemStyle:{color:'#2f6bff'},
+  data.push({id:'__hub__',name:'企业',category:0,symbolSize:64,itemStyle:{color:'#0d9488'},
     label:{show:true,fontSize:15,fontWeight:'bold',color:'#fff'}});
   // 边: 企业→实体类 + 实体类→实例 + 原关系边
   const links=[];
   entityList.forEach(et=>{
-    links.push({source:'__hub__',target:'__cls__'+et,lineStyle:{color:'#2f6bff',opacity:0.6,width:2},label:{show:false}});
+    links.push({source:'__hub__',target:'__cls__'+et,lineStyle:{color:'#0d9488',opacity:0.6,width:2},label:{show:false}});
     (grp[et]||[]).forEach(n=>{
       links.push({source:'__cls__'+et,target:et+':'+n.id,lineStyle:{color:colorOf(et),opacity:0.35,width:1},label:{show:false}});
     });
@@ -440,7 +440,7 @@ function drawOntoGraph(model){
   // 原跨实体关系边
   edges.forEach(e=>{
     if(idSet.has(e.from)&&idSet.has(e.to)) links.push({source:e.from,target:e.to,
-      lineStyle:{color:'#ff8c1a',opacity:0.8,width:1.5},label:{show:false}});
+      lineStyle:{color:'#7c3aed',opacity:0.8,width:1.5},label:{show:false}});
   });
   el.innerHTML=`<div id="ontchart" style="height:480px;width:100%"></div>
     <div style="padding:6px 2px;font-size:11px;color:var(--mute)">${Object.keys(nodes).length} 实例 · ${entityList.length} 实体类 · ${edges.length} 跨实体关系 · 拖动缩放 · 悬停看详情</div>
@@ -453,9 +453,9 @@ function drawOntoGraph(model){
     animationDuration:800,
     series:[{type:'graph', layout:'force', roam:true,
       force:{repulsion:250, edgeLength:[50,110], gravity:0.15, friction:0.6},
-      label:{show:true,position:'right',fontSize:9,color:'#1a2233'},
+      label:{show:true,position:'right',fontSize:9,color:'#1f2937'},
       edgeSymbol:['none','arrow'], edgeSymbolSize:[0,5],
-      categories:[{name:'企业',itemStyle:{color:'#2f6bff'}},
+      categories:[{name:'企业',itemStyle:{color:'#0d9488'}},
         ...entityList.map(et=>({name:et,itemStyle:{color:colorOf(et)}}))],
       data:data, links:links,
       lineStyle:{opacity:0.6,width:1.5,curveness:0.1},
@@ -613,7 +613,7 @@ async function refreshSitePanel(){
         const nm=d.name||d.device||'设备';
         const cpu=d.cpu!=null?`CPU ${d.cpu}%`:''; const mem=d.mem!=null?`MEM ${d.mem}%`:'';
         return `<div style="font-size:11px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:6px 8px;margin-bottom:4px">
-          <b>${esc(nm)}</b> ${cpu} ${mem} ${d.ok?'' : (d.error?'<span style="color:#e74c3c"> ⚠ '+esc(d.error)+'</span>':'')}</div>`;
+          <b>${esc(nm)}</b> ${cpu} ${mem} ${d.ok?'' : (d.error?'<span style="color:#ef4444"> ⚠ '+esc(d.error)+'</span>':'')}</div>`;
       }).join('');
     } else {
       sbox.innerHTML=`<div style="font-size:11px;color:var(--mute)">无设备状态</div>`;
@@ -874,7 +874,7 @@ async function runMonitor(){
   const r=await api('/api/monitor');
   if(r.error){out.innerHTML='❌ '+r.error;return;}
   const cpu=r.cpu||{}, mem=r.memory||{}, proc=r.processes||{}, disk=r.disk||{};
-  const bar=(p)=>`<div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden;margin-top:4px"><div style="width:${Math.min(100,p||0)}%;height:100%;background:${(p||0)>85?'#e74c3c':(p||0)>70?'#e8890c':'var(--green)'};border-radius:4px"></div></div>`;
+  const bar=(p)=>`<div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden;margin-top:4px"><div style="width:${Math.min(100,p||0)}%;height:100%;background:${(p||0)>85?'#ef4444':(p||0)>70?'#7c3aed':'var(--green)'};border-radius:4px"></div></div>`;
   out.innerHTML=`
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
       <div style="background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:12px">
