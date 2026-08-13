@@ -24,17 +24,35 @@ _EXTREME_CN = {"最大": "最大", "最高": "最高", "最贵": "最贵", "最�
 _STOP_CN = {"id", "编码", "编号", "序号", "UDI"}
 
 
+# 常见工厂列名 → 中文（方法论统一: 对齐 factory 中文问答语义）
+COL_CN_MAP = {
+    "device_name": "设备名称", "deviceName": "设备名称", "name": "名称",
+    "device_type": "设备类型", "deviceType": "设备类型", "type": "类型", "category": "分类", "类别": "类别",
+    "status": "状态", "workshop": "车间", "zone": "区域", "region": "区域",
+    "power_kw": "功率", "power": "功率", "capacity_mw": "容量", "capacity": "容量",
+    "vibration_mm_s": "振动", "temp_c": "温度", "temperature": "温度", "current_a": "电流",
+    "price": "价格", "成本": "成本", "stock": "库存", "quantity": "数量",
+    "customer": "客户", "customer_name": "客户名称", "customer_type": "客户类型",
+    "product": "产品", "product_type": "产品类型", "product_name": "产品名称",
+    "unit": "机组", "unit_type": "机组类型", "fuel_type": "燃料类型", "fuel": "燃料",
+    "quality": "质量", "grade": "等级", "batch": "批次", "lot": "批次",
+    "date": "日期", "produce_date": "生产日期", "delivery_date": "交付日期",
+    "load": "负荷", "output": "产量", "efficiency": "效率", "yield": "良率",
+}
+
+
 def _col_cn(col: str) -> str:
-    """列名 → 中文（剥 id/下划线/驼峰，简单启发式）。"""
-    c = re.sub(r"[_\-]", " ", col).strip()
-    c = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", c)
-    parts = [p for p in c.split() if p]
-    if not parts:
-        return col
-    # 英文单词不翻译, 保留原名作为展示; 已是中文(含中文)则直接返回
+    """列名 → 中文（方法论统一: 常见工厂列名转中文, 对齐 factory 中文问答）。"""
+    if col in COL_CN_MAP:
+        return COL_CN_MAP[col]
+    # 已是中文(含中文)则直接返回
     if re.search(r"[\u4e00-\u9fff]", col):
         return col
-    return col  # 英文列名保留英文, 由 FDE/词典补充中文
+    # 剥 id/下划线/驼峰后的英文, 尝试精确匹配映射; 否则保留原名(FDE/词典补中文)
+    c = re.sub(r"[_\-]", "", col).strip().lower()
+    if c in COL_CN_MAP:
+        return COL_CN_MAP[c]
+    return col
 
 
 def _entity_name(entity_name: str) -> str:
