@@ -153,15 +153,15 @@ def to_factory_lexicon(draft, table_name="数据", entity_cn=None):
     _STATUS_COLS = ("status", "状态")
     _ZONE_COLS = ("workshop", "车间", "zone", "区域", "产线")
     for col, e in (draft or {}).items():
+        low = str(col).lower()
+        # 跳过 id/编号/唯一标识 列(不是枚举也不进属性映射, 不污染词典)
+        if any(k in low for k in ("id", "udi", "编号", "序号", "码", "_id")):
+            continue
         cn = e.get("cn", "") or col
         typ = e.get("type", "string")
         enum = e.get("enum") or []
         ename = local_name(col)
         if enum:
-            low = str(col).lower()
-            # 跳过 id/编号/唯一标识 列(不是枚举类型)
-            if any(k in low for k in ("id", "udi", "编号", "序号", "码", "_id")):
-                continue
             target = type_cn2en
             if any(k in low for k in _STATUS_COLS):
                 target = status_cn2en
@@ -207,6 +207,10 @@ def to_review_items(draft):
     """
     items = []
     for col, e in (draft or {}).items():
+        low = str(col).lower()
+        # 过滤 id/编号/序号/唯一标识 列, 不污染 review 队列(与 to_factory_lexicon 一致)
+        if any(k in low for k in ("id", "udi", "编号", "序号", "码", "_id")):
+            continue
         cn = e.get("cn", "") or col
         typ = e.get("type", "string")
         enum = e.get("enum") or []
