@@ -253,7 +253,16 @@ def report_draft(*, kb: str, industry: str, hit: float, questions_n: int, hits: 
         "",
         "> 本报告为 FDE 起草初稿，最终版由闭源交付流程生成并归档。",
     ]
-    return "\n".join(lines)
+    md = "\n".join(lines)
+
+    # AI味自检（生成→检测→提示）：接入 zh-writing-checker，给出评分与建议，不强制改写
+    ai = None
+    try:
+        from solo import writing as _w  # noqa: PLC0415
+        ai = _w.ai_taste(md, style="report")
+    except Exception:  # noqa: BLE001
+        ai = {"ok": False, "note": "zh-writing-checker 未接入"}
+    return md, ai
 
 
 def report_draft_dict(*, kb: str, industry: str, hit: float, questions_n: int, hits: int,

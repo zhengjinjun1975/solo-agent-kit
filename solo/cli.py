@@ -359,10 +359,16 @@ def _assist_lexicon_draft(args):
 def _assist_report_draft(args):
     """起草交付报告(FDE D4)。"""
     from solo.factory.assist import report_draft
-    rep = report_draft(kb=args.kb, industry=args.industry, hit=args.hit,
-                       questions_n=args.questions, hits=args.hits,
-                       asset_versions=args.asset_versions, note=args.note)
-    return {"report": rep}
+    from solo import writing as _w
+    md, ai = report_draft(kb=args.kb, industry=args.industry, hit=args.hit,
+                          questions_n=args.questions, hits=args.hits,
+                          asset_versions=args.asset_versions, note=args.note)
+    out = {"report": md}
+    if ai and ai.get("ok"):
+        out["ai_taste"] = {"score": ai["ai_score"], "note": ai["note"],
+                           "suggestions": ai["suggestions"][:6],
+                           "hard_fails": ai["hard_fails"]}
+    return out
 
 
 if __name__ == "__main__":

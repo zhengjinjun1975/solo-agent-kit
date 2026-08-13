@@ -31,6 +31,49 @@ def list_styles() -> dict:
     """返回可用风格模板清单。"""
     return {k: {"name": v["name"], "hint": v["hint"]} for k, v in STYLES.items()}
 
+
+# ═══════════════════════ AI味自检（接入 zh-writing-checker）═══════════════════════
+def ai_taste(text: str, style: str = "report") -> dict:
+    """AI味自检：调用 zh-writing-checker 检测 AI 腔，返回评分+建议（零依赖）。
+
+    接入生态：让 solo 写作产出先过一遍"人味门检→两层检测"，
+    给出 AI 味分（100=最像人）与可执行改写建议，只提示不强制改写。
+    """
+    from . import zh_ai_taste
+    return zh_ai_taste.ai_taste_report(text, style=style)
+
+
+def format_ai_taste(report: dict, source: str = "文本") -> str:
+    """把 ai_taste 结果渲染为人类可读提示。"""
+    from . import zh_ai_taste
+    return zh_ai_taste.format_ai_report(report, source=source)
+
+
+def write_natural(text: str, style: str = "tweet", provider=None) -> dict:
+    """生成→AI味检测→改写建议→复检 闭环，产出对齐风格的更自然文本。
+
+    流程:
+      1. 检测 AI 味（zh-writing-checker）
+      2. 若可用 provider：按风格改写；否则返回风格指导 + 检测建议
+      3. 对结果复检，给出前后 AI 味分对比
+    不强制改写——检测到自然文本或未接入检查器时，如实说明。
+    """
+    report = ai_taste(text, style)
+    if not report.get("ok"):
+        return {"ai_taste": report, "note": report.get("note", "未接入检查器")}
+    r = rewrite(text, style, provider)  # 风格改写（本地模板/LLM）
+    rewritten = r.get("rewritten") or ""
+    recheck = ai_taste(rewritten, style) if rewritten else None
+    return {
+        "style": style,
+        "ai_taste_before": report,
+        "rewrite": r,
+        "ai_taste_after": recheck,
+        "improvement": None if (recheck is None or report["ai_score"] is None)
+                       else round(recheck["ai_score"] - report["ai_score"], 1),
+        "note": "建议已给出（提示不强制）；若 AI 味分高，可用 provider 自动改写或按建议手动打磨。",
+    }
+
 def rewrite(text: str, style: str = "tweet", provider=None) -> dict:
     """按风格模板改写文本（对标 AI 写作助手 写作）。
 
