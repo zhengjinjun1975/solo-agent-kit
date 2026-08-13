@@ -2,6 +2,14 @@
 
 所有显著变更记录在此。格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [0.5.6] - 2026-08-13
+
+### 新增(合并远程v0.8.x功能 + 本地FDE交付辅助, 版本统一0.5.6)
+
+- 保留远程 v0.8.x 全部功能：外部插件体系(Obsidian/Excel报表/网络扫描/协议探针)、前端厂区面板、writing 优化器、竞品分析
+- FDE交付辅助: draft-questions(评测题)/lexicon-draft(词典草稿)/report-draft(报告草稿)
+- FDE套件运行手册
+
 ## [0.8.4] - 2026-08-11
 
 ### 新增(插件P1 + 协议探针 + 前端厂区面板 + 竞品分析)
@@ -43,7 +51,7 @@
   - think(JSON方案) / implement(生成+loop迭代) / review(双层) / test / run_tests
   - 模型调用接 provider(urllib零依赖): 生成走远端,审查走本地
 - README 重写: AI原生思想 + 方法论决定一切(单一事实源/本体优先/反过度工程/诚实定位)
-  - 经 OpenClaw 总编辑润色(科技感+严谨性), 修正虚构命令为真实CLI
+  - 经总编辑润色(科技感+严谨性), 修正虚构命令为真实CLI
   - 六维写作自检通过(0问题, 无破折号/禁词)
 
 ### 验证
@@ -172,7 +180,7 @@
 
 ## [0.5.1] - 2026-08-10
 
-### 修复(OpenClaw审查P0)
+### 修复(代码审查P0)
 - detect_anomaly 空数据/少数据防护(防IndexError)
 - CodeGraph RE_DEF 支持缩进 → 方法级符号索引(39→110)
 - agent chat兜底身份锚定(防模型自报Ornith)
@@ -184,7 +192,7 @@
 ### 新增
 - AI 原生对话路由：agent.py 意图识别→调用全部套件模块（自然语言指挥）
 - Web 后端 web_server.py：完整 REST API（clean/stats/ontology/memory/skill/writing/code-overview/gen/setup/config）
-- 前端重写为 AI 原生设计（OpenClaw 式聊天对话框为中心，WorkBuddy 多面板）
+- 前端重写为 AI 原生设计（聊天对话框为中心，WorkBuddy 多面板）
 - provider.yaml 从文件读取真正生效
 
 ### 修复
@@ -199,7 +207,7 @@
 - **factory 模块进 CLI**：`solo factory-clean` / `factory-stats` / `factory-onto` 命令
 - **部署检查**：`solo setup`（Python/Ollama/config/记忆库 四检）
 - **配置查看**：`solo config`（provider.yaml 脱敏显示）
-- **可视化前端**：`web/index.html`（单文件零依赖）——融合 OpenClaw（暗色玻璃拟态）+ WorkBuddy（办公多面板），工业蓝（工厂套件）+ 暖橙（个人套件），涵盖全部套件能力
+- **可视化前端**：`web/index.html`（单文件零依赖）——融合暗色玻璃拟态 + 办公多面板，工业蓝（工厂套件）+ 暖橙（个人套件），涵盖全部套件能力
 - 定位升级：**针对 FDE 的轻量化全栈工具，一人公司的必备能力**
 
 ### 修复

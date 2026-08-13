@@ -32,7 +32,7 @@
 **目标**：FDE 现场产出的报告/方案/经验自动归档到 Obsidian 知识库。
 
 > **注意**：Obsidian 笔记应用**无官方 CLI**（npm 那个 `obsidian` 是 QA 平台工具，不可用）。
-> 正确方式：**直接文件系统读写 vault**（`D:/knowledge-base/obsidian-vault/`），
+> 正确方式：**直接文件系统读写 vault**（`~/obsidian-vault`），
 > 遵循 vault 目录结构（knowledge/projects/reports/daily）+ Markdown 语法（frontmatter/link/tag）。
 
 | 能力 | 实现 | 复用现有 |

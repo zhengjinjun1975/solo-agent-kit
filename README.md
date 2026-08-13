@@ -9,7 +9,7 @@
     <img src="https://img.shields.io/badge/License-Apache--2.0-blue.svg" alt="License">
   </a>
   <a href="https://github.com/zhengjinjun1975/solo-agent-kit/blob/main/CHANGELOG.md">
-    <img src="https://img.shields.io/badge/version-0.8.4-blue.svg" alt="Version">
+    <img src="https://img.shields.io/badge/version-0.5.6-blue.svg" alt="Version">
   </a>
   <a href="https://www.python.org/">
     <img src="https://img.shields.io/badge/Python-3.9%2B-blue.svg" alt="Python">
@@ -141,7 +141,7 @@ solo plugins list          # 查看各插件可用性（obsidian/visualize 等�
 ```
 
 **二、可靠优先，用本机已有的**
-插件优先复用本机已装工具，不引入脆弱依赖。Obsidian 集成直接用文件系统读写 vault（`D:/knowledge-base/obsidian-vault/`），因为 Obsidian 笔记应用无官方 CLI；可视化复用 matplotlib（本机已装），零新增依赖。
+插件优先复用本机已装工具，不引入脆弱依赖。Obsidian 集成直接用文件系统读写 vault（`~/obsidian-vault`），因为 Obsidian 笔记应用无官方 CLI；可视化复用 matplotlib（本机已装），零新增依赖。
 
 **三、能力可扩展，注册表驱动**
 `plugins/__init__.py` 的注册表声明每个插件的依赖与能力。新增插件只需注册模块，`list_plugins()` 自动显示可用性。这是 FDE 套件"进厂区后按需加载能力"的机制：用不到的不装，装上的必须可靠。
@@ -203,7 +203,7 @@ solo export-markdown               # 导出记忆为 Markdown，可回写
 
 ## 限制与诚实声明
 
-solo 不是通用 agent 框架，不试图替代 Hermes、Claude Code 等成熟工具。
+solo 不是通用 agent 框架，不试图替代 Claude Code、Cursor 等成熟工具。
 
 - 不是又一个通用 Agent 框架。它轻量、方法论驱动、非对标大厂。
 - 不是 AI 替代人类的计划。人留在循环里，agent 是帮手不是取代。

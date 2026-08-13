@@ -24,10 +24,10 @@ acknowledged for transparency:
 
 1. OptMem (permanent agent memory, hierarchical summary tree + hybrid
    semantic retrieval) — methodology source for solo/memory.py
-   Author: zhengjinjun1975 (local, E:\optmem)
+   Author: zhengjinjun1975 (local project)
 
 2. codegraph (code impact analysis) — methodology source for solo/code.py
-   Author: zhengjinjun1975 (local, E:\optmem\codegraph)
+   Author: zhengjinjun1975 (local project)
 
 3. zh-writing-checker (six-dimension Chinese writing quality check) —
    methodology source for solo/writing.py

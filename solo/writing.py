@@ -6,7 +6,7 @@
 
 能力双全：
   1. 检测（scan）：合并 zh-writing-checker v3.0 全量规则 + 本地 v1.0 接口兼容
-  2. 改写（rewrite + STYLES）：本地独有，按场景风格模板改写（OpenClaw 写作）
+  2. 改写（rewrite + STYLES）：本地独有，按场景风格模板改写（AI 写作助手 写作）
 """
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ import re
 VERSION = "2.0"
 
 # ═══════════════════════ 改写能力（本地独有）═══════════════════════
-# 风格模板（对标 OpenClaw 写作）：不同场景的写作风格约束
+# 风格模板（对标 AI 写作助手 写作）：不同场景的写作风格约束
 STYLES = {
     "tweet": {"name": "推文", "hint": "短小精悍，一句观点+一句佐证+一句行动，无破折号，口语化有活人感",
               "max_len": 280, "rules": ["避免堆砌形容词", "结尾用洞察或反问"]},
@@ -32,7 +32,7 @@ def list_styles() -> dict:
     return {k: {"name": v["name"], "hint": v["hint"]} for k, v in STYLES.items()}
 
 def rewrite(text: str, style: str = "tweet", provider=None) -> dict:
-    """按风格模板改写文本（对标 OpenClaw 写作）。
+    """按风格模板改写文本（对标 AI 写作助手 写作）。
 
     style: tweet/report/wechat/paper
     provider: 可选 LLM provider；无则用规则提示（返回风格指导）。

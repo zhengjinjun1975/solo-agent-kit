@@ -2,7 +2,7 @@
 """obsidian.py — Obsidian 知识库集成（零依赖，文件系统读写 vault）。
 
 FDE 现场产出的报告/方案/经验自动归档到 Obsidian 知识库。
-Obsidian 笔记应用无官方 CLI，直接用文件系统读写 vault（D:/knowledge-base/obsidian-vault/），
+Obsidian 笔记应用无官方 CLI，直接用文件系统读写 vault（~/obsidian-vault），
 遵循 vault 目录结构（reports/projects/knowledge）+ Markdown 语法（frontmatter/link/tag）。
 
 能力：
@@ -16,8 +16,8 @@ import os
 import re
 from datetime import datetime
 
-# vault 根目录（可用环境变量覆盖）
-DEFAULT_VAULT = os.environ.get("SOLO_VAULT", r"D:/knowledge-base/obsidian-vault")
+# vault 根目录（可用环境变量 SOLO_VAULT 覆盖）
+DEFAULT_VAULT = os.environ.get("SOLO_VAULT", os.path.join(os.path.expanduser("~"), "obsidian-vault"))
 
 
 def _vault() -> str:

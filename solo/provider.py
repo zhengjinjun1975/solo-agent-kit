@@ -147,9 +147,9 @@ class Provider:
 
 
 def _read_env_key(key: str) -> str:
-    """从 Hermes .env 文件读取密钥（web 服务等进程未 source .env 时兜底）。"""
-    for p in [os.path.expanduser("~/.hermes/.env"),
-              os.path.expanduser("~/AppData/Local/hermes/.env")]:
+    """从 ~/.env 文件读取密钥（web 服务等进程未 source .env 时兜底）。"""
+    for p in [os.path.expanduser("~/.env"),
+              os.path.join(os.getcwd(), ".env")]:
         try:
             with open(p, encoding="utf-8") as f:
                 for line in f:

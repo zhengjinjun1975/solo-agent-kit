@@ -22,7 +22,6 @@ import os
 import sys
 
 from solo import __version__
-from solo._util import is_num as _num
 from solo import memory as memory_mod
 from solo import provider as provider_mod
 from solo.factory import clean as clean_mod
@@ -68,6 +67,23 @@ def main(argv=None):
     p_fo.add_argument("--id", dest="id_col", help="主键列")
     p_fo.add_argument("--relations", help="关系声明 JSON 文件")
 
+    # 交付辅助(FDE D0/D1/D4): 问题集/词典初稿/报告起草
+    p_dq = sub.add_parser("draft-questions", help="起草问题集(FDE D0)")
+    p_dq.add_argument("csv", help="CSV 数据文件")
+    p_dq.add_argument("--entity", default="设备", help="实体名(用于量词)")
+    p_dq.add_argument("--limit", type=int, default=12, help="问题数上限")
+    p_ld = sub.add_parser("lexicon-draft", help="起草词典初稿(FDE D1)")
+    p_ld.add_argument("csv", help="CSV 数据文件")
+    p_ld.add_argument("--json", action="store_true", help="输出 JSON")
+    p_rd = sub.add_parser("report-draft", help="起草交付报告(FDE D4)")
+    p_rd.add_argument("--kb", required=True, help="知识库名")
+    p_rd.add_argument("--industry", required=True, help="行业名")
+    p_rd.add_argument("--hit", type=float, default=0.0, help="命中率0-1")
+    p_rd.add_argument("--questions", type=int, default=0, help="题数")
+    p_rd.add_argument("--hits", type=int, default=0, help="命中题数")
+    p_rd.add_argument("--asset-versions", type=int, default=0, help="资产版本数")
+    p_rd.add_argument("--note", default="", help="补充说明")
+
     # 任务状态控制面
     p_tn = sub.add_parser("task-new", help="新建任务")
     p_tn.add_argument("goal", help="任务目标")
@@ -84,43 +100,6 @@ def main(argv=None):
     p_bk.add_argument("dest", nargs="?", help="备份目录(默认 ~/.solo/backups)")
     p_rs = sub.add_parser("restore", help="恢复备份")
     p_rs.add_argument("src", help="备份目录")
-
-    # 插件体系
-    p_plug = sub.add_parser("plugins", help="插件体系(Obsidian/可视化)")
-    psub = p_plug.add_subparsers(dest="plug_cmd")
-    psub.add_parser("list", help="列出全部插件及可用性")
-    p_psave = psub.add_parser("report", help="现场报告归档到Obsidian")
-    p_psave.add_argument("title")
-    p_psave.add_argument("content", nargs="?", default="")
-    p_psave.add_argument("--category", default="site")
-    p_psave.add_argument("--tags", default="")
-    p_pspv = psub.add_parser("spc", help="SPC控制图")
-    p_pspv.add_argument("values", nargs="+", type=float)
-    p_pspv.add_argument("--title", default="SPC 控制图")
-    p_pspv.add_argument("--file", default="spc")
-
-    # 厂区运维配置与定位
-    p_site = sub.add_parser("site", help="厂区配置与定位")
-    ssub = p_site.add_subparsers(dest="site_cmd")
-    ssub.add_parser("list", help="列出所有厂区")
-    ssub.add_parser("devices", help="列出当前厂区设备台账")
-    p_suse = ssub.add_parser("use", help="切换到指定厂区")
-    p_suse.add_argument("name")
-    p_sadd = ssub.add_parser("add-site", help="新增厂区")
-    p_sadd.add_argument("name")
-    p_sadd.add_argument("--location", default="", help="厂区位置")
-    p_sadd.add_argument("--contact", default="", help="联系人")
-    p_sdev = ssub.add_parser("add-device", help="添加设备到当前厂区")
-    p_sdev.add_argument("name")
-    p_sdev.add_argument("host")
-    p_sdev.add_argument("--user", default="", help="SSH用户")
-    p_sdev.add_argument("--port", type=int, default=22, help="SSH端口")
-    p_sdev.add_argument("--group", default="", help="设备分组")
-    p_sdev.add_argument("--role", default="", help="设备角色")
-    p_srm = ssub.add_parser("rm-device", help="移除设备")
-    p_srm.add_argument("name")
-    p_srole = ssub.add_parser("role", help="查看/设置部署角色")
-    p_srole.add_argument("value", nargs="?", help="laptop / on-site（缺省查看）")
 
     try:
         args = parser.parse_args(argv)
@@ -170,6 +149,12 @@ def _dispatch(args):
         return _factory_stats(args)
     if cmd == "factory-onto":
         return _factory_onto(args)
+    if cmd == "draft-questions":
+        return _assist_draft_questions(args)
+    if cmd == "lexicon-draft":
+        return _assist_lexicon_draft(args)
+    if cmd == "report-draft":
+        return _assist_report_draft(args)
     if cmd == "task-new":
         from solo.task import Task
         t = Task()
@@ -189,10 +174,6 @@ def _dispatch(args):
         from solo.task import Task
         t = Task()
         return t.resolve(args.tid)
-    if cmd == "site":
-        return _site(args)
-    if cmd == "plugins":
-        return _plugins(args)
     if cmd == "backup":
         return _backup(args.dest)
     if cmd == "restore":
@@ -339,54 +320,49 @@ def _factory_onto(args):
             "summary": o.entity_summary()}
 
 
-
-def _plugins(args):
-    """插件体系命令分发。"""
-    from solo import plugins
-    pc = args.plug_cmd
-    if pc == "list":
-        return {"plugins": plugins.list_plugins()}
-    if pc == "report":
-        from solo.plugins import obsidian
-        tags = [t.strip() for t in args.tags.split(",") if t.strip()] if args.tags else None
-        return obsidian.save_report(args.title, args.content or "# 报告\n", tags, args.category)
-    if pc == "spc":
-        from solo.plugins import visualize
-        return visualize.spc_chart(list(args.values), title=args.title, filename=args.file)
-    return {"error": f"未知 plugins 子命令: {pc}"}
-
-
-def _site(args):
-    """厂区配置与定位命令分发。"""
-    from solo.site import Site
-    s = Site()
-    sc = args.site_cmd
-    if sc == "list":
-        return {"role": s.role, "current_site": s.current_site,
-                "sites": s.list_sites()}
-    if sc == "use":
-        r = s.use(args.name)
-        return r if not r["ok"] else {"ok": True, "current_site": r["current_site"],
-                                       "devices": [d["name"] for d in s.devices()]}
-    if sc == "add-site":
-        return s.add_site(args.name, args.location, args.contact)
-    if sc == "devices":
-        return {"current_site": s.current_site, "devices": s.devices()}
-    if sc == "add-device":
-        return s.add_device(args.name, args.host, args.user, args.port,
-                            args.group, args.role)
-    if sc == "rm-device":
-        return s.rm_device(args.name)
-    if sc == "role":
-        if args.value:
-            return s.set_role(args.value)
-        return {"role": s.role}
-    return {"error": "未知 site 子命令", "cmd": sc}
+def _num(v):
+    try:
+        float(v)
+        return True
+    except (ValueError, TypeError):
+        return False
 
 
 def _now():
     import datetime
     return datetime.datetime.now().isoformat(timespec="seconds")
+
+
+def _load_rows_csv(csv_path):
+    import csv
+    with open(csv_path, encoding="utf-8-sig") as f:
+        return list(csv.DictReader(f))
+
+
+def _assist_draft_questions(args):
+    """起草问题集(FDE D0)。"""
+    from solo.factory.assist import draft_questions
+    rows = _load_rows_csv(args.csv)
+    qs = draft_questions(rows, args.entity, limit=args.limit)
+    return {"questions": qs, "count": len(qs)}
+
+
+def _assist_lexicon_draft(args):
+    """起草词典初稿(FDE D1)。"""
+    from solo.factory.assist import lexicon_draft
+    rows = _load_rows_csv(args.csv)
+    headers = list(rows[0].keys()) if rows else []
+    lex = lexicon_draft(headers, rows[:30])
+    return lex if args.json else {"columns": len(lex), "draft": lex}
+
+
+def _assist_report_draft(args):
+    """起草交付报告(FDE D4)。"""
+    from solo.factory.assist import report_draft
+    rep = report_draft(kb=args.kb, industry=args.industry, hit=args.hit,
+                       questions_n=args.questions, hits=args.hits,
+                       asset_versions=args.asset_versions, note=args.note)
+    return {"report": rep}
 
 
 if __name__ == "__main__":
