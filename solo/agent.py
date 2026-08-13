@@ -185,7 +185,7 @@ def run(task: str, mem_dir: str = None, skill_dir: str = None, tier: str = "auto
 - 左侧导航进入各工作区（写作/代码/技能/配置/部署）
 - 数据类能力需先选择数据文件或数据库
 - 也可直接对话，用自然语言描述任务（如"清洗 xx.csv"）
-版本 v0.5.5，零第三方依赖。"""
+版本 v0.5.6，零第三方依赖。"""
     context = f"{identity}\n\n用户画像:\n{profile}\n\n相关记忆:\n{related_txt}"
     # P0-6 多轮对话：注入会话历史（最近 6 轮）供延续性对话
     if history:
