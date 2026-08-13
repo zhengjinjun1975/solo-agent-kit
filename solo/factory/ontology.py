@@ -38,10 +38,14 @@ def guess_type(value: str) -> str:
 
 
 def local_name(col: str) -> str:
-    """列名 → 本体局部名。None 容错。"""
+    """列名 → 本体局部名。None 容错。
+
+    保留中文字符（CJK），使中文列名（如"材质"/"规格"）能原样返回，
+    而非被全量替换成下划线（修复 P0-2 中文列名损坏）。
+    """
     if col is None:
         return "_"
-    return re.sub(r"[^A-Za-z0-9_]", "_", str(col).strip())
+    return re.sub(r"[^A-Za-z0-9_\u4e00-\u9fff]", "_", str(col).strip())
 
 
 class Ontology:
