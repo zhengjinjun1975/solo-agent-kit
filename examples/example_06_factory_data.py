@@ -11,8 +11,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from solo.factory import clean as clean_mod
-from solo.factory import stats as stats_mod
+from solo.factory import data as data_mod
 
 DATA = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 
@@ -22,7 +21,7 @@ def main():
 
     # 1. 数据清洗
     print("[1/4] 数据清洗...")
-    cl = clean_mod.DataCleaner()
+    cl = data_mod.DataCleaner()
     raw = cl.load_csv(os.path.join(DATA, "factory_sensor.csv"))
     print(f"  原始 {len(raw)} 行（含缺失/重复/异常）")
     clean_rows = cl.clean(raw, numeric_cols=["temp_c", "vibration_mm_s", "power_kw", "pressure_bar"],
@@ -34,14 +33,14 @@ def main():
     # 2. 数据分析（温度列）
     print("\n[2/4] 数据分析（温度 ℃）...")
     temps = [float(r["temp_c"]) for r in clean_rows if r.get("temp_c")]
-    desc = stats_mod.describe(temps)
+    desc = data_mod.describe(temps)
     print(f"  均值 {desc['mean']} | 中位数 {desc['median']} | 标准差 {desc['std']}")
     print(f"  min {desc['min']} | max {desc['max']}")
 
     # 3. 异常检测 + SPC 控制图
     print("\n[3/4] 异常检测 + SPC 控制图...")
-    anomalies = stats_mod.detect_anomaly(temps, method="zscore")
-    cc = stats_mod.control_chart(temps)
+    anomalies = data_mod.detect_anomaly(temps, method="zscore")
+    cc = data_mod.control_chart(temps)
     print(f"  异常点(zscore>3σ): {len(anomalies)} 个")
     for a in anomalies[:5]:
         print(f"    点{a['index']}: 值={a['value']} z={a['zscore']}")
@@ -55,10 +54,10 @@ def main():
 
     # 4. 趋势分析
     print("\n[4/4] 趋势 + 相关性...")
-    tr = stats_mod.trend(temps)
+    tr = data_mod.trend(temps)
     print(f"  温度趋势: {tr['direction']}（斜率 {tr['slope']}）")
     vib = [float(r["vibration_mm_s"]) for r in clean_rows if r.get("vibration_mm_s")]
-    corr = stats_mod.correlation(temps, vib)
+    corr = data_mod.correlation(temps, vib)
     print(f"  温度↔振动相关: {corr}")
 
     print("\n== 完成：工厂现场数据处理闭环 ==")

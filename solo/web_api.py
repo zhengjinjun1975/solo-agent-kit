@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import os
 
-from solo.factory import clean as clean_mod
+from solo.factory import data as data_mod
 
 # ---- 路径/数据辅助（供 web_server 调用，纯业务） ----
 
@@ -82,10 +82,10 @@ def load_rows(body: dict) -> list:
 
 
 def guess_col_type(vals: list) -> str:
-    """推断列类型（复用 clean 的逻辑）。"""
+    """推断列类型（复用 data.guess_type）。"""
     if not vals:
         return "empty"
-    return clean_mod.guess_type(str(vals[0]))
+    return data_mod.guess_type(str(vals[0]))
 
 
 def write_config(config: dict) -> bool:

@@ -123,6 +123,25 @@ def test_decisions(server):
     assert r.get("total", 0) >= 0
 
 
+# ---- 需求→验收（survey 打通入口）----
+def test_survey_outline(server):
+    from urllib.parse import quote
+    _, r = api(server, "/api/survey/outline?industry=" + quote("阀门制造"))
+    assert r.get("kb") == "valve"
+    assert isinstance(r.get("questions"), list)
+
+
+def test_survey_structure_and_acceptance(server):
+    name = "e2e_survey_p1_%d" % int(time.time())  # 唯一名，防跨次运行状态污染(~/.solo/surveys)
+    _, r = api(server, "/api/survey", "POST", {"action": "structure", "name": name,
+                                               "story": "库存盘点耗时",
+                                               "acceptance": ["对账成功率≥99%"]})
+    assert r.get("id") == "R-001"
+    _, r = api(server, "/api/survey", "POST", {"action": "acceptance", "name": name})
+    assert r.get("count") == 1
+    assert r.get("check", {}).get("ok") is True
+
+
 # ---- 数据清洗 ----
 def test_clean(server):
     _, r = api(server, "/api/clean", "POST", {"csv": os.path.join(DATA, "factory_sensor.csv")})

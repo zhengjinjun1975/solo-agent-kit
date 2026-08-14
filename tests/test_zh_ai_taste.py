@@ -35,10 +35,10 @@ def test_write_natural_closed_loop():
 
 
 def test_ai_taste_degrades_gracefully(monkeypatch):
-    # 模拟找不到检查器：改候选路径为空 → ok=False 不抛异常
-    import solo.zh_ai_taste as zat
-    monkeypatch.setattr(zat, "_CANDIDATES", [])
-    monkeypatch.setattr(zat, "_LOADED", None)
-    rep = zat.ai_taste_report("任意文本")
+    # 模拟找不到检查器：改候选路径为空 → ok=False 不抛异常（zh_ai_taste 已并入 writing）
+    import solo.writing as w
+    monkeypatch.setattr(w, "_CANDIDATES", [])
+    monkeypatch.setattr(w, "_LOADED", None)
+    rep = w.ai_taste_report("任意文本")
     assert rep["ok"] is False
     assert rep["ai_score"] is None

@@ -16,7 +16,7 @@ from solo import memory as memory_mod
 from solo import provider as provider_mod
 from solo import skill as skill_mod
 from solo import app as app_mod  # 统一服务门面（业务单一事实来源）
-from solo.factory import clean as clean_mod
+from solo.factory import data as data_mod
 
 # 意图 → 处理函数 路由表
 INTENTS = {
@@ -81,14 +81,14 @@ def run(task: str, mem_dir: str = None, skill_dir: str = None, tier: str = "auto
     # ---- 套件模块路由 ----（业务单一事实来源 = solo.app 门面）
     if intent == "clean":
         path = csv_path or "examples/data/factory_sensor.csv"
-        cl = clean_mod.DataCleaner()
+        cl = data_mod.DataCleaner()
         rows = cl.load_csv(path)
         res = app_mod.data_clean(rows, method="drop", outlier="iqr")
         return {"intent": "clean", "summary": f"清洗完成 {res['input']}→{res['output']} 行",
                 "report": res["report"], "memory_dir": m.dir}
     if intent == "stats":
         path = csv_path or "examples/data/factory_sensor.csv"
-        cl = clean_mod.DataCleaner()
+        cl = data_mod.DataCleaner()
         rows = cl.load_csv(path)
         res = app_mod.data_stats(rows, col)
         if "error" in res:
@@ -99,7 +99,7 @@ def run(task: str, mem_dir: str = None, skill_dir: str = None, tier: str = "auto
                 "control_chart": res["control_chart"], "memory_dir": m.dir}
     if intent == "ontology":
         path = csv_path or "examples/data/factory_equipment.csv"
-        cl = clean_mod.DataCleaner()
+        cl = data_mod.DataCleaner()
         rows = cl.load_csv(path)
         res = app_mod.build_ontology(rows, entity="equip", id_col="id")
         return {"intent": "ontology", "entities": res.get("entities", []),
@@ -117,9 +117,13 @@ def run(task: str, mem_dir: str = None, skill_dir: str = None, tier: str = "auto
         return {"intent": "code_overview", "indexed": n, "symbols": len(cg.symbols),
                 "overview": cg.overview(), "memory_dir": m.dir}
     if intent == "gen":
-        from solo import gen as gen_mod
         kind = "readme" if any(k in task for k in ("readme", "README", "文档", "指南")) else "code"
-        out = gen_mod.generate_doc(task, kind=kind) if kind != "code" else gen_mod.generate_code(task)
+        if kind != "code":
+            from solo import writing as writing_mod
+            out = writing_mod.generate_doc(task, kind=kind)
+        else:
+            from solo import code as code_mod
+            out = code_mod.generate_code(task)
         return {"intent": "gen", "output": out, "memory_dir": m.dir}
     if intent == "setup":
         res = app_mod.check_environment()

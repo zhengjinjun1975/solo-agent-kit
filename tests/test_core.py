@@ -191,22 +191,22 @@ def test_code_overview_explain(tmp):
     assert any("main.py" in u for u in ex.get("used_by", []))
 
 
-# ---- gen：FDE 代码/文档/审查 ----
+# ---- gen：FDE 代码/文档生成（并入 code.py / writing.py）----
 def test_gen_signatures():
-    """gen 模块：代码生成/文档/审查函数可调用，参数正确。"""
+    """code.generate_code / writing.generate_doc 可调用，参数正确。"""
     import inspect
-    from solo import gen
-    assert callable(getattr(gen, "generate_code", None))
-    assert callable(getattr(gen, "generate_doc", None))
-    assert callable(getattr(gen, "review_code", None))
-    sig = inspect.signature(gen.generate_doc)
+    from solo import code, writing
+    assert callable(getattr(code, "generate_code", None))
+    assert callable(getattr(writing, "generate_doc", None))
+    assert callable(getattr(code, "CodeAgent", None))
+    sig = inspect.signature(writing.generate_doc)
     assert "kind" in sig.parameters and "topic" in sig.parameters
 
 
 # ---- clean：工厂数据清洗 ----
 def test_clean_dedup_missing_outlier(tmp):
     """清洗：去重/缺失/异常值处理。"""
-    from solo.factory import clean as clean_mod
+    from solo.factory import data as data_mod
     rows = [
         {"id": "1", "temp": "45.2", "status": "运行"},
         {"id": "1", "temp": "45.2", "status": "运行"},  # 重复
@@ -216,7 +216,7 @@ def test_clean_dedup_missing_outlier(tmp):
         {"id": "5", "temp": "45.1", "status": "运行"},
         {"id": "6", "temp": "80.0", "status": "运行"},  # 异常值
     ]
-    cl = clean_mod.DataCleaner()
+    cl = data_mod.DataCleaner()
     out = cl.clean(rows, numeric_cols=["temp"], fill_missing="drop", outlier_method="iqr")
     assert cl.report["dropped_dup"] == 1
     assert cl.report["dropped_outlier"] == 1
@@ -227,14 +227,14 @@ def test_clean_dedup_missing_outlier(tmp):
 # ---- stats：工厂数据分析 ----
 def test_stats_describe_and_anomaly():
     """分析：描述性统计 + 异常检测(IQR稳健) + SPC。"""
-    from solo.factory import stats as stats_mod
+    from solo.factory import data as data_mod
     data = [45.2, 45.5, 45.1, 45.3, 45.4, 45.2, 58.9, 45.3]  # 含异常 58.9
-    desc = stats_mod.describe(data)
+    desc = data_mod.describe(data)
     assert desc["count"] == 8 and "mean" in desc and "median" in desc
     # IQR 法稳健检测 58.9（zscore 会被离群点拉高 std 而不敏感）
-    anom = stats_mod.detect_anomaly(data, method="iqr")
+    anom = data_mod.detect_anomaly(data, method="iqr")
     assert any(abs(a["value"] - 58.9) < 0.1 for a in anom), f"anom={anom}"
-    cc = stats_mod.control_chart(data)
+    cc = data_mod.control_chart(data)
     assert "ucl" in cc and "lcl" in cc
     assert cc["ucl"] > cc["lcl"]
 

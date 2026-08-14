@@ -168,6 +168,9 @@ class SoloHandler(BaseHTTPRequestHandler):
             # 工单列表（GET：FDE 现场看未闭环问题）
             from solo.task import Task
             self._json({"issues": Task().list_issues()})
+        elif path == "/api/survey/outline":
+            # 需求访谈提纲（survey 打通入口，行业数据驱动）
+            self._json(app_mod.survey_outline(qs.get("industry", [None])[0]))
         elif path == "/api/deploy":
             self._json(app_mod.deploy())
         elif path == "/api/monitor":
@@ -611,6 +614,28 @@ class SoloHandler(BaseHTTPRequestHandler):
             m = memory_mod.Memory()
             added = m.add_fact(body.get("text", ""), tags=["fact"])
             self._json({"added": added})
+        elif path == "/api/survey":
+            # 需求→验收生命周期（survey 打通入口，POST action 分发）
+            body = self._read_body()
+            act = body.get("action", "outline")
+            try:
+                if act == "outline":
+                    self._json(app_mod.survey_outline(body.get("industry")))
+                elif act == "structure":
+                    self._json(app_mod.survey_structure(
+                        body.get("name", ""), body.get("story", ""),
+                        category=body.get("category", "生产"),
+                        priority=body.get("priority", "P2"),
+                        acceptance=body.get("acceptance"),
+                        title=body.get("title")))
+                elif act == "srs":
+                    self._json(app_mod.survey_srs(body.get("name", ""), title=body.get("title")))
+                elif act == "acceptance":
+                    self._json(app_mod.survey_acceptance(body.get("name", "")))
+                else:
+                    self._json({"error": f"unknown survey action: {act}"}, 400)
+            except ValueError as e:
+                self._json({"error": str(e)}, 400)
         elif path == "/api/skill-add":
             body = self._read_body()
             s = skill_mod.Skill()
@@ -640,13 +665,12 @@ class SoloHandler(BaseHTTPRequestHandler):
             cg.index(body.get("dir") or "solo")
             self._json(cg.review(body.get("file", "")))
         elif path == "/api/gen":
-            from solo import gen as gen_mod
             body = self._read_body()
             try:
                 if body.get("kind") == "code-agent":
                     # CodeAgent 全链路: 生成+审查+测试
-                    from solo import code_agent as ca_mod
-                    ca = ca_mod.CodeAgent()
+                    from solo import code as code_mod
+                    ca = code_mod.CodeAgent()
                     out = ca.implement(body.get("topic", ""), language=body.get("language", "python"))
                     self._json({"output": out.get("files", {}).get("main.py", ""),
                                 "score": out.get("score"),
@@ -654,9 +678,11 @@ class SoloHandler(BaseHTTPRequestHandler):
                                 "summary": out.get("summary", "")})
                     return
                 if body.get("kind") in ("readme", "guide", "docstring"):
-                    out = gen_mod.generate_doc(body.get("topic", ""), kind=body.get("kind"))
+                    from solo import writing as writing_mod
+                    out = writing_mod.generate_doc(body.get("topic", ""), kind=body.get("kind"))
                 else:
-                    out = gen_mod.generate_code(body.get("topic", ""))
+                    from solo import code as code_mod
+                    out = code_mod.generate_code(body.get("topic", ""))
                 self._json({"output": out})
             except Exception as e:
                 self._json({"error": str(e)}, 500)

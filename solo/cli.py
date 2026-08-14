@@ -13,6 +13,10 @@
     solo factory-clean <csv>     工厂数据清洗
     solo factory-stats <csv>     工厂数据分析（描述/趋势/SPC）
     solo factory-onto <csv>      工厂本体建模
+    solo survey-outline          需求访谈提纲（行业数据驱动）
+    solo survey-structure <name> <story>  结构化一条需求（编号R-xxx）
+    solo survey-srs <name>       生成SRS需求文档
+    solo survey-acceptance <name>  生成验收清单+勾稽检查
     solo version                 显示版本
 """
 from __future__ import annotations
@@ -65,6 +69,21 @@ def main(argv=None):
     p_fo.add_argument("--entity", help="实体名")
     p_fo.add_argument("--id", dest="id_col", help="主键列")
     p_fo.add_argument("--relations", help="关系声明 JSON 文件")
+
+    # 需求→验收生命周期（survey 打通入口）
+    p_so = sub.add_parser("survey-outline", help="需求访谈提纲(行业数据驱动)")
+    p_so.add_argument("--industry", help="行业名(联动实体/量词)")
+    p_ss = sub.add_parser("survey-structure", help="结构化一条需求(编号R-xxx)")
+    p_ss.add_argument("name", help="调研名")
+    p_ss.add_argument("story", help="用户故事/痛点")
+    p_ss.add_argument("--category", choices=["生产", "销售", "运维", "管理"], default="生产", help="需求分类")
+    p_ss.add_argument("--priority", choices=["P0", "P1", "P2"], default="P2", help="优先级")
+    p_ss.add_argument("--acceptance", action="append", help="可验收条款(可多次)")
+    p_sr = sub.add_parser("survey-srs", help="生成SRS需求文档")
+    p_sr.add_argument("name", help="调研名")
+    p_sr.add_argument("--title", help="文档标题(缺省用调研名)")
+    p_sa = sub.add_parser("survey-acceptance", help="生成验收清单+勾稽检查")
+    p_sa.add_argument("name", help="调研名")
 
     # 交付辅助(FDE D0/D1/D4): 问题集/词典初稿/报告起草（行业→kb/词典联动）
     p_dq = sub.add_parser("draft-questions", help="起草问题集(FDE D0)")
@@ -167,6 +186,15 @@ def _dispatch(args):
     if cmd == "factory-onto":
         return app_mod.build_ontology(_load_rows_csv(args.csv), entity=args.entity,
                                       id_col=args.id_col, relations=args.relations)
+    if cmd == "survey-outline":
+        return app_mod.survey_outline(getattr(args, "industry", None))
+    if cmd == "survey-structure":
+        return app_mod.survey_structure(args.name, args.story, category=args.category,
+                                        priority=args.priority, acceptance=args.acceptance)
+    if cmd == "survey-srs":
+        return app_mod.survey_srs(args.name, title=args.title)
+    if cmd == "survey-acceptance":
+        return app_mod.survey_acceptance(args.name)
     if cmd == "draft-questions":
         return _assist_draft_questions(args)
     if cmd == "lexicon-draft":

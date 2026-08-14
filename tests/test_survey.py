@@ -213,3 +213,43 @@ class TestSurveyLifecycle:
     def test_enum_constants(self):
         assert CATEGORIES == ("生产", "销售", "运维", "管理")
         assert PRIORITIES == ("P0", "P1", "P2")
+
+
+# ------------------------------------------------------------------ P1: app 门面打通入口
+class TestAppEntrance:
+    """survey 打通入口：app 门面四个函数（cli/web 均经此）。"""
+
+    def test_survey_outline(self):
+        from solo import app
+        o = app.survey_outline("阀门制造")
+        assert o["kb"] == "valve"
+        assert isinstance(o["questions"], list)
+
+    def test_survey_structure_assigns_id(self, tmp_path):
+        from solo import app
+        r = app.survey_structure("调研P1", "库存盘点耗时", category="生产",
+                                 priority="P0", acceptance=["对账成功率≥99%"], dir=str(tmp_path))
+        assert r["id"] == "R-001"
+        assert r["acceptance"] == ["对账成功率≥99%"]
+
+    def test_survey_srs_contains_req(self, tmp_path):
+        from solo import app
+        app.survey_structure("调研P1", "希望自动对账降低差错", dir=str(tmp_path))
+        d = app.survey_srs("调研P1", dir=str(tmp_path))
+        assert "R-001" in d["markdown"]
+        assert "scan" in d and "ai" in d
+
+    def test_survey_acceptance_reconciles(self, tmp_path):
+        from solo import app
+        app.survey_structure("调研P1", "库存盘点耗时",
+                             acceptance=["对账成功率≥99%"], dir=str(tmp_path))
+        out = app.survey_acceptance("调研P1", dir=str(tmp_path))
+        assert out["count"] == 1
+        assert out["acceptance"][0]["aid"] == "A-001"
+        assert out["check"]["ok"] is True
+
+    def test_survey_invalid_category_rejected(self, tmp_path):
+        from solo import app
+        import pytest
+        with pytest.raises(ValueError):
+            app.survey_structure("调研P1", "x", category="研发", dir=str(tmp_path))

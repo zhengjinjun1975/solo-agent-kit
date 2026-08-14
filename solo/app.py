@@ -16,8 +16,7 @@ import sys
 
 from solo import provider as provider_mod
 from solo import memory as memory_mod
-from solo.factory import clean as clean_mod
-from solo.factory import stats as stats_mod
+from solo.factory import data as data_mod
 from solo.factory import ontology as ontology_mod
 from solo._util import is_num
 
@@ -46,7 +45,7 @@ def capabilities() -> dict:
 # ---- 数据清洗 ----
 def data_clean(rows: list, method: str = "drop", outlier: str = "iqr") -> dict:
     """工厂数据清洗。返回 {input, output, report, sample}。"""
-    cl = clean_mod.DataCleaner()
+    cl = data_mod.DataCleaner()
     out = cl.clean(rows, fill_missing=method, outlier_method=outlier)
     return {"input": len(rows), "output": len(out), "report": cl.report,
             "sample": out[:5]}
@@ -92,10 +91,10 @@ def data_stats(rows: list, col: str = None) -> dict:
     if not vals:
         return {"error": "column not found or no numeric data"}
     return {"column": col,
-            "describe": stats_mod.describe(vals),
-            "anomalies": stats_mod.detect_anomaly(vals, method="iqr"),
-            "control_chart": stats_mod.control_chart(vals),
-            "trend": stats_mod.trend(vals)}
+            "describe": data_mod.describe(vals),
+            "anomalies": data_mod.detect_anomaly(vals, method="iqr"),
+            "control_chart": data_mod.control_chart(vals),
+            "trend": data_mod.trend(vals)}
 
 
 # ---- 数据概览报告（对标 pandas-profiling） ----
@@ -110,11 +109,11 @@ def data_report(rows: list, cols: list = None) -> dict:
         vals = [r.get(c, "") for r in rows]
         non_empty = [v for v in vals if str(v).strip() != ""]
         missing[c] = total - len(non_empty)
-        types[c] = clean_mod.guess_type(str(non_empty[0])) if non_empty else "empty"
+        types[c] = data_mod.guess_type(str(non_empty[0])) if non_empty else "empty"
         if types[c] in ("float", "integer"):
             nums = [float(v) for v in non_empty if is_num(v)]
             if nums:
-                col_stats[c] = stats_mod.describe(nums)
+                col_stats[c] = data_mod.describe(nums)
     seen = set()
     dups = 0
     for r in rows:
@@ -244,3 +243,33 @@ def build_ontology(rows: list, entity: str = None, id_col: str = None,
     o.build()
     return {"entities": list(o.entities.keys()), "triples": len(o.triples),
             "summary": o.entity_summary()}
+
+
+# ---- 需求→验收生命周期（survey 打通入口）----
+def survey_outline(industry: str = None) -> dict:
+    """访谈提纲（行业数据驱动）。"""
+    from solo.factory import survey as s
+    return s.interview_outline(industry)
+
+
+def survey_structure(name: str, story: str, category: str = "生产",
+                     priority: str = "P2", acceptance: list = None,
+                     title: str = None, dir: str = None) -> dict:
+    """录入并结构化一条需求（Survey 生命周期，编号 R-xxx 单一事实来源）。"""
+    from solo.factory import survey as s
+    return s.Survey(name, dir=dir).collect(story, category=category, priority=priority,
+                                           acceptance=acceptance, title=title)
+
+
+def survey_srs(name: str, title: str = None, dir: str = None) -> dict:
+    """生成 SRS 文档（含中文质量自检 scan + ai_taste）。"""
+    from solo.factory import survey as s
+    return s.Survey(name, dir=dir).to_srs(title=title)
+
+
+def survey_acceptance(name: str, dir: str = None) -> dict:
+    """生成验收清单（A-xxx）+ 勾稽防漏项检查。"""
+    from solo.factory import survey as s
+    sv = s.Survey(name, dir=dir)
+    items = sv.prepare_acceptance()
+    return {"acceptance": items, "count": len(items), "check": sv.check()}
