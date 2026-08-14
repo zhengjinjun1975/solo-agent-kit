@@ -24,6 +24,10 @@
     solo onto-to-nt / onto-answer / onto-search <csv>  本体 导出/聚合问答/检索
     solo to-factory-lexicon <csv> / to-review-items <csv>  词典→工厂契约/审查队列
     solo version                 显示版本
+
+拆分说明：原 _dispatch(圈复杂度41) 改为「命令名→处理函数」注册表 + 每个命令一个
+处理函数；argparse 注册抽到 _build_parser()（命令名字符串仍在 cli.py，供注册回归断言）。
+业务逻辑仍下沉 solo/app.py 与 solo/factory。
 """
 from __future__ import annotations
 
@@ -38,11 +42,26 @@ from solo import provider as provider_mod
 from solo import app as app_mod
 
 
-def main(argv=None):
-    argv = argv if argv is not None else sys.argv[1:]
+def _build_parser() -> argparse.ArgumentParser:
+    """构造 argparse（子命令注册）。抽离自 main()，命令名注册集中在此。
+
+    按职责分组成 4 个 _add_*_parsers 帮助函数，缩短单函数长度；
+    命令名字符串仍在 cli.py，供注册回归断言（test_completeness）。
+    """
     parser = argparse.ArgumentParser(prog="solo", description="OPC 与工厂级 FDE 的方法论 Agent")
     sub = parser.add_subparsers(dest="cmd")
+    _add_core_parsers(sub)
+    _add_factory_parsers(sub)
+    _add_survey_parsers(sub)
+    _add_delivery_parsers(sub)
+    _add_task_backup_parsers(sub)
+    _add_code_writing_parsers(sub)
+    _add_memory_ontology_parsers(sub)
+    return parser
 
+
+def _add_core_parsers(sub):
+    """个人套件核心命令：version/init/setup/config/run/skill-add/obsidian。"""
     sub.add_parser("version", help="显示版本")
     sub.add_parser("init", help="初始化记忆库")
     sub.add_parser("setup", help="部署检查（环境/模型/初始化）")
@@ -60,7 +79,9 @@ def main(argv=None):
     p_exp = sub.add_parser("export-markdown", help="导出记忆为 Markdown")
     p_exp.add_argument("dir")
 
-    # 工厂套件命令
+
+def _add_factory_parsers(sub):
+    """工厂套件命令：factory-clean/stats/onto。"""
     p_fc = sub.add_parser("factory-clean", help="工厂数据清洗")
     p_fc.add_argument("csv", help="CSV 数据文件")
     p_fc.add_argument("--method", choices=["drop", "zero", "mean"], default="drop", help="缺失值处理")
@@ -76,7 +97,9 @@ def main(argv=None):
     p_fo.add_argument("--id", dest="id_col", help="主键列")
     p_fo.add_argument("--relations", help="关系声明 JSON 文件")
 
-    # 需求→验收生命周期（survey 打通入口）
+
+def _add_survey_parsers(sub):
+    """需求→验收生命周期（survey 打通入口）。"""
     p_so = sub.add_parser("survey-outline", help="需求访谈提纲(行业数据驱动)")
     p_so.add_argument("--industry", help="行业名(联动实体/量词)")
     p_ss = sub.add_parser("survey-structure", help="结构化一条需求(编号R-xxx)")
@@ -91,7 +114,9 @@ def main(argv=None):
     p_sa = sub.add_parser("survey-acceptance", help="生成验收清单+勾稽检查")
     p_sa.add_argument("name", help="调研名")
 
-    # 交付辅助(FDE D0/D1/D4): 问题集/词典初稿/报告起草（行业→kb/词典联动）
+
+def _add_delivery_parsers(sub):
+    """交付辅助(FDE D0/D1/D4)：问题集/词典初稿/报告起草 + 行业联动。"""
     p_dq = sub.add_parser("draft-questions", help="起草问题集(FDE D0)")
     p_dq.add_argument("csv", help="CSV 数据文件")
     p_dq.add_argument("--entity", default=None, help="实体名(用于量词, 缺省时用行业默认实体/通用'设备')")
@@ -119,7 +144,9 @@ def main(argv=None):
     p_iset.add_argument("--limit", type=int, default=12, help="问题集上限")
     sub.add_parser("industry-current", help="查看当前行业及生效配置(改行业自动联动状态)")
 
-    # 任务状态控制面
+
+def _add_task_backup_parsers(sub):
+    """任务状态控制面 + 备份恢复（P2-3）。"""
     p_tn = sub.add_parser("task-new", help="新建任务")
     p_tn.add_argument("goal", help="任务目标")
     p_ts = sub.add_parser("task-status", help="查看任务状态")
@@ -130,19 +157,19 @@ def main(argv=None):
     p_tr = sub.add_parser("task-resolve", help="解决所有待确认门")
     p_tr.add_argument("tid")
 
-    # 备份恢复（P2-3）
     p_bk = sub.add_parser("backup", help="备份记忆/技能/任务")
     p_bk.add_argument("dest", nargs="?", help="备份目录(默认 ~/.solo/backups)")
     p_rs = sub.add_parser("restore", help="恢复备份")
     p_rs.add_argument("src", help="备份目录")
 
-    # 代码审查（对齐 codeagent 评分口径）
+
+def _add_code_writing_parsers(sub):
+    """代码审查 + 写作检查/改写。"""
     p_cr = sub.add_parser("code-review", help="代码审查(静态分析+0-100评分)")
     p_cr.add_argument("file", help="待审 Python 文件")
     p_cr.add_argument("--max-complexity", type=int, default=10, help="圈复杂度阈值")
     p_cr.add_argument("--strict-undefined", action="store_true", help="启用未定义名启发式检查")
 
-    # 写作检查/改写（写自然 → AI味复检闭环）
     p_wat = sub.add_parser("writing-ai-taste", help="中文文本 AI 味自检(评分+建议+自洽结论)")
     p_wat.add_argument("text")
     p_wat.add_argument("--style", choices=["tweet", "report", "wechat", "paper"], default="report")
@@ -150,7 +177,9 @@ def main(argv=None):
     p_wn.add_argument("text")
     p_wn.add_argument("--style", choices=["tweet", "report", "wechat", "paper"], default="tweet")
 
-    # 记忆 note/search（温域事实层）
+
+def _add_memory_ontology_parsers(sub):
+    """记忆 note/search（温域 + OptMem）+ 本体导出/问答/检索 + 词典下游。"""
     p_mn = sub.add_parser("memory-note", help="记一条事实(温域记忆)")
     p_mn.add_argument("text")
     p_mn.add_argument("--tag", action="append", help="标签(可多次)")
@@ -158,7 +187,6 @@ def main(argv=None):
     p_ms.add_argument("query")
     p_ms.add_argument("--top-k", type=int, default=5)
 
-    # OptMem note/search（跨项目全局记忆）
     p_on = sub.add_parser("optmem-note", help="沉淀经验/方法论进 OptMem 全局记忆")
     p_on.add_argument("text")
     p_os = sub.add_parser("optmem-search", help="语义检索 OptMem 记忆")
@@ -196,6 +224,10 @@ def main(argv=None):
     p_tri.add_argument("csv")
     p_tri.add_argument("--industry", help="行业名(联动列名中文映射)")
 
+
+def main(argv=None):
+    argv = argv if argv is not None else sys.argv[1:]
+    parser = _build_parser()
     try:
         args = parser.parse_args(argv)
         result = _dispatch(args)
@@ -220,118 +252,180 @@ def _load_rows_csv(csv_path):
         return list(csv.DictReader(f))
 
 
+# ─── 命令→处理函数注册表（取代巨型 if/elif，_dispatch 只做查表分发）───
+_HANDLERS = {
+    "version": lambda a: {"version": __version__},
+    "init": lambda a: _h_init(),
+    "setup": lambda a: app_mod.check_environment(),
+    "config": lambda a: app_mod.config_view(),
+    "import-obsidian": lambda a: _h_import_obsidian(a),
+    "export-markdown": lambda a: _h_export_markdown(a),
+    "skill-add": lambda a: _h_skill_add(a),
+    "run": lambda a: _h_run(a),
+    "factory-clean": lambda a: _h_factory_clean(a),
+    "factory-stats": lambda a: _h_factory_stats(a),
+    "factory-onto": lambda a: _h_factory_onto(a),
+    "survey-outline": lambda a: _h_survey_outline(a),
+    "survey-structure": lambda a: _h_survey_structure(a),
+    "survey-srs": lambda a: _h_survey_srs(a),
+    "survey-acceptance": lambda a: _h_survey_acceptance(a),
+    "draft-questions": lambda a: _assist_draft_questions(a),
+    "lexicon-draft": lambda a: _assist_lexicon_draft(a),
+    "report-draft": lambda a: _assist_report_draft(a),
+    "industry-list": lambda a: _industry_list(),
+    "industry-set": lambda a: _industry_set(a),
+    "industry-current": lambda a: _industry_current(),
+    "task-new": lambda a: _h_task_new(a),
+    "task-status": lambda a: _h_task_status(a),
+    "task-gate": lambda a: _h_task_gate(a),
+    "task-resolve": lambda a: _h_task_resolve(a),
+    "backup": lambda a: _backup(a.dest),
+    "restore": lambda a: _restore(a.src),
+    "code-review": lambda a: _h_code_review(a),
+    "writing-ai-taste": lambda a: _h_writing_ai_taste(a),
+    "writing-write-natural": lambda a: _h_writing_write_natural(a),
+    "memory-note": lambda a: _h_memory_note(a),
+    "memory-search": lambda a: _h_memory_search(a),
+    "optmem-note": lambda a: _h_optmem_note(a),
+    "optmem-search": lambda a: _h_optmem_search(a),
+    "onto-to-nt": lambda a: _onto_to_nt(a),
+    "onto-answer": lambda a: _onto_answer(a),
+    "onto-search": lambda a: _onto_search(a),
+    "to-factory-lexicon": lambda a: _assist_to_factory_lexicon(a),
+    "to-review-items": lambda a: _assist_to_review_items(a),
+}
+
+
 def _dispatch(args):
-    cmd = args.cmd
-    if cmd == "version":
-        return {"version": __version__}
-    if cmd == "init":
-        m = memory_mod.Memory()
-        m.set_profile("created", _now())
-        return {"init": True, "mem_dir": m.dir}
-    if cmd == "setup":
-        return app_mod.check_environment()
-    if cmd == "config":
-        return app_mod.config_view()
-    if cmd == "import-obsidian":
-        m = memory_mod.Memory()
-        return {"imported": m.import_markdown(args.dir)}
-    if cmd == "export-markdown":
-        m = memory_mod.Memory()
-        m.export_markdown(args.dir)
-        return {"exported_to": args.dir}
-    if cmd == "skill-add":
-        m = memory_mod.Memory()
-        return {"added": m.add_fact(args.exp, tags=["skill"])}
-    if cmd == "run":
-        from solo import agent as agent_mod
-        return agent_mod.run(args.task, tier=args.tier)
-    if cmd == "factory-clean":
-        return app_mod.data_clean(_load_rows_csv(args.csv), method=args.method, outlier=args.outlier)
-    if cmd == "factory-stats":
-        return app_mod.data_stats(_load_rows_csv(args.csv), col=args.col)
-    if cmd == "factory-onto":
-        return app_mod.build_ontology(_load_rows_csv(args.csv), entity=args.entity,
-                                      id_col=args.id_col, relations=args.relations)
-    if cmd == "survey-outline":
-        return app_mod.survey_outline(getattr(args, "industry", None))
-    if cmd == "survey-structure":
-        return app_mod.survey_structure(args.name, args.story, category=args.category,
-                                        priority=args.priority, acceptance=args.acceptance)
-    if cmd == "survey-srs":
-        return app_mod.survey_srs(args.name, title=args.title)
-    if cmd == "survey-acceptance":
-        return app_mod.survey_acceptance(args.name)
-    if cmd == "draft-questions":
-        return _assist_draft_questions(args)
-    if cmd == "lexicon-draft":
-        return _assist_lexicon_draft(args)
-    if cmd == "report-draft":
-        return _assist_report_draft(args)
-    if cmd == "industry-list":
-        return _industry_list()
-    if cmd == "industry-set":
-        return _industry_set(args)
-    if cmd == "industry-current":
-        return _industry_current()
-    if cmd == "task-new":
-        from solo.task import Task
-        t = Task()
-        task = t.new(args.goal)
-        return {"id": task["id"], "goal": task["goal"], "state": task["state"]}
-    if cmd == "task-status":
-        from solo.task import Task
-        t = Task()
-        if args.tid:
-            return t.status(args.tid)
-        return {"tasks": t.list()}
-    if cmd == "task-gate":
-        from solo.task import Task
-        t = Task()
-        return t.gate(args.tid, args.question)
-    if cmd == "task-resolve":
-        from solo.task import Task
-        t = Task()
-        return t.resolve(args.tid)
-    if cmd == "backup":
-        return _backup(args.dest)
-    if cmd == "restore":
-        return _restore(args.src)
-    if cmd == "code-review":
-        from solo import code_review as cr
-        return cr.review_file(args.file, max_complexity=args.max_complexity,
-                              strict_undefined=args.strict_undefined)
-    if cmd == "writing-ai-taste":
-        from solo import writing as w
-        return w.ai_taste(args.text, style=args.style)
-    if cmd == "writing-write-natural":
-        from solo import writing as w
-        return w.write_natural(args.text, style=args.style)
-    if cmd == "memory-note":
-        m = memory_mod.Memory()
-        return {"added": m.add_fact(args.text, tags=args.tag), "text": args.text}
-    if cmd == "memory-search":
-        m = memory_mod.Memory()
-        return {"hits": m.search(args.query, top_k=args.top_k)}
-    if cmd == "optmem-note":
-        from solo.memory import optmem_note
-        ok, msg = optmem_note(args.text)
-        return {"ok": ok, "message": msg}
-    if cmd == "optmem-search":
-        from solo.memory import optmem_search
-        return {"hits": optmem_search(args.query, top_k=args.top_k)}
-    if cmd == "onto-to-nt":
-        return _onto_to_nt(args)
-    if cmd == "onto-answer":
-        return _onto_answer(args)
-    if cmd == "onto-search":
-        return _onto_search(args)
-    if cmd == "to-factory-lexicon":
-        return _assist_to_factory_lexicon(args)
-    if cmd == "to-review-items":
-        return _assist_to_review_items(args)
-    return {"error": "unknown command"}
+    handler = _HANDLERS.get(args.cmd)
+    if handler is None:
+        return {"error": "unknown command"}
+    return handler(args)
 
 
+# ─── 简单命令处理函数（每个命令一个）───
+def _h_init():
+    m = memory_mod.Memory()
+    m.set_profile("created", _now())
+    return {"init": True, "mem_dir": m.dir}
+
+
+def _h_import_obsidian(args):
+    m = memory_mod.Memory()
+    return {"imported": m.import_markdown(args.dir)}
+
+
+def _h_export_markdown(args):
+    m = memory_mod.Memory()
+    m.export_markdown(args.dir)
+    return {"exported_to": args.dir}
+
+
+def _h_skill_add(args):
+    m = memory_mod.Memory()
+    return {"added": m.add_fact(args.exp, tags=["skill"])}
+
+
+def _h_run(args):
+    from solo import agent as agent_mod
+    return agent_mod.run(args.task, tier=args.tier)
+
+
+def _h_factory_clean(args):
+    return app_mod.data_clean(_load_rows_csv(args.csv), method=args.method, outlier=args.outlier)
+
+
+def _h_factory_stats(args):
+    return app_mod.data_stats(_load_rows_csv(args.csv), col=args.col)
+
+
+def _h_factory_onto(args):
+    return app_mod.build_ontology(_load_rows_csv(args.csv), entity=args.entity,
+                                  id_col=args.id_col, relations=args.relations)
+
+
+def _h_survey_outline(args):
+    return app_mod.survey_outline(getattr(args, "industry", None))
+
+
+def _h_survey_structure(args):
+    return app_mod.survey_structure(args.name, args.story, category=args.category,
+                                    priority=args.priority, acceptance=args.acceptance)
+
+
+def _h_survey_srs(args):
+    return app_mod.survey_srs(args.name, title=args.title)
+
+
+def _h_survey_acceptance(args):
+    return app_mod.survey_acceptance(args.name)
+
+
+def _h_task_new(args):
+    from solo.task import Task
+    t = Task()
+    task = t.new(args.goal)
+    return {"id": task["id"], "goal": task["goal"], "state": task["state"]}
+
+
+def _h_task_status(args):
+    from solo.task import Task
+    t = Task()
+    if args.tid:
+        return t.status(args.tid)
+    return {"tasks": t.list()}
+
+
+def _h_task_gate(args):
+    from solo.task import Task
+    t = Task()
+    return t.gate(args.tid, args.question)
+
+
+def _h_task_resolve(args):
+    from solo.task import Task
+    t = Task()
+    return t.resolve(args.tid)
+
+
+def _h_code_review(args):
+    from solo import code_review as cr
+    return cr.review_file(args.file, max_complexity=args.max_complexity,
+                          strict_undefined=args.strict_undefined)
+
+
+def _h_writing_ai_taste(args):
+    from solo import writing as w
+    return w.ai_taste(args.text, style=args.style)
+
+
+def _h_writing_write_natural(args):
+    from solo import writing as w
+    return w.write_natural(args.text, style=args.style)
+
+
+def _h_memory_note(args):
+    m = memory_mod.Memory()
+    return {"added": m.add_fact(args.text, tags=args.tag), "text": args.text}
+
+
+def _h_memory_search(args):
+    m = memory_mod.Memory()
+    return {"hits": m.search(args.query, top_k=args.top_k)}
+
+
+def _h_optmem_note(args):
+    from solo.memory import optmem_note
+    ok, msg = optmem_note(args.text)
+    return {"ok": ok, "message": msg}
+
+
+def _h_optmem_search(args):
+    from solo.memory import optmem_search
+    return {"hits": optmem_search(args.query, top_k=args.top_k)}
+
+
+# ─── 备份/恢复 ───
 def _backup(dest: str = None) -> dict:
     """P2-3: 备份记忆/技能/任务数据。"""
     import shutil
@@ -373,6 +467,7 @@ def _now():
     return datetime.datetime.now().isoformat(timespec="seconds")
 
 
+# ─── 交付辅助（FDE D0/D1/D4）───
 def _assist_draft_questions(args):
     """起草问题集(FDE D0)。行业联动：--industry 决定默认实体/量词/列名中文映射。"""
     from solo.factory.assist import draft_questions
@@ -409,8 +504,8 @@ def _assist_report_draft(args):
     ind = getattr(args, "industry", None)
     if getattr(args, "json", False):
         return report_draft_dict(kb=args.kb, industry=ind, hit=args.hit,
-                                  questions_n=args.questions, hits=args.hits,
-                                  asset_versions=args.asset_versions)
+                                 questions_n=args.questions, hits=args.hits,
+                                 asset_versions=args.asset_versions)
     md, ai = report_draft(kb=args.kb, industry=ind, hit=args.hit,
                           questions_n=args.questions, hits=args.hits,
                           asset_versions=args.asset_versions, note=args.note)
@@ -423,6 +518,27 @@ def _assist_report_draft(args):
     return out
 
 
+def _assist_to_factory_lexicon(args):
+    """词典初稿 → 工厂本体 lexicon 契约（FDE D1 下游，独立 CLI 入口）。"""
+    from solo.factory.assist import lexicon_draft, to_factory_lexicon
+    rows = _load_rows_csv(args.csv)
+    headers = list(rows[0].keys()) if rows else []
+    d = lexicon_draft(headers, rows[:30], industry=getattr(args, "industry", None))
+    return to_factory_lexicon(d, table_name=args.table_name, entity_cn=args.entity_cn,
+                              industry=getattr(args, "industry", None))
+
+
+def _assist_to_review_items(args):
+    """词典初稿 → 闭源 review 待确认队列（P2 接线入口）。"""
+    from solo.factory.assist import lexicon_draft, to_review_items
+    rows = _load_rows_csv(args.csv)
+    headers = list(rows[0].keys()) if rows else []
+    d = lexicon_draft(headers, rows[:30], industry=getattr(args, "industry", None))
+    items = to_review_items(d)
+    return {"items": items, "count": len(items)}
+
+
+# ─── 行业联动 ───
 def _industry_list():
     """列出已登记行业(行业→kb/词典联动注册表)。"""
     from solo.factory.industry import industries_list
@@ -448,6 +564,7 @@ def _industry_current():
     return {"current": get_current_industry() or "(默认工厂)", "apply": apply_industry()}
 
 
+# ─── 本体命令 ───
 def _onto_build(args):
     """从 CSV 建本体（onto-to-nt/answer/search 共用）。返回 (Ontology, 错误dict)。
 
@@ -496,26 +613,6 @@ def _onto_search(args):
     if err:
         return err
     return {"term": args.term, "hits": o.search(args.term, top_k=args.top_k)}
-
-
-def _assist_to_factory_lexicon(args):
-    """词典初稿 → 工厂本体 lexicon 契约（FDE D1 下游，独立 CLI 入口）。"""
-    from solo.factory.assist import lexicon_draft, to_factory_lexicon
-    rows = _load_rows_csv(args.csv)
-    headers = list(rows[0].keys()) if rows else []
-    d = lexicon_draft(headers, rows[:30], industry=getattr(args, "industry", None))
-    return to_factory_lexicon(d, table_name=args.table_name, entity_cn=args.entity_cn,
-                              industry=getattr(args, "industry", None))
-
-
-def _assist_to_review_items(args):
-    """词典初稿 → 闭源 review 待确认队列（P2 接线入口）。"""
-    from solo.factory.assist import lexicon_draft, to_review_items
-    rows = _load_rows_csv(args.csv)
-    headers = list(rows[0].keys()) if rows else []
-    d = lexicon_draft(headers, rows[:30], industry=getattr(args, "industry", None))
-    items = to_review_items(d)
-    return {"items": items, "count": len(items)}
 
 
 if __name__ == "__main__":
