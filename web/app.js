@@ -976,7 +976,95 @@ async function runMonitor(){
       </div>
     </div>
     <div style="font-size:11px;color:var(--mute)">磁盘：${(disk.parts||[]).map(p=>`${p.mount} ${p.percent}%`).join(' · ')||'—'}</div>
-    <div style="font-size:11px;color:var(--mute);margin-top:6px">进程：${proc.count||'?'} 个 · Top: ${(proc.top||[]).slice(0,4).map(p=>p.name).join(' / ')}</div>`;
+    <div     <div style="font-size:11px;color:var(--mute);margin-top:6px">进程：${proc.count||'?'} 个 · Top: ${(proc.top||[]).slice(0,4).map(p=>p.name).join(' / ')}</div>`;
+}
+// ===== 设备监测（Web 化：指标/告警/工单/AI问数/ingest）=====
+const monOut=()=>document.getElementById('monitor-result2');
+// 一键端到端演示：模拟数据→告警→工单→AI问数（全链路填数据）
+async function runMonitorDemo(){
+  const out=monOut(); out.innerHTML='⏳ 运行端到端演示…';
+  const r=await api('/api/monitor/demo',{method:'POST',body:JSON.stringify({rounds:8})});
+  if(r.error){out.innerHTML='❌ '+r.error;return;}
+  out.innerHTML='<b>✅ 一键演示完成</b>\n指标数 '+r.metrics+' · 触发中告警 '+r.firing_alerts+' · 总告警 '+r.total_alerts+' · 工单 '+r.tickets
+    +'\n\n❓ 哪台设备温度过高 → '+esc(r.q_high_temp)
+    +'\n❓ 最近有哪些告警 → '+esc(r.q_alerts)
+    +'\n❓ 温度最高的设备 → '+esc(r.q_max_temp);
+  runMonitorMetrics();
+}
+// 指标看板快照
+async function runMonitorMetrics(){
+  const out=monOut(); out.innerHTML='⏳ 加载看板…';
+  const r=await api('/api/monitor/metrics');
+  if(r.error){out.innerHTML='❌ '+r.error;return;}
+  const a=r.alerts||{}, t=r.tickets||{};
+  let html=`<b>📡 设备监测看板</b>　设备 ${r.device_count} 台 · 指标 ${r.metric_count} 条 · 规则 ${r.rules} 条
+  <div style="margin-top:6px;color:var(--mute)">告警：触发中 <b style="color:#ef4444">${a.firing||0}</b> · 已恢复 ${a.recovered||0} · 总计 ${a.total||0}　|　工单：开放 <b style="color:#ef4444">${t.open||0}</b> · 处理中 ${t.in_progress||0} · 已关闭 ${t.done||0}</div>`;
+  if(!r.devices.length){ html+='\n\n<div style="color:var(--mute)">（暂无数据，点「一键端到端演示」或「模拟接入指标」填充）</div>'; }
+  r.devices.forEach(d=>{
+    const ms=Object.keys(d.metrics||{}).map(m=>`${esc(m)}=<b>${esc(d.metrics[m].value)}</b>（${esc(d.metrics[m].ts)}）`).join(' · ')||'—';
+    html+=`\n\n▪ <b>${esc(d.device_id)}</b>\n   ${ms}`;
+  });
+  out.innerHTML=html;
+}
+// 告警列表
+async function runMonitorAlerts(){
+  const out=monOut(); out.innerHTML='⏳ 加载告警…';
+  const r=await api('/api/monitor/alerts');
+  if(r.error){out.innerHTML='❌ '+r.error;return;}
+  if(!r.alerts.length){out.innerHTML='<div style="color:var(--mute)">暂无告警</div>';return;}
+  out.innerHTML='<b>🚨 告警（'+r.count+'）</b>\n'+r.alerts.map(a=>
+    `- ${esc(a.device_id)}.${esc(a.metric)} [${a.type}] 值=${esc(a.value)} 阈值${a.op}${a.threshold} · ${a.state==='firing'?'触发中':'已恢复'} · ${esc(a.level)} · ${esc(a.raised_at)}`).join('\n');
+}
+// 工单列表 + 状态机推进
+async function runMonitorTickets(){
+  const out=monOut(); out.innerHTML='⏳ 加载工单…';
+  const r=await api('/api/monitor/tickets');
+  if(r.error){out.innerHTML='❌ '+r.error;return;}
+  if(!r.tickets.length){out.innerHTML='<div style="color:var(--mute)">暂无工单</div>';return;}
+  const stateCn={open:'开放',in_progress:'处理中',done:'已关闭'};
+  out.innerHTML='<b>🎫 工单（'+r.count+'）</b>\n'+r.tickets.map(t=>{
+    const next=t.state==='open'?'in_progress':(t.state==='in_progress'?'done':null);
+    const btn=next?` <button class="btn" onclick="runMonitorTicketState('${esc(t.id)}','${next}')">→ ${next}</button>`:'';
+    return `- <b>${esc(t.id)}</b> ${esc(t.problem)} · [${stateCn[t.state]||t.state}]${btn}`;
+  }).join('\n');
+}
+// 工单状态推进
+async function runMonitorTicketState(id,target){
+  const r=await api('/api/monitor/ticket-state',{method:'POST',body:JSON.stringify({ticket_id:id,target})});
+  if(r.error){monOut().innerHTML='❌ '+r.error;}
+  runMonitorTickets();
+}
+// 模拟接入指标（全链路）
+async function runMonitorIngest(){
+  const dev=document.getElementById('mon-ing-dev').value.trim();
+  const metric=document.getElementById('mon-ing-metric').value;
+  const value=document.getElementById('mon-ing-val').value;
+  if(!dev||value===''){monOut().innerHTML='⚠️ 请填设备/指标/值';return;}
+  const out=monOut(); out.innerHTML='⏳ 接入…';
+  const r=await api('/api/monitor/ingest',{method:'POST',body:JSON.stringify({device_id:dev,metric,value})});
+  if(r.error){out.innerHTML='❌ '+r.error;return;}
+  out.innerHTML=`✅ 已接入 <b>${esc(dev)}.${esc(metric)}=${esc(value)}</b> → 新增告警 ${r.alerts} 条 · 工单 ${r.tickets} 张`;
+  runMonitorMetrics();
+}
+// 设置告警规则
+async function runMonitorRule(){
+  const dev=document.getElementById('mon-ru-dev').value.trim();
+  const metric=document.getElementById('mon-ru-metric').value;
+  const op=document.getElementById('mon-ru-op').value;
+  const threshold=document.getElementById('mon-ru-thr').value;
+  if(!dev||threshold===''){monOut().innerHTML='⚠️ 请填设备/阈值';return;}
+  const r=await api('/api/monitor/rule',{method:'POST',body:JSON.stringify({device_id:dev,metric,op,threshold})});
+  if(r.error){monOut().innerHTML='❌ '+r.error;return;}
+  monOut().innerHTML=`✅ 已设置规则 ${esc(dev)}.${esc(metric)} ${op} ${threshold}`;
+}
+// AI 问数
+async function runMonitorAsk(){
+  const q=document.getElementById('mon-ask-q').value.trim();
+  if(!q){monOut().innerHTML='⚠️ 请输入问题';return;}
+  const out=monOut(); out.innerHTML='⏳ 问数…';
+  const r=await api('/api/monitor/ask',{method:'POST',body:JSON.stringify({question:q})});
+  if(r.error){out.innerHTML='❌ '+r.error;return;}
+  out.innerHTML='<b>💬 '+esc(r.answer||'')+'</b>';
 }
 // 日志诊断
 async function runLogs(level){

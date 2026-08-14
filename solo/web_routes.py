@@ -94,6 +94,27 @@ class _GetRoutesMixin:
         except Exception as e:
             self._json({"error": str(e)}, 500)
 
+    def _get_monitor_metrics(self, qs):
+        # 设备监测：指标看板快照（设备+最新指标+告警/工单计数）
+        from solo.factory import monitor as mon
+        self._json(mon.monitor_snapshot())
+
+    def _get_monitor_alerts(self, qs):
+        # 设备监测：告警列表（?state=firing|recovered）
+        from solo.factory import monitor as mon
+        state = qs().get("state", [None])[0] or None
+        store = mon.MetricStore()
+        self._json({"alerts": store.alerts(state, limit=100),
+                    "count": len(store.alerts(state))})
+
+    def _get_monitor_tickets(self, qs):
+        # 设备监测：工单列表（?state=open|in_progress|done）
+        from solo.factory import monitor as mon
+        state = qs().get("state", [None])[0] or None
+        store = mon.MetricStore()
+        self._json({"tickets": store.tickets(state),
+                    "count": len(store.tickets(state))})
+
     def _get_site_devices(self, qs):
         # 厂区设备台账
         try:
@@ -272,6 +293,82 @@ class _PostRoutesMixin:
         else:
             ok = api.write_config(body.get("config", {}))
             self._json({"saved": ok})
+
+    def _post_monitor_ingest(self, body):
+        # 设备监测：接入一条指标，走全链路 ingest→存储→告警→(auto)工单
+        from solo.factory import monitor as mon
+        device_id = body.get("device_id")
+        metric = body.get("metric")
+        value = body.get("value")
+        if not device_id or not metric or value is None:
+            self._json({"error": "需 device_id / metric / value"}, 400)
+            return
+        s = mon.Source(auto_ticket=bool(body.get("auto_ticket", True)))
+        try:
+            r = s.feed(device_id, metric, float(value))
+        except (TypeError, ValueError):
+            self._json({"error": "value 需为数字"}, 400)
+            return
+        self._json({"ingested": f"{device_id}.{metric}={value}",
+                    "alerts": r["alerts"], "tickets": r["tickets"],
+                    "latest": s.store.latest(device_id, metric)})
+
+    def _post_monitor_ask(self, body):
+        # 设备监测：AI 问数（自然语言查设备/告警/工单，先查库再回答）
+        from solo.factory import monitor as mon
+        q = (body.get("question") or "").strip()
+        if not q:
+            self._json({"error": "需 question"}, 400)
+            return
+        self._json(mon.MonitorAsk().ask(q))
+
+    def _post_monitor_rule(self, body):
+        # 设备监测：设置告警规则（阈值 + 可选突变检测）
+        from solo.factory import monitor as mon
+        device_id = body.get("device_id")
+        metric = body.get("metric")
+        if not device_id or not metric:
+            self._json({"error": "需 device_id / metric"}, 400)
+            return
+        try:
+            thr = float(body.get("threshold"))
+        except (TypeError, ValueError):
+            self._json({"error": "threshold 需为数字"}, 400)
+            return
+        store = mon.MetricStore()
+        store.set_rule(device_id, metric, body.get("op", ">"), thr,
+                       level=body.get("level", "medium"),
+                       mutate_pct=body.get("mutate_pct"))
+        rules = store.rules(device_id)
+        self._json({"ok": True, "rule": rules[-1] if rules else None})
+
+    def _post_monitor_ticket_state(self, body):
+        # 设备监测：推进工单状态机 open → in_progress → done
+        from solo.factory import monitor as mon
+        r = mon.AlertEngine().ticket_state(
+            body.get("ticket_id"), body.get("target"),
+            body.get("note", ""))
+        if "error" in r:
+            self._json(r, 400)
+            return
+        self._json(r)
+
+    def _post_monitor_demo(self, body):
+        # 设备监测：一键端到端演示（模拟数据→告警→工单→AI问数）
+        from solo.factory import monitor as mon
+        try:
+            rounds = int(body.get("rounds", 12))
+        except (TypeError, ValueError):
+            rounds = 12
+        r = mon.run_demo(rounds=rounds)
+        self._json({
+            "metrics": r["metrics"], "firing_alerts": r["firing_alerts"],
+            "total_alerts": r["total_alerts"], "tickets": r["tickets"],
+            "q_high_temp": r["q_high_temp"]["answer"],
+            "q_alerts": r["q_alerts"]["answer"],
+            "q_max_temp": r["q_max_temp"]["answer"],
+        })
+
 
     def _post_stats(self, body):
         # POST 数据分析（数据源对象：csv 或 db+table）

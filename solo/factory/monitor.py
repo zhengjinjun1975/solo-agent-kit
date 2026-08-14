@@ -20,7 +20,11 @@ import re
 import time
 from datetime import datetime, timedelta
 
-DEFAULT_DIR = os.path.join(os.path.expanduser("~"), ".solo", "monitor")
+# 数据目录默认 ~/.solo/monitor，可用环境变量 SOLO_MONITOR_DIR 覆盖（web/e2e 隔离用）
+DEFAULT_DIR = os.environ.get(
+    "SOLO_MONITOR_DIR",
+    os.path.join(os.path.expanduser("~"), ".solo", "monitor"),
+)
 
 
 def _now_ts() -> str:
@@ -591,6 +595,36 @@ class MonitorAsk:
 # ═══════════════════════════════════════════════════════════════════════
 # 5. 一站式：演示/接入工厂本体决策
 # ═══════════════════════════════════════════════════════════════════════
+def monitor_snapshot(dir: str = None) -> dict:
+    """设备监测看板快照（web /api/monitor/metrics 用）。
+
+    返回：设备清单 + 每设备最新指标 + 告警/工单按状态计数，
+    供前端一次性渲染监测面板，避免多端点拼装。
+    """
+    store = MetricStore(dir or DEFAULT_DIR)
+    devices = []
+    for d in store.devices():
+        metrics = {}
+        for m in sorted({r["metric"] for r in store.series(d)}):
+            lat = store.latest(d, m)
+            if lat:
+                metrics[m] = {"value": lat["value"], "ts": lat["ts"]}
+        devices.append({"device_id": d, "metrics": metrics})
+    return {
+        "devices": devices,
+        "device_count": len(devices),
+        "metric_count": len(store._metrics),
+        "alerts": {"firing": len(store.alerts("firing")),
+                   "recovered": len(store.alerts("recovered")),
+                   "total": len(store._alerts)},
+        "tickets": {"open": len(store.tickets("open")),
+                    "in_progress": len(store.tickets("in_progress")),
+                    "done": len(store.tickets("done")),
+                    "total": len(store._tickets)},
+        "rules": len(store._rules),
+    }
+
+
 def run_demo(devices=None, metrics=None, rounds: int = 12,
              temp_high: float = 80.0, dir: str = None) -> dict:
     """端到端演示：模拟设备数据 → 存储 → 告警评估 → 触发工单 → AI问数。

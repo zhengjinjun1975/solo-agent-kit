@@ -4,6 +4,15 @@
 
 ## [Unreleased] - 2026-08-14
 
+### 新增：设备监测 web 化 + 防断链（一切归结到 web）
+
+- Web `/api/monitor/metrics|alerts|tickets`（GET）：设备指标看板快照 / 告警列表 / 工单列表
+- Web `/api/monitor/ingest|rule|ask|ticket-state|demo`（POST）：模拟接入指标(全链路) / 设告警规则 / AI问数 / 推进工单状态机 / 一键端到端演示
+- 前端「监控」面板新增设备监测区：指标看板 / 告警 / 工单(含状态机推进) / 模拟ingest / 设规则 / AI问数 / 一键演示
+- 防断链：`ingest→指标存储→告警→工单状态机→AI问数` 全链路在 web 可操作；CLI(monitor-demo/ask/ingest) 与 web 双入口共用 `solo/factory/monitor` 同一实现
+- `MetricStore` 数据目录可用环境变量 `SOLO_MONITOR_DIR` 覆盖（web/e2e 测试隔离，不污染 ~/.solo/monitor）
+- 新增 `monitor_snapshot()` 看板快照助手 + `tests/test_monitor_web.py`（web 全链路防断链 e2e，5 例）
+
 ### 新增：改行业→自动重建产物（事件驱动无死角）
 
 - `industry-set <行业> [csv]`：改行业事件驱动入口，一步 ①持久化"当前行业" ②自动重建 D0问题集/D1词典(工厂lexicon)/D4报告/决策阈值 ③按"行业+kb"隔离落盘产物包（跨行业不覆盖/串台）

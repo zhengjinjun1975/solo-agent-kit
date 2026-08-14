@@ -60,6 +60,9 @@ class SoloHandler(_GetRoutesMixin, _PostRoutesMixin, BaseHTTPRequestHandler):
         "/api/deploy": "_get_deploy",
         "/api/monitor": "_get_monitor",
         "/api/monitor/devices": "_get_monitor_devices",
+        "/api/monitor/metrics": "_get_monitor_metrics",
+        "/api/monitor/alerts": "_get_monitor_alerts",
+        "/api/monitor/tickets": "_get_monitor_tickets",
         "/api/site/devices": "_get_site_devices",
         "/api/data/fetch": "_get_data_fetch",
         "/api/charts/spc": "_get_charts_spc",
@@ -101,6 +104,11 @@ class SoloHandler(_GetRoutesMixin, _PostRoutesMixin, BaseHTTPRequestHandler):
         "/api/delivery": "_post_delivery",
         "/api/industry": "_post_industry",
         "/api/memory/optmem-note": "_post_optmem_note",
+        "/api/monitor/ingest": "_post_monitor_ingest",
+        "/api/monitor/ask": "_post_monitor_ask",
+        "/api/monitor/rule": "_post_monitor_rule",
+        "/api/monitor/ticket-state": "_post_monitor_ticket_state",
+        "/api/monitor/demo": "_post_monitor_demo",
     }
 
     def _json(self, data, code=200):

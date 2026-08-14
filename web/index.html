@@ -237,11 +237,54 @@
       <div id="decisions-result" style="font-size:11px;margin-top:8px"></div>
     </div>
 
-    <!-- 监控工作区（FDE 资源监控） -->
+    <!-- 监控工作区（FDE 资源监控 + 设备监测 Web 化：指标/告警/工单/AI问数） -->
     <div id="ws-monitor" style="display:none">
       <div class="lbl">环境监控 — FDE 资源看板</div>
-      <button class="btn pri run" onclick="runMonitor()">📈 刷新监控</button>
+      <button class="btn pri run" onclick="runMonitor()">📈 刷新资源</button>
       <div id="monitor-result" style="font-size:12px;margin-top:10px"></div>
+
+      <div class="lbl" style="margin-top:16px">设备监测 — 指标/告警/工单/AI问数</div>
+      <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+        <button class="btn pri" onclick="runMonitorDemo()">▶ 一键端到端演示</button>
+        <button class="btn" onclick="runMonitorMetrics()">📡 刷新看板</button>
+        <button class="btn" onclick="runMonitorAlerts()">🚨 告警</button>
+        <button class="btn" onclick="runMonitorTickets()">🎫 工单</button>
+      </div>
+
+      <div class="lbl" style="margin-top:12px">模拟接入指标（全链路 ingest→告警→工单）</div>
+      <div style="display:flex;gap:6px;margin-top:6px">
+        <input id="mon-ing-dev" value="d1" style="flex:1;padding:7px;border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--text)">
+        <select id="mon-ing-metric" style="flex:1.4;padding:7px;border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--text)">
+          <option value="temperature">temperature</option>
+          <option value="power">power</option>
+          <option value="vibration">vibration</option>
+        </select>
+        <input id="mon-ing-val" value="90" type="number" style="flex:1;padding:7px;border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--text)">
+        <button class="btn pri" onclick="runMonitorIngest()">⬆ 接入</button>
+      </div>
+
+      <div class="lbl" style="margin-top:12px">告警规则（阈值，触发后自动建工单）</div>
+      <div style="display:flex;gap:6px;margin-top:6px">
+        <input id="mon-ru-dev" value="d1" style="flex:1;padding:7px;border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--text)">
+        <select id="mon-ru-metric" style="flex:1.4;padding:7px;border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--text)">
+          <option value="temperature">temperature</option>
+          <option value="power">power</option>
+          <option value="vibration">vibration</option>
+        </select>
+        <select id="mon-ru-op" style="flex:.8;padding:7px;border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--text)">
+          <option value="&gt;">&gt;</option><option value="&lt;">&lt;</option>
+        </select>
+        <input id="mon-ru-thr" value="80" type="number" style="flex:1;padding:7px;border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--text)">
+        <button class="btn" onclick="runMonitorRule()">＋ 设规则</button>
+      </div>
+
+      <div class="lbl" style="margin-top:12px">AI 问数（查设备/告警/工单）</div>
+      <div style="display:flex;gap:6px;margin-top:6px">
+        <input id="mon-ask-q" placeholder="如：哪台设备温度过高 / 最近有哪些告警 / 有哪些待处理工单" style="flex:1;padding:7px;border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--text)">
+        <button class="btn pri" onclick="runMonitorAsk()">💬 问数</button>
+      </div>
+
+      <div id="monitor-result2" style="font-size:11px;margin-top:12px;background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:10px;max-height:420px;overflow:auto;white-space:pre-wrap"></div>
     </div>
 
     <!-- 厂区运维面板 -->
