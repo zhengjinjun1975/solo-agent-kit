@@ -167,6 +167,15 @@ def ai_taste_report(text: str, style: str = "report") -> dict:
         "issues": issues, "suggestions": suggestions,
         "note": f"AI味分 {ai_score}（100=最像人）",
     }
+    # 自洽结论：score/fail/建议 三者不矛盾（P2-8）
+    if hard_fails:
+        result["verdict"] = f"存在 {hard_fails} 项 L1 必改问题（错字/标点/语病/数字），需修正后再定稿，勿仅凭 AI 味分判断"
+    elif ai_score >= 80:
+        result["verdict"] = "自然，可定稿"
+    elif ai_score >= 60:
+        result["verdict"] = "略AI腔，建议按提示打磨后再定稿"
+    else:
+        result["verdict"] = "AI腔明显，建议按提示改写后再定稿"
     if gate and gate.get("human"):
         result["note"] = "命中真人文本，停手不改声口。" + result["note"]
     return result

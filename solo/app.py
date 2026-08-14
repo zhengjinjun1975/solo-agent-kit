@@ -52,12 +52,32 @@ def data_clean(rows: list, method: str = "drop", outlier: str = "iqr") -> dict:
 
 
 # ---- 数据分析（唯一数值列探测） ----
+_ID_COL_HINTS = ("id", "编号", "序号", "主键", "udi", "_id")
+
+
+def _is_id_like(col: str) -> bool:
+    """判断列名是否为 id/编号/序号 主键类（统计时应跳过，避免把主键当数值列）。"""
+    low = str(col).strip().lower()
+    return any(k in low for k in _ID_COL_HINTS)
+
+
 def _detect_numeric_col(rows: list) -> str:
     """唯一数值列探测：返回第一个含数值的列名；无则 None。
+
+    跳过 id/编号/序号 主键类列（主键虽常为数字，但不是要分析的指标列），
+    确保 factory-stats 默认分析到真实指标而非主键。
 
     原 cli._factory_stats / web_api.handle_stats / web_server 两处内联 / agent
     各自实现了一份数值列探测，行为还不一致。统一收敛于此。
     """
+    for r in rows:
+        for k in r:
+            if _is_id_like(k):
+                continue
+            v = r.get(k, "")
+            if str(v).strip() and is_num(v):
+                return k
+    # 全表无非 id 数值列 → 回退允许 id（避免无可分析列时反而空白）
     for r in rows:
         for k in r:
             v = r.get(k, "")

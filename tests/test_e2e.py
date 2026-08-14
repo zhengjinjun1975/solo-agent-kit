@@ -35,9 +35,13 @@ def _free_port():
 def server():
     """启动测试 web 服务。"""
     port = _free_port()
+    # 隔离 survey 落盘到临时目录，避免端到端测试污染 ~/.solo/surveys
+    import tempfile
+    survey_dir = tempfile.mkdtemp(prefix="solo_e2e_survey_")
+    _env = dict(os.environ, SOLO_SURVEY_DIR=survey_dir)
     proc = subprocess.Popen(
         [sys.executable, os.path.join(REPO, "solo", "web_server.py"), "--port", str(port)],
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=_env)
     base = f"http://127.0.0.1:{port}"
     # 等待就绪
     for _ in range(20):

@@ -17,6 +17,12 @@
     solo survey-structure <name> <story>  结构化一条需求（编号R-xxx）
     solo survey-srs <name>       生成SRS需求文档
     solo survey-acceptance <name>  生成验收清单+勾稽检查
+    solo code-review <file>      代码审查（静态分析+0-100评分）
+    solo writing-ai-taste <text> / writing-write-natural <text>  中文写作检查/改写
+    solo memory-note <text> / memory-search <q>    温域记忆 记/查
+    solo optmem-note <text> / optmem-search <q>   OptMem 全局记忆 记/查
+    solo onto-to-nt / onto-answer / onto-search <csv>  本体 导出/聚合问答/检索
+    solo to-factory-lexicon <csv> / to-review-items <csv>  词典→工厂契约/审查队列
     solo version                 显示版本
 """
 from __future__ import annotations
@@ -130,6 +136,63 @@ def main(argv=None):
     p_rs = sub.add_parser("restore", help="恢复备份")
     p_rs.add_argument("src", help="备份目录")
 
+    # 代码审查（对齐 codeagent 评分口径）
+    p_cr = sub.add_parser("code-review", help="代码审查(静态分析+0-100评分)")
+    p_cr.add_argument("file", help="待审 Python 文件")
+    p_cr.add_argument("--max-complexity", type=int, default=10, help="圈复杂度阈值")
+    p_cr.add_argument("--strict-undefined", action="store_true", help="启用未定义名启发式检查")
+
+    # 写作检查/改写（写自然 → AI味复检闭环）
+    p_wat = sub.add_parser("writing-ai-taste", help="中文文本 AI 味自检(评分+建议+自洽结论)")
+    p_wat.add_argument("text")
+    p_wat.add_argument("--style", choices=["tweet", "report", "wechat", "paper"], default="report")
+    p_wn = sub.add_parser("writing-write-natural", help="风格改写+AI味复检闭环")
+    p_wn.add_argument("text")
+    p_wn.add_argument("--style", choices=["tweet", "report", "wechat", "paper"], default="tweet")
+
+    # 记忆 note/search（温域事实层）
+    p_mn = sub.add_parser("memory-note", help="记一条事实(温域记忆)")
+    p_mn.add_argument("text")
+    p_mn.add_argument("--tag", action="append", help="标签(可多次)")
+    p_ms = sub.add_parser("memory-search", help="语义检索记忆")
+    p_ms.add_argument("query")
+    p_ms.add_argument("--top-k", type=int, default=5)
+
+    # OptMem note/search（跨项目全局记忆）
+    p_on = sub.add_parser("optmem-note", help="沉淀经验/方法论进 OptMem 全局记忆")
+    p_on.add_argument("text")
+    p_os = sub.add_parser("optmem-search", help="语义检索 OptMem 记忆")
+    p_os.add_argument("query")
+    p_os.add_argument("--top-k", type=int, default=5)
+
+    # 本体：导出 NT / 聚合问答 / 三元组检索（消除 Python-only 无入口断层）
+    p_ont = sub.add_parser("onto-to-nt", help="CSV建本体并导出 N-Triples")
+    p_ont.add_argument("csv")
+    p_ont.add_argument("--entity", help="实体名")
+    p_ont.add_argument("--id", dest="id_col", help="主键列")
+    p_ont.add_argument("--relations", help="关系声明 JSON 文件")
+    p_oa = sub.add_parser("onto-answer", help="本体聚合问答(计数/极值/枚举/列表)")
+    p_oa.add_argument("csv")
+    p_oa.add_argument("question", help="问题(如'有多少台设备'/'功率最大的设备'/'设备类型有哪些')")
+    p_oa.add_argument("--entity", help="实体名")
+    p_oa.add_argument("--id", dest="id_col", help="主键列")
+    p_osr = sub.add_parser("onto-search", help="本体三元组检索")
+    p_osr.add_argument("csv")
+    p_osr.add_argument("term")
+    p_osr.add_argument("--entity", help="实体名")
+    p_osr.add_argument("--id", dest="id_col", help="主键列")
+    p_osr.add_argument("--top-k", type=int, default=5)
+
+    # 词典 → 工厂契约 / review 待确认队列（FDE D1 下游，独立 CLI 入口）
+    p_tfl = sub.add_parser("to-factory-lexicon", help="词典初稿→工厂本体 lexicon 契约")
+    p_tfl.add_argument("csv")
+    p_tfl.add_argument("--industry", help="行业名(联动列名中文映射/实体)")
+    p_tfl.add_argument("--table-name", default="数据", help="lexicon 表名")
+    p_tfl.add_argument("--entity-cn", default=None, help="实体中文名(缺省用行业默认)")
+    p_tri = sub.add_parser("to-review-items", help="词典初稿→闭源 review 待确认队列")
+    p_tri.add_argument("csv")
+    p_tri.add_argument("--industry", help="行业名(联动列名中文映射)")
+
     try:
         args = parser.parse_args(argv)
         result = _dispatch(args)
@@ -230,6 +293,39 @@ def _dispatch(args):
         return _backup(args.dest)
     if cmd == "restore":
         return _restore(args.src)
+    if cmd == "code-review":
+        from solo import code_review as cr
+        return cr.review_file(args.file, max_complexity=args.max_complexity,
+                              strict_undefined=args.strict_undefined)
+    if cmd == "writing-ai-taste":
+        from solo import writing as w
+        return w.ai_taste(args.text, style=args.style)
+    if cmd == "writing-write-natural":
+        from solo import writing as w
+        return w.write_natural(args.text, style=args.style)
+    if cmd == "memory-note":
+        m = memory_mod.Memory()
+        return {"added": m.add_fact(args.text, tags=args.tag), "text": args.text}
+    if cmd == "memory-search":
+        m = memory_mod.Memory()
+        return {"hits": m.search(args.query, top_k=args.top_k)}
+    if cmd == "optmem-note":
+        from solo.memory import optmem_note
+        ok, msg = optmem_note(args.text)
+        return {"ok": ok, "message": msg}
+    if cmd == "optmem-search":
+        from solo.memory import optmem_search
+        return {"hits": optmem_search(args.query, top_k=args.top_k)}
+    if cmd == "onto-to-nt":
+        return _onto_to_nt(args)
+    if cmd == "onto-answer":
+        return _onto_answer(args)
+    if cmd == "onto-search":
+        return _onto_search(args)
+    if cmd == "to-factory-lexicon":
+        return _assist_to_factory_lexicon(args)
+    if cmd == "to-review-items":
+        return _assist_to_review_items(args)
     return {"error": "unknown command"}
 
 
@@ -318,6 +414,7 @@ def _assist_report_draft(args):
     out = {"report": md}
     if ai and ai.get("ok"):
         out["ai_taste"] = {"score": ai["ai_score"], "note": ai["note"],
+                           "verdict": ai.get("verdict"),
                            "suggestions": ai["suggestions"][:6],
                            "hard_fails": ai["hard_fails"]}
     return out
@@ -346,6 +443,63 @@ def _industry_current():
     """查看当前行业及生效配置（改行业自动联动状态）。"""
     from solo.factory.industry import apply_industry, get_current_industry
     return {"current": get_current_industry() or "(默认工厂)", "apply": apply_industry()}
+
+
+def _onto_build(args):
+    """从 CSV 建本体（onto-to-nt/answer/search 共用）。返回 (Ontology, 错误dict)。"""
+    from solo.factory.ontology import Ontology
+    rows = _load_rows_csv(args.csv)
+    if not rows:
+        return None, {"error": "数据源无效或为空"}
+    o = Ontology()
+    o.from_rows(rows, entity_name=args.entity, id_col=args.id_col)
+    o.build()
+    return o, None
+
+
+def _onto_to_nt(args):
+    """CSV → 本体 → N-Triples（消除 Python-only 无入口断层）。"""
+    o, err = _onto_build(args)
+    if err:
+        return err
+    return {"nt": o.to_nt(), "entities": list(o.entities.keys()),
+            "triples": len(o.triples)}
+
+
+def _onto_answer(args):
+    """本体聚合问答（计数/极值/枚举/列表，闭环 draft_questions 生成题）。"""
+    o, err = _onto_build(args)
+    if err:
+        return err
+    return {"question": args.question, "answers": o.answer(args.question, entity=args.entity)}
+
+
+def _onto_search(args):
+    """本体三元组检索。"""
+    o, err = _onto_build(args)
+    if err:
+        return err
+    return {"term": args.term, "hits": o.search(args.term, top_k=args.top_k)}
+
+
+def _assist_to_factory_lexicon(args):
+    """词典初稿 → 工厂本体 lexicon 契约（FDE D1 下游，独立 CLI 入口）。"""
+    from solo.factory.assist import lexicon_draft, to_factory_lexicon
+    rows = _load_rows_csv(args.csv)
+    headers = list(rows[0].keys()) if rows else []
+    d = lexicon_draft(headers, rows[:30], industry=getattr(args, "industry", None))
+    return to_factory_lexicon(d, table_name=args.table_name, entity_cn=args.entity_cn,
+                              industry=getattr(args, "industry", None))
+
+
+def _assist_to_review_items(args):
+    """词典初稿 → 闭源 review 待确认队列（P2 接线入口）。"""
+    from solo.factory.assist import lexicon_draft, to_review_items
+    rows = _load_rows_csv(args.csv)
+    headers = list(rows[0].keys()) if rows else []
+    d = lexicon_draft(headers, rows[:30], industry=getattr(args, "industry", None))
+    items = to_review_items(d)
+    return {"items": items, "count": len(items)}
 
 
 if __name__ == "__main__":

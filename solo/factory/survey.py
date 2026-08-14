@@ -33,7 +33,8 @@ CATEGORIES = ("生产", "销售", "运维", "管理")   # 需求分类
 PRIORITIES = ("P0", "P1", "P2")                # 优先级
 PHASES = ("采集", "结构化", "SRS", "验收")      # 生命周期阶段（对应 task 状态）
 
-_DEFAULT_DIR = os.path.join(os.path.expanduser("~"), ".solo", "surveys")
+_DEFAULT_DIR = os.environ.get("SOLO_SURVEY_DIR",
+                              os.path.join(os.path.expanduser("~"), ".solo", "surveys"))
 
 
 def _now() -> str:
@@ -66,7 +67,7 @@ def interview_outline(industry: str = None) -> dict:
     # 行业化追问：从行业 note / 实体名落一条更贴现场的题
     note = (cfg.get("note") or "").strip()
     questions.append(
-        f"行业(={ctx['kb']})：围绕{ent}（{measure}），针对{'、'.join((note or '行业要点'))}"
+        f"行业(={ctx['kb']})：围绕{ent}（{measure}），针对{note or '行业要点'}"
         f"，现有管控/流程有哪些缺口？")
     return {"industry": apply_industry(industry)["industry"], "kb": ctx["kb"],
             "entity_cn": ent, "measure": measure, "note": note,

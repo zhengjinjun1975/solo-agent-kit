@@ -72,12 +72,38 @@ solo init                          # 初始化记忆库
 solo run "写一篇公众号推文"        # 走完整方法论
 ```
 
-厂区运维（FDE 进厂区）：
+FDE（工厂/前置交付）工具箱：
 ```bash
-solo site use 华东一厂              # 进入厂区运维模式，定位
-solo site devices                  # 查看该厂区设备台账
-solo site add-device MES服务器 192.168.1.10 --user root   # 登记设备
-solo site role on-site             # 部署角色：laptop本机 / on-site部署在对方机
+solo industry-list                # 列出已登记行业（行业→kb/词典联动注册表）
+solo industry-set 阀门制造 <data.csv>   # 改行业→自动重建 问题集/词典/工厂契约/审查队列/报告
+solo industry-current             # 查看当前行业及生效配置
+solo draft-questions <data.csv>          # 起草 benchmark 问题集（FDE D0）
+solo lexicon-draft <data.csv>            # 起草词典初稿（FDE D1）
+solo to-factory-lexicon <data.csv>       # 词典→工厂本体 lexicon 契约
+solo to-review-items <data.csv>          # 词典→闭源 review 待确认队列
+solo report-draft --hit 0.8 --questions 20 --hits 15   # 起草交付报告（FDE D4）
+solo survey-outline                # 需求访谈提纲（行业数据驱动）
+solo survey-structure <name> "<痛点>"   # 结构化一条需求（编号 R-xxx）
+solo survey-srs <name> / survey-acceptance <name>   # 生成 SRS / 验收清单
+```
+
+个人套件 CLI：
+```bash
+solo code-review <file>.py         # 代码审查（静态分析+0-100评分）
+solo writing-ai-taste "文本" --style report      # 中文 AI 味自检（评分+建议+自洽结论）
+solo writing-write-natural "文本" --style tweet   # 风格改写 + AI 味复检闭环
+solo memory-note "事实" --tag 经验  / memory-search "查询"   # 温域记忆 记/查
+solo optmem-note "经验" / optmem-search "查询"             # OptMem 全局记忆 记/查
+solo onto-to-nt <data.csv>         # CSV→本体→N-Triples
+solo onto-answer <data.csv> "有多少台设备"   # 本体聚合问答（计数/极值/枚举）
+solo onto-search <data.csv> "设备"          # 本体三元组检索
+```
+
+工厂数据三件套：
+```bash
+solo factory-clean <data.csv>      # 数据清洗（缺失/重复/异常值）
+solo factory-stats <data.csv>      # 数据分析（描述/趋势/SPC，自动跳过 id 主键列）
+solo factory-onto <data.csv>       # 工厂本体建模
 ```
 
 ## 真实场景示例
@@ -104,23 +130,24 @@ python examples/example_04_factory_ontology.py
 
 | 模块 | 能力 | 方法论锚点 |
 |---|---|---|
-| `memory.py` | 三层两域记忆 | 单一事实源加热域/温域/冷域 |
+| `memory.py` | 三层两域记忆 + OptMem 互通 | 单一事实源加热域/温域/冷域 |
 | `skill.py` | 可复用经验 | 从任务提取，带版本与触发边界 |
-| `writing.py` | 六维写作检查 | D1错字/D2标点/D3语病/D4数字/D5去AI味/D6活人感 |
-| `desensitize.py` | 写作脱敏 | 掩码 IP/手机/邮箱/金额/自定义词，防泄露给 LLM |
-| `gen.py`、`code_agent.py` | 代码生成/审查/测试 | 静态分析加双层审查加生成测试 |
+| `writing.py` | 六维写作检查 + 风格改写 | D1错字/D2标点/D3语病/D4数字/D5去AI味/D6活人感 |
+| `code_review.py` | 代码审查 | 静态分析 + 0-100 评分（对齐 codeagent 口径） |
 | `code.py` | 代码库理解 | impact 影响分析，overview/explain |
-| `task.py` | 任务状态 | 断点续跑、决策门、可证伪预期 |
+| `task.py` | 任务/工单状态 | 断点续跑、决策门、可证伪预期 |
 
-**厂区套件**（`solo/factory/`，FDE 进厂区）：
+**FDE/工厂套件**（`solo/factory/`，FDE 交付工具箱）：
 
 | 模块 | 能力 | 方法论锚点 |
 |---|---|---|
-| `site.py` | 厂区配置与定位 | 设备台账，部署角色 laptop/on-site |
-| `remote.py` | 远程运维 | SSH 设备名重载，采集/执行/日志 |
-| `monitor.py` | 设备监控 | monitor_device，批量巡检 |
-| `data_connector.py` | 数据源统一 | connect(type=device) 远程拉厂区数据 |
-| `clean.py`、`stats.py`、`ontology.py` | 数据三件套 | 清洗、SPC 分析、本体建模，对接厂区数据 |
+| `data.py` | 数据清洗/分析 | 缺失/重复/异常值，SPC/趋势 |
+| `ontology.py` | 本体建模/问答 | 计数/极值/枚举聚合问答，N-Triples 导出 |
+| `decisions.py` | 决策规则引擎 | 阈值表 + 行业阈值覆盖 |
+| `survey.py` | 需求→验收生命周期 | 访谈提纲/结构化/SRS/验收清单/勾稽 |
+| `assist.py` | FDE 交付辅助 | 问题集/词典/工厂契约/审查队列/报告起草 |
+| `industry.py` | 行业→kb 联动 | 改行业自动重建全部 FDE 产物 |
+| `quote.py`/`train.py`/`support.py` | 报价/培训/工单运维 | FDE 全域交付能力 |
 
 **插件**（`solo/plugins/`，可降级）：
 
@@ -128,6 +155,8 @@ python examples/example_04_factory_ontology.py
 |---|---|---|
 | `obsidian.py` | Obsidian 知识库集成：报告归档/检索/经验沉淀 | 零依赖 |
 | `visualize.py` | 数据可视化：SPC 控制图/趋势图/异常标记 | matplotlib(可选) |
+| `excel_report.py` | Excel 报告导出 | openpyxl(可选) |
+| `netscan.py` | 网络扫描/资产发现 | 零依赖 |
 
 ### 插件设计说明
 
@@ -176,17 +205,23 @@ solo plugins list          # 查看各插件可用性（obsidian/visualize 等�
 ```
 solo-agent-kit/
 ├── solo/                 # 个人套件（零依赖）
-│   ├── memory.py         #   三层两域记忆
-│   ├── writing.py        #   六维写作检查
-│   ├── desensitize.py    #   写作脱敏
-│   ├── code_agent.py     #   代码生成/审查/测试
-│   ├── site.py           #   厂区配置与定位
-│   └── factory/          # 厂区套件
-│       ├── clean.py      #   数据清洗
-│       ├── stats.py      #   数据分析(SPC)
-│       ├── ontology.py   #   本体建模
-│       ├── remote.py     #   远程运维
-│       └── monitor.py    #   设备监控
+│   ├── app.py            #   统一服务门面（业务单一事实源）
+│   ├── cli.py            #   CLI 命令入口（agent-first，JSON out）
+│   ├── memory.py         #   三层两域记忆 + OptMem 互通
+│   ├── writing.py        #   六维写作检查 + 风格改写
+│   ├── code_review.py    #   代码审查（静态分析+0-100评分）
+│   ├── code.py           #   代码库理解
+│   ├── task.py           #   任务/工单状态
+│   └── factory/          # FDE 交付工具箱
+│       ├── data.py       #   数据清洗/分析(SPC)
+│       ├── ontology.py   #   本体建模/聚合问答
+│       ├── decisions.py  #   决策规则引擎
+│       ├── survey.py     #   需求→验收生命周期
+│       ├── assist.py     #   FDE 交付辅助（问题集/词典/契约/审查队列/报告）
+│       ├── industry.py   #   行业→kb 联动（改行业自动重建）
+│       └── quote.py/train.py/support.py   # 报价/培训/工单运维
+├── solo/plugins/         # 可降级插件（obsidian/visualize/excel_report/netscan）
+├── config/               # model_config / industries / decisions 配置
 ├── examples/             # 真实场景示例
 ├── docs/                 # 设计文档
 ├── web/                  # Web 前端

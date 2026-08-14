@@ -180,14 +180,27 @@ class Ontology:
         return out
 
     def answer(self, question: str, entity: str = None) -> list:
-        """工厂级问题解答（结构化）：按已知实体/关系导航。
+        """工厂级问题解答（结构化）：关系导航 + 聚合问答。
+
+        支持两类：
+        1. 聚合问答（闭环 draft_questions 生成题可答，零 LLM）：
+             - 计数  有多少台设备 / 有多少个阀门
+             - 极值  功率最大的设备 / 公称通径最小的阀门
+             - 枚举  设备类型有哪些 / 状态有哪些 / 区域有哪些
+             - 列表  有哪些设备（取名称列去重）
+        2. 关系导航（原能力）：某设备属于哪条产线 / 位于哪个位置
+           （query entity, id_val, rel_col）
 
         示例：query entity='device', id_val='D001', rel_col='line_id'
-        → 返回 D001 属于哪条产线。零 LLM，纯结构化。
+        → 返回 D001 属于哪条产线。纯结构化，无 LLM。
         """
+        q = str(question).strip()
+        # 聚合问答优先（修闭环断裂：draft_questions 生成题在此可答）
+        agg = self._answer_aggregate(q, entity)
+        if agg is not None:
+            return agg
+        # 关系导航（原能力）
         results = []
-        # 尝试解析：某实体实例的关系
-        # 先找最匹配的实体（question 含实体名）
         for ent, rels in self.relations.items():
             if entity is None or ent == entity:
                 for col, cfg in rels.items():
@@ -199,6 +212,91 @@ class Ontology:
                                 results.append({"entity": ent, "instance": inst,
                                                 "rel": cfg["label"], "value": val[0]})
         return results
+
+    @staticmethod
+    def _is_num(v) -> bool:
+        """是否数值（聚合极值用）。"""
+        return guess_type(str(v).strip()) in ("integer", "decimal")
+
+    @staticmethod
+    def _is_name_col(col: str) -> bool:
+        """是否名称类列（列表问答取名称列用）。"""
+        low = str(col).strip().lower()
+        return any(k in low for k in ("名称", "名字", "name"))
+
+    def _cn2col(self, headers) -> dict:
+        """列名 → 中文 反查表（复用 assist 词典映射，与 draft_questions 措辞一致）。"""
+        try:
+            from .assist import _col_cn_for  # noqa: PLC0415  # 惰性导入避免循环依赖
+            return {_col_cn_for(c, {}): c for c in headers}
+        except Exception:  # noqa: BLE001
+            return {}
+
+    def _answer_aggregate(self, q: str, entity=None):
+        """聚合问答：计数/极值/枚举/列表。无法匹配 → 返回 None（交回关系导航）。"""
+        rows_ents = [e for e, m in self.entities.items() if m.get("rows")]
+        if not rows_ents:
+            return None
+        # 确定目标实体：entity 参数优先；否则按题面含实体名；再默认第一个主实体
+        ent = None
+        if entity and entity in self.entities and self.entities[entity].get("rows"):
+            ent = entity
+        else:
+            ent = next((e for e in rows_ents if e in q), None) or rows_ents[0]
+        rows = self.entities[ent].get("rows", [])
+        if not rows:
+            return None
+        headers = list(rows[0].keys())
+        cn2col = self._cn2col(headers)
+
+        def _target_col(colcn):
+            return cn2col.get(colcn.strip(), colcn.strip())
+
+        # 1) 计数：有多少[量词][实体]
+        m = re.match(r"^有多少[个台条位家本批艘]?(.+)$", q)
+        if m:
+            subj = m.group(1).strip()
+            if not subj or subj == ent or subj in rows_ents:
+                return [{"type": "count", "entity": ent, "question": q, "value": len(rows)}]
+
+        # 2) 极值：[列名]最大的[实体] / [列名]最小的[实体]
+        m = re.match(r"^(?P<col>.+?)最(?P<ext>大|小)的(?P<ent>.*)$", q)
+        if m:
+            col = _target_col(m.group("col"))
+            scored = [(float(r[col]), r) for r in rows
+                      if r.get(col) is not None and str(r[col]).strip() != "" and self._is_num(r[col])]
+            if scored:
+                is_max = m.group("ext") == "大"
+                _, best = (max if is_max else min)(scored, key=lambda x: x[0])
+                return [{"type": "extreme",
+                         "extreme": "最大" if is_max else "最小",
+                         "entity": ent, "column": col,
+                         "column_cn": m.group("col").strip(),
+                         "value": best.get(col), "instance": best, "question": q}]
+
+        # 3) 枚举：[列名]有哪些
+        m = re.match(r"^(?P<col>.+?)有哪些$", q)
+        if m:
+            col = _target_col(m.group("col"))
+            uniq = sorted({str(r[col]).strip() for r in rows
+                           if r.get(col) is not None and str(r[col]).strip()})
+            if uniq:
+                return [{"type": "enum", "entity": ent, "column": col,
+                         "column_cn": m.group("col").strip(),
+                         "values": uniq, "question": q}]
+
+        # 4) 列表：有哪些[实体]（取名称列去重）
+        m = re.match(r"^有哪些(.+)$", q)
+        if m:
+            subj = m.group(1).strip()
+            if not subj or subj == ent or subj in rows_ents:
+                name_col = next((c for c in headers if self._is_name_col(c)), None)
+                if name_col:
+                    names = sorted({str(r[name_col]).strip() for r in rows
+                                    if r.get(name_col) is not None and str(r[name_col]).strip()})
+                    return [{"type": "list", "entity": ent, "column": name_col,
+                             "values": names, "question": q}]
+        return None
 
     # ---- 输出 ----
     def to_nt(self) -> str:

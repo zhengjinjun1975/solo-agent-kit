@@ -24,6 +24,42 @@ _MEASURE = {"设备": "台", "机器": "台", "产品": "个", "项目": "个", 
 _EXTREME_CN = {"最大": "最大", "最高": "最高", "最贵": "最贵", "最小": "最小", "最低": "最低"}
 _STOP_CN = {"id", "编码", "编号", "序号", "UDI"}
 
+# id/编号/序号 主键类列（不参与属性/枚举映射，避免污染词典/review/lexicon）
+_ID_HINTS = ("id", "编号", "序号", "主键", "udi", "_id")
+# 名称类列（名称/客户/产品名/name）——实体名而非"类型"，不污染 type_cn2en
+_NAME_HINTS = ("名称", "客户", "产品名", "name")
+
+# 常见中文枚举值 → 英文建议（词典/lexicon 非恒等映射：给中文值补英文键，供工厂本体消费）
+_CN_EN = {
+    "运行": "running", "待机": "standby", "停机": "stopped", "故障": "fault",
+    "正常": "normal", "异常": "abnormal", "在用": "in_use", "备用": "standby",
+    "车床": "lathe", "铣床": "milling", "球阀": "ball_valve", "闸阀": "gate_valve",
+    "一车间": "workshop_1", "二车间": "workshop_2", "三车间": "workshop_3",
+    "华东一厂": "plant_east_1", "华北一厂": "plant_north_1",
+}
+
+
+def _is_id_like(col: str) -> bool:
+    """是否 id/编号/序号 主键类列。"""
+    low = str(col).strip().lower()
+    return any(k in low for k in _ID_HINTS)
+
+
+def _is_name_like(col: str) -> bool:
+    """是否名称类列（实体名/客户/产品名，非类型）。"""
+    low = str(col).strip().lower()
+    return any(k in low for k in _NAME_HINTS)
+
+
+def _en_suggest(v: str) -> dict:
+    """中文枚举值 → 英文建议（非恒等映射）。已知词查表；未知中文词标记需人工翻译。"""
+    en = _CN_EN.get(str(v).strip())
+    if en:
+        return {"en": en, "needs_translation": False}
+    if re.search(r"[\u4e00-\u9fff]", str(v)):
+        return {"en": "", "needs_translation": True}  # 中文未知词 → 需人工确认英文
+    return {"en": str(v), "needs_translation": False}  # 已是英文/数字 → 原样
+
 
 # 常见工厂列名 → 中文（方法论统一: 对齐 factory 中文问答语义）
 COL_CN_MAP = {
@@ -148,6 +184,15 @@ def lexicon_draft(headers, sample_rows=None, industry: str = None):
     ctx = _industry_ctx(industry)
     draft = {}
     for h in headers:
+        # id/编号/序号 主键类列：标记为 identifier，不进属性/枚举映射（不污染词典）
+        if _is_id_like(h):
+            draft[h] = {
+                "cn": _col_cn_for(h, ctx["col_cn"]),
+                "type": "identifier",
+                "enum": None,
+                "suggest": "主键/标识列，不参与属性或枚举映射",
+            }
+            continue
         vals = [str(r.get(h, "")) for r in sample_rows if r.get(h) is not None]
         vals = [v for v in vals if v.strip()]
         typ = guess_type(vals[0]) if vals else "string"
@@ -180,6 +225,7 @@ def to_factory_lexicon(draft, table_name="数据", entity_cn=None, industry: str
     attr_cn2en, attr_en2cn = {}, {}
     type_cn2en, status_cn2en, zone_cn2en = {}, {}, {}
     numeric_fields, value_fields, field_aliases = {}, {}, {}
+    value_en_suggest = {}   # 中文枚举值 → 英文建议（非恒等映射）
     # 枚举列: 值→值(中文值直接映射自身), 按列名归类
     _TYPE_COLS = ("type", "类型", "category", "类别", "产品")
     _STATUS_COLS = ("status", "状态")
@@ -187,22 +233,25 @@ def to_factory_lexicon(draft, table_name="数据", entity_cn=None, industry: str
     for col, e in (draft or {}).items():
         low = str(col).lower()
         # 跳过 id/编号/唯一标识 列(不是枚举也不进属性映射, 不污染词典)
-        if any(k in low for k in ("id", "udi", "编号", "序号", "码", "_id")):
+        if _is_id_like(col):
             continue
         cn = e.get("cn", "") or col
         typ = e.get("type", "string")
         enum = e.get("enum") or []
         ename = local_name(col)
-        if enum:
-            target = type_cn2en
+        # 名称类列（名称/客户/产品名/name）是实体名而非"类型"，不进 type_cn2en
+        is_name = _is_name_like(col)
+        if enum and not is_name:
+            target = status_cn2en
             if any(k in low for k in _STATUS_COLS):
                 target = status_cn2en
             elif any(k in low for k in _ZONE_COLS):
                 target = zone_cn2en
-            elif any(k in low for k in _TYPE_COLS) or True:
+            else:
                 target = type_cn2en
             for v in enum:
                 target.setdefault(v, v)
+                value_en_suggest.setdefault(str(v), _en_suggest(v))
             value_fields[ename] = cn
             field_aliases.setdefault(ename, []).extend([cn, col])
         elif typ in ("integer", "decimal"):
@@ -228,6 +277,7 @@ def to_factory_lexicon(draft, table_name="数据", entity_cn=None, industry: str
         "numeric_fields": numeric_fields,
         "field_aliases": field_aliases,
         "value_fields": value_fields,
+        "value_en_suggest": value_en_suggest,
     }
 
 
@@ -243,12 +293,13 @@ def to_review_items(draft):
     for col, e in (draft or {}).items():
         low = str(col).lower()
         # 过滤 id/编号/序号/唯一标识 列, 不污染 review 队列(与 to_factory_lexicon 一致)
-        if any(k in low for k in ("id", "udi", "编号", "序号", "码", "_id")):
+        if _is_id_like(col):
             continue
         cn = e.get("cn", "") or col
         typ = e.get("type", "string")
         enum = e.get("enum") or []
-        if enum:
+        # 名称类列（名称/客户/产品名/name）是实体名, 不进枚举待确认, 仅作属性映射
+        if enum and not _is_name_like(col):
             # 枚举列: 每条枚举值一条待确认(type_enum, 若含状态词则 status_enum)
             for v in enum:
                 items.append(("type_enum", v, cn))

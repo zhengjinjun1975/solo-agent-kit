@@ -187,7 +187,7 @@ def rebuild_industry_artifacts(industry: str = None, rows: list = None, table_na
     返回 {"industry", "kb", "entity_cn", "measure", "thresholds", "artifacts", "persisted"}。
     """
     from .assist import (draft_questions, lexicon_draft, to_factory_lexicon,
-                         report_draft_dict)
+                         to_review_items, report_draft_dict)
     cfg = apply_industry(industry)
     # 1. 事件副作用：持久化当前行业（改行业核心）
     set_current_industry(industry)
@@ -199,6 +199,8 @@ def rebuild_industry_artifacts(industry: str = None, rows: list = None, table_na
         artifacts["lexicon"] = lex
         artifacts["factory_lexicon"] = to_factory_lexicon(
             lex, table_name=(table_name or cfg["kb"]), industry=industry)
+        # 闭源 review 队列（P2 接线：改行业即带上待确认项，供 ingest_lexicon 消费）
+        artifacts["review_items"] = to_review_items(lex)
     # 报告草稿（D4，行业 → kb 自动解析）
     report_defaults = {"hit": 0.0, "questions_n": questions_n, "hits": 0}
     report_defaults.update(report_kw)
