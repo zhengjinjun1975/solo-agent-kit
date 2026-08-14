@@ -68,6 +68,17 @@
           <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
           工单</div>
       </div>
+      <div class="ng"><div class="lbl">交付与任务</div>
+        <div class="ni p" data-cap="delivery">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.7l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.7l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M3.3 7L12 12l8.7-5M12 22V12"/></svg>
+          交付辅助</div>
+        <div class="ni p" data-cap="task">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3 8-8"/><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/></svg>
+          任务</div>
+        <div class="ni p" data-cap="memory">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z"/><path d="M19 13h-4a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-4a2 2 0 0 0-2-2z"/></svg>
+          记忆</div>
+      </div>
       <div class="ng"><div class="lbl">能力扩展</div>
         <div class="ni p" data-cap="skill">
           <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.9 6.3 6.9.8-5.1 4.7 1.4 6.8L12 17.8 5.9 20.6l1.4-6.8L2.2 9.1l6.9-.8z"/></svg>
@@ -136,6 +147,7 @@
       <div id="wc-actions">
         <button class="btn pri" onclick="wcGenerate()">✨ 生成方案</button>
         <button class="btn" onclick="wcCheck()">🛡 六维自检</button>
+        <button class="btn" onclick="wcAiTaste()">🤖 AI味自检</button>
         <button class="btn" onclick="wcRewrite()">🎨 按风格改写</button>
         <button class="btn" onclick="wcClear()">🗑 清空</button>
       </div>
@@ -206,6 +218,14 @@
       <button class="btn pri run" onclick="runOntoDS()">🕸️ 建企业级本体</button>
       <div id="onto-result" style="font-size:12px;margin-top:10px"></div>
       <div id="onto-graph" style="margin-top:8px"></div>
+      <div class="lbl" style="margin-top:14px">本体问答 / 检索</div>
+      <input id="onto-q" placeholder="聚合问答（如：有多少台设备 / 功率最大的设备）" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;margin-top:8px;background:#fff;color:var(--text)">
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <button class="btn pri" onclick="runOntoAnswer()" style="flex:1">💬 问答</button>
+        <button class="btn" onclick="runOntoSearch()" style="flex:1">🔍 检索</button>
+        <button class="btn" onclick="runOntoNt()" style="flex:1">🧾 导出 NT</button>
+      </div>
+      <div id="onto-qa" style="font-size:12px;margin-top:10px"></div>
     </div>
 
     <!-- 决策工作区（企业决策：规则引擎→行动清单） -->
@@ -267,6 +287,65 @@
       <div id="issue-result" style="font-size:12px;margin-top:10px"></div>
     </div>
 
+    <!-- 任务工作区（目标式任务：新建/状态/决策门/解决，task-new/gate/resolve/status） -->
+    <div id="ws-task" style="display:none">
+      <div class="lbl">任务控制面 — 断点续跑 · 决策门</div>
+      <input id="tk-goal" placeholder="任务目标（如：完成设备数据采集与分析）" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;margin-top:8px;background:#fff;color:var(--text)">
+      <button class="btn pri run" onclick="runTaskNew()" style="margin-top:8px">➕ 新建任务</button>
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <button class="btn" onclick="runTaskList()" style="flex:1">📋 任务列表</button>
+        <button class="btn" onclick="runTaskStatus()" style="flex:1">🔍 查状态</button>
+      </div>
+      <input id="tk-id" placeholder="任务 id（查状态/设决策门/解决用）" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;margin-top:8px;background:#fff;color:var(--text)">
+      <input id="tk-gate-q" placeholder="决策门：待确认问题" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;margin-top:6px;background:#fff;color:var(--text)">
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <button class="btn" onclick="runTaskGate()" style="flex:1">🚪 设决策门</button>
+        <button class="btn" onclick="runTaskResolve()" style="flex:1">✅ 解决门</button>
+      </div>
+      <div id="task-result" style="font-size:12px;margin-top:10px"></div>
+    </div>
+
+    <!-- 记忆工作区（温域记忆 note/search + OptMem 全局记忆 note/search） -->
+    <div id="ws-memory" style="display:none">
+      <div class="lbl">记忆 — 温域 + OptMem 全局</div>
+      <textarea id="mem-note" rows="2" placeholder="记一条事实 / 沉淀经验（如：交付前先跑 e2e 联调再打补丁）" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;margin-top:8px;background:#fff;color:var(--text);resize:vertical"></textarea>
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <button class="btn pri" onclick="runMemNote('warm')" style="flex:1">💾 记温域</button>
+        <button class="btn pri" onclick="runMemNote('optmem')" style="flex:1">🌍 沉淀 OptMem</button>
+      </div>
+      <input id="mem-q" placeholder="检索关键词（如：交付 / 本体）" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;margin-top:8px;background:#fff;color:var(--text)">
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <button class="btn" onclick="runMemSearch('warm')" style="flex:1">🔍 温域检索</button>
+        <button class="btn" onclick="runMemSearch('optmem')" style="flex:1">🌍 OptMem 检索</button>
+      </div>
+      <div id="mem-result" style="font-size:12px;margin-top:10px"></div>
+    </div>
+
+    <!-- 交付辅助工作区（FDE D0/D1/D4：问题集/词典/报告/工厂契约/审查队列 + 行业联动） -->
+    <div id="ws-delivery" style="display:none">
+      <div class="lbl">交付辅助 — FDE D0/D1/D4</div>
+      <div class="ds-picker" onclick="openDsModal('delivery')">＋ 选择数据文件（问题集/词典/契约/审查队列）</div>
+      <div id="browse-delivery" style="font-size:11px;margin-top:6px"></div>
+      <input id="dl-ind" placeholder="行业（如 阀门制造，选填，联动列名中文映射）" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;margin-top:8px;background:#fff;color:var(--text)">
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+        <button class="btn" onclick="runDelivery('draft-questions')">📋 问题集 D0</button>
+        <button class="btn" onclick="runDelivery('lexicon-draft')">📖 词典初稿 D1</button>
+        <button class="btn" onclick="runDelivery('to-factory-lexicon')">🏭 工厂契约</button>
+        <button class="btn" onclick="runDelivery('to-review-items')">🔍 审查队列</button>
+      </div>
+      <div class="lbl" style="margin-top:12px">交付报告起草 D4</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <input id="dl-hit" placeholder="命中率 0-1" value="0.85" style="width:72px;padding:6px;border:1px solid var(--border);border-radius:6px;background:#fff;color:var(--text)">
+        <input id="dl-qn" placeholder="题数" value="20" style="width:60px;padding:6px;border:1px solid var(--border);border-radius:6px;background:#fff;color:var(--text)">
+        <input id="dl-hits" placeholder="命中题" value="17" style="width:60px;padding:6px;border:1px solid var(--border);border-radius:6px;background:#fff;color:var(--text)">
+        <input id="dl-av" placeholder="资产版本" value="2" style="width:72px;padding:6px;border:1px solid var(--border);border-radius:6px;background:#fff;color:var(--text)">
+        <button class="btn pri" onclick="runDelivery('report-draft')">📄 起草报告</button>
+      </div>
+      <div class="lbl" style="margin-top:12px">行业联动</div>
+      <button class="btn" onclick="runIndustryState()">🔄 当前行业</button>
+      <div id="delivery-result" style="font-size:11px;margin-top:10px;max-height:280px;overflow:auto;background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:10px;white-space:pre-wrap"></div>
+    </div>
+
     <!-- 写作辅助面板（主区画布的右侧辅助：风格 + 六维自检） -->
     <div id="ws-writing" style="display:none" class="writing-panel">
       <div class="lbl">写作风格</div>
@@ -289,6 +368,10 @@
       <textarea id="code-prompt" rows="3" style="width:100%;background:#fff;border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12px;padding:8px;outline:none" placeholder="描述要生成的代码…"></textarea>
       <button class="btn pri" style="margin-top:6px;width:100%" onclick="runCodeGen()">生成代码</button>
       <div id="gen-result" style="font-size:11px;margin-top:8px;max-height:150px;overflow:auto;white-space:pre-wrap;background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:8px"></div>
+      <div class="lbl" style="margin-top:14px">代码审查（静态分析 + 0-100 评分）</div>
+      <input id="cr-file" placeholder="待审 Python 文件（如 solo/web_routes.py）" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;margin-top:8px;background:#fff;color:var(--text)">
+      <button class="btn pri" style="margin-top:6px;width:100%" onclick="runCodeReview()">🛡 审查文件</button>
+      <div id="cr-result" style="font-size:11px;margin-top:8px;max-height:200px;overflow:auto;white-space:pre-wrap;background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:8px"></div>
     </div>
 
     <!-- 技能工作区 -->

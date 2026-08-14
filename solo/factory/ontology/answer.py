@@ -87,8 +87,9 @@ class _AnswerMixin:
             if res is not None:
                 return res
 
-        # 2) 极值：[列名]最大的[实体] / [列名]最小的[实体]
-        m = re.match(r"^(?P<col>.+?)最(?P<ext>大|小)的(?P<ent>.*)$", q)
+        # 2) 极值：功率最大的设备 / 价格最高的设备 / 数量最多的产品 / 重量最轻的零件 ...
+        #    扩展极值词（最大/最高/最贵/最多/最小/最低/最便宜/最少等），非仅 大|小
+        m = re.match(r"^(?P<col>.+?)最(?P<ext>高|低|贵|便宜|多|少|大|小)的(?P<ent>.*)$", q)
         if m:
             res = self._agg_extreme(m, ent, rows, cn2col, q)
             if res is not None:
@@ -139,10 +140,11 @@ class _AnswerMixin:
                   if r.get(col) is not None and str(r[col]).strip() != "" and self._is_num(r[col])]
         if not scored:
             return None
-        is_max = m.group("ext") == "大"
+        is_max = m.group("ext") in ("大", "高", "贵", "多")
+        extreme = "最" + m.group("ext")
         _, best = (max if is_max else min)(scored, key=lambda x: x[0])
         return [{"type": "extreme",
-                 "extreme": "最大" if is_max else "最小",
+                 "extreme": extreme,
                  "entity": ent,
                  "column": col,
                  "column_cn": m.group("col").strip(),
@@ -164,6 +166,10 @@ class _AnswerMixin:
         if not subj or subj == ent or subj in rows_ents:
             headers = list(rows[0].keys()) if rows else []
             name_col = next((c for c in headers if self._is_name_col(c)), None)
+            if not name_col:
+                # 无名称列：回退 id 列（id / *_id），保证"有哪些X"可答不落空
+                name_col = next((c for c in headers
+                                 if c.strip().lower() == "id" or c.lower().endswith("_id")), None)
             if name_col:
                 names = sorted({str(r[name_col]).strip() for r in rows
                                 if r.get(name_col) is not None and str(r[name_col]).strip()})

@@ -244,6 +244,22 @@ class _GetRoutesMixin:
         rows = dc.connect({"type": "sqlite", "path": db, "table": table})[:5]
         self._json({"rows": rows})
 
+    def _get_industry(self, qs):
+        # 行业联动状态（industry-list + industry-current）
+        from solo.factory.industry import industries_list, get_current_industry, apply_industry
+        self._json({"industries": industries_list(), "count": len(industries_list()),
+                    "current": get_current_industry() or "(默认工厂)", "apply": apply_industry()})
+
+    def _get_optmem_search(self, qs):
+        # OptMem 全局记忆语义检索（optmem-search）
+        from solo.memory import optmem_search
+        q = qs().get("q", [""])[0]
+        try:
+            top_k = int(qs().get("top_k", ["5"])[0])
+        except ValueError:
+            top_k = 5
+        self._json({"query": q, "hits": optmem_search(q, top_k=top_k)})
+
 
 class _PostRoutesMixin:
     """POST 端点。body 参数为已解析的 JSON dict。"""
@@ -320,7 +336,7 @@ class _PostRoutesMixin:
             self._json({"ok": False, "error": str(e)}, 400)
 
     def _post_task(self, body):
-        # 工单闭环（FDE 问题管理）
+        # 工单闭环（FDE 问题管理）+ 目标式任务控制面（task-new/gate/resolve/list_tasks）
         from solo.task import Task
         t = Task()
         cmd = body.get("cmd") or "new_issue"
@@ -332,6 +348,15 @@ class _PostRoutesMixin:
             self._json(t.resolve_issue(body.get("id", ""), body.get("resolution", "")))
         elif cmd == "status":
             self._json(t.status(body.get("id", "")))
+        elif cmd == "new":  # 目标式任务（task-new）
+            task = t.new(body.get("goal", ""))
+            self._json({"id": task["id"], "goal": task["goal"], "state": task["state"]})
+        elif cmd == "gate":  # 决策门（task-gate）
+            self._json(t.gate(body.get("id", ""), body.get("question", "")))
+        elif cmd == "resolve_task":  # 解决所有待确认门（task-resolve）
+            self._json(t.resolve(body.get("id", "")))
+        elif cmd == "list_tasks":  # 目标式任务列表（task-status）
+            self._json({"tasks": t.list(body.get("state"))})
         else:
             self._json({"issues": t.list_issues()})
 
@@ -524,6 +549,14 @@ class _PostRoutesMixin:
             self._json(provider_mod.mask_and_rewrite(
                 body.get("text", ""), body.get("style", "tweet"),
                 provider=p, custom_words=custom))
+        elif body.get("action") == "ai-taste":
+            # writing-ai-taste：AI 味自检（评分+建议+自洽结论）
+            self._json(writing_mod.ai_taste(body.get("text", ""), style=body.get("style", "report")))
+        elif body.get("action") == "write-natural":
+            # writing-write-natural：风格改写 + AI味复检闭环
+            p = provider_mod.Provider.from_file()
+            self._json(writing_mod.write_natural(body.get("text", ""),
+                                                 style=body.get("style", "tweet"), provider=p))
         else:
             self._json(writing_mod.scan(body.get("text", "")))
 
@@ -555,6 +588,141 @@ class _PostRoutesMixin:
             self._json({"output": out})
         except Exception as e:
             self._json({"error": str(e)}, 500)
+
+    # ---- CLI→web 回归：本体导出/聚合问答/检索（onto-to-nt/onto-answer/onto-search）----
+    def _build_onto(self, rows, entity=None, id_col=None, industry=None):
+        """从 rows 建本体，注入行业 col_cn（对齐 cli._onto_build，使行业化列名问答可答）。"""
+        from solo.factory.ontology import Ontology
+        col_cn = {}
+        if industry:
+            from solo.factory import industry as ind_mod
+            cfg = ind_mod.load_industry(industry)
+            col_cn = dict(cfg.get("col_cn") or {})
+            if not entity and cfg.get("entity_cn"):
+                entity = cfg["entity_cn"]
+        o = Ontology(col_cn=col_cn)
+        o.from_rows(rows, entity_name=entity, id_col=id_col)
+        o.build()
+        return o
+
+    def _post_onto_nt(self, body):
+        rows = api.load_rows(body)
+        if not rows:
+            self._json({"error": "数据源无效或为空（CSV路径或数据库表）"}, 400)
+            return
+        o = self._build_onto(rows, body.get("entity"), body.get("id"), body.get("industry"))
+        self._json({"nt": o.to_nt(), "entities": list(o.entities.keys()), "triples": len(o.triples)})
+
+    def _post_onto_answer(self, body):
+        rows = api.load_rows(body)
+        if not rows:
+            self._json({"error": "数据源无效或为空（CSV路径或数据库表）"}, 400)
+            return
+        q = body.get("question", "")
+        if not q:
+            self._json({"error": "question 必填（如'有多少台设备'/'功率最大的设备'）"}, 400)
+            return
+        o = self._build_onto(rows, body.get("entity"), body.get("id"), body.get("industry"))
+        self._json({"question": q, "answers": o.answer(q, entity=body.get("entity"))})
+
+    def _post_onto_search(self, body):
+        rows = api.load_rows(body)
+        if not rows:
+            self._json({"error": "数据源无效或为空（CSV路径或数据库表）"}, 400)
+            return
+        term = body.get("term", "")
+        o = self._build_onto(rows, body.get("entity"), body.get("id"), body.get("industry"))
+        self._json({"term": term, "hits": o.search(term, top_k=body.get("top_k", 5))})
+
+    # ---- CLI→web 回归：交付辅助 FDE D0/D1/D4（draft-questions/lexicon-draft/report-draft/to-factory-lexicon/to-review-items）----
+    def _post_delivery(self, body):
+        act = body.get("action", "draft-questions")
+        ind = body.get("industry")
+        try:
+            from solo.factory.assist import (draft_questions, lexicon_draft,
+                                             report_draft, report_draft_dict,
+                                             to_factory_lexicon, to_review_items)
+            rows = api.load_rows(body)
+            if act in ("draft-questions", "lexicon-draft", "to-factory-lexicon", "to-review-items") and not rows:
+                self._json({"error": "数据源无效或为空（CSV路径或数据库表）"}, 400)
+                return
+            if act == "draft-questions":
+                qs = draft_questions(rows, body.get("entity"), limit=body.get("limit", 12), industry=ind)
+                out = {"questions": qs, "count": len(qs)}
+            elif act == "lexicon-draft":
+                headers = list(rows[0].keys()) if rows else []
+                lex = lexicon_draft(headers, rows[:30], industry=ind)
+                out = {"columns": len(lex), "draft": lex}
+            elif act == "report-draft":
+                if body.get("json"):
+                    out = report_draft_dict(kb=body.get("kb"), industry=ind, hit=body.get("hit", 0.0),
+                                            questions_n=body.get("questions", 0), hits=body.get("hits", 0),
+                                            asset_versions=body.get("asset_versions", 0))
+                else:
+                    md, ai = report_draft(kb=body.get("kb"), industry=ind, hit=body.get("hit", 0.0),
+                                          questions_n=body.get("questions", 0), hits=body.get("hits", 0),
+                                          asset_versions=body.get("asset_versions", 0), note=body.get("note", ""))
+                    out = {"report": md}
+                    if ai and ai.get("ok"):
+                        out["ai_taste"] = {"score": ai["ai_score"], "note": ai["note"],
+                                           "verdict": ai.get("verdict"),
+                                           "suggestions": ai["suggestions"][:6],
+                                           "hard_fails": ai["hard_fails"]}
+            elif act == "to-factory-lexicon":
+                headers = list(rows[0].keys()) if rows else []
+                d = lexicon_draft(headers, rows[:30], industry=ind)
+                out = to_factory_lexicon(d, table_name=body.get("table_name", "数据"),
+                                         entity_cn=body.get("entity_cn"), industry=ind)
+            elif act == "to-review-items":
+                headers = list(rows[0].keys()) if rows else []
+                d = lexicon_draft(headers, rows[:30], industry=ind)
+                items = to_review_items(d)
+                out = {"items": items, "count": len(items)}
+            else:
+                self._json({"error": f"unknown delivery action: {act}"}, 400)
+                return
+            if ind:
+                from solo.factory.industry import apply_industry
+                out["industry"] = apply_industry(ind)
+            self._json(out)
+        except ValueError as e:
+            self._json({"error": str(e)}, 400)
+
+    # ---- CLI→web 回归：行业联动（industry-list/industry-set/industry-current）----
+    def _post_industry(self, body):
+        from solo.factory.industry import rebuild_industry_artifacts, apply_industry, get_current_industry
+        act = body.get("action", "set")
+        if act == "set":
+            rows = None
+            if body.get("csv"):
+                rows = api.load_rows(body)
+            res = rebuild_industry_artifacts(industry=body.get("industry") or None, rows=rows,
+                                             out_dir=body.get("out_dir") or None,
+                                             questions_n=body.get("limit", 12))
+            res["current"] = get_current_industry() or "(默认工厂)"
+            if body.get("industry"):
+                res["apply"] = apply_industry(body.get("industry"))
+            self._json(res)
+            return
+        self._json({"current": get_current_industry() or "(默认工厂)", "apply": apply_industry()})
+
+    # ---- CLI→web 回归：OptMem 全局记忆 note（optmem-note）----
+    def _post_optmem_note(self, body):
+        from solo.memory import optmem_note
+        ok, msg = optmem_note(body.get("text", ""))
+        self._json({"ok": ok, "message": msg})
+
+    # ---- CLI→web 回归：代码审查（code-review，code_review.review_file 口径对齐）----
+    def _post_code_review_file(self, body):
+        from solo import code_review as cr
+        path = api.safe_path(body.get("file", ""))
+        if not path or not os.path.exists(path):
+            self._json({"error": "文件不存在或不在项目内"}, 400)
+            return
+        res = cr.review_file(path, max_complexity=int(body.get("max_complexity", 10)),
+                             strict_undefined=bool(body.get("strict_undefined", False)))
+        self._json({"file": res["file"], "score": res["static_score"],
+                    "issues": res["static_issues"]})
 
     # ---- 多表数据源加载 / schema 生成（多端点共用，降低 _post_ontology_multi 复杂度）----
     def _load_multi_tables(self, body):

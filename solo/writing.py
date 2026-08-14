@@ -232,6 +232,11 @@ def write_natural(text: str, style: str = "tweet", provider=None) -> dict:
         return {"ai_taste": report, "note": report.get("note", "未接入检查器")}
     r = rewrite(text, style, provider)  # 风格改写（本地模板/LLM）
     rewritten = r.get("rewritten") or ""
+    if not rewritten and provider is None:
+        # 无 provider：本地模式，直接返回原文 + 风格指导（对齐 web，避免 CLI 改写恒空）
+        r = dict(r, rewritten=text, rewritten_len=len(text),
+                 note="未配置 provider，返回原文+风格指导；配置 provider 后可自动改写")
+        rewritten = text
     recheck = ai_taste(rewritten, style) if rewritten else None
     return {
         "style": style,

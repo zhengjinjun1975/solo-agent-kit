@@ -126,7 +126,8 @@ class _EnterpriseMixin:
                 graph["nodes"][node_id] = {"entity": eid, "id": kid, "idx": i, "data": row}
                 node_ids.setdefault(eid, []).append(node_id)
 
-        # FK join 关系边
+        # FK join 关系边（去重：同一 from→to→rel 只保留一条，避免 traverse 重复边）
+        seen_edges = set()
         for r in relations:
             if not r.get("fk"):
                 continue
@@ -146,6 +147,10 @@ class _EnterpriseMixin:
                 src = f"{r['from']}:{src_key}"
                 for dst in fk_to_nodes.get(str(val), []):
                     if src in graph["nodes"] and dst in graph["nodes"]:
+                        key = (src, dst, r["id"])
+                        if key in seen_edges:
+                            continue
+                        seen_edges.add(key)
                         graph["edges"].append({"from": src, "to": dst, "rel": r["id"],
                                                "label": r.get("label", r["id"])})
         return graph

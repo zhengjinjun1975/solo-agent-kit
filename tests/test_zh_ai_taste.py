@@ -34,6 +34,15 @@ def test_write_natural_closed_loop():
     assert "rewrite" in out
 
 
+def test_write_natural_no_provider_returns_input_not_empty():
+    # P1 修复：不传 provider（CLI 场景）时 rewritten 不得恒空，应返回原文+建议
+    text = "在当今时代，随着科技的进步，我们赋能传统流程。"
+    out = w.write_natural(text, style="report", provider=None)
+    assert out["rewrite"]["rewritten"]  # 非空
+    assert out["rewrite"]["rewritten"] == text  # 返回输入原文
+    assert "hint" in out["rewrite"] or "note" in out["rewrite"]  # 带建议
+
+
 def test_ai_taste_degrades_gracefully(monkeypatch):
     # 模拟找不到检查器：改候选路径为空 → ok=False 不抛异常（zh_ai_taste 已并入 writing）
     import solo.writing as w

@@ -69,6 +69,8 @@ class SoloHandler(_GetRoutesMixin, _PostRoutesMixin, BaseHTTPRequestHandler):
         "/api/browse": "_get_browse",
         "/api/db-connect": "_get_db_connect",
         "/api/db-preview": "_get_db_preview",
+        "/api/industry": "_get_industry",
+        "/api/memory/optmem-search": "_get_optmem_search",
     }
     _POST_ROUTES = {
         "/api/config": "_post_config",
@@ -91,7 +93,14 @@ class SoloHandler(_GetRoutesMixin, _PostRoutesMixin, BaseHTTPRequestHandler):
         "/api/skill-add": "_post_skill_add",
         "/api/writing": "_post_writing",
         "/api/code-review": "_post_code_review",
+        "/api/code-review-file": "_post_code_review_file",
         "/api/gen": "_post_gen",
+        "/api/onto/nt": "_post_onto_nt",
+        "/api/onto/answer": "_post_onto_answer",
+        "/api/onto/search": "_post_onto_search",
+        "/api/delivery": "_post_delivery",
+        "/api/industry": "_post_industry",
+        "/api/memory/optmem-note": "_post_optmem_note",
     }
 
     def _json(self, data, code=200):

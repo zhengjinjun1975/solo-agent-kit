@@ -137,6 +137,99 @@ class TestOntologyAnswerAggregate:
 
 
 # ══════════════════════════════════════════════════════════════════════
+# P2-修复 极值词扩展（最高/最低/最贵/最便宜/最多/最少 等，非仅 大|小）
+# ══════════════════════════════════════════════════════════════════════
+class TestExtremeWordsExpanded:
+    ROWS = [
+        {"id": "1", "name": "车床A", "price": "100"},
+        {"id": "2", "name": "车床B", "price": "300"},
+        {"id": "3", "name": "车床C", "price": "200"},
+    ]
+
+    @pytest.fixture()
+    def ont(self):
+        from solo.factory.ontology import Ontology
+        o = Ontology()
+        o.from_rows(self.ROWS, entity_name="设备")
+        o.build()
+        return o
+
+    def test_extreme_max_high_expensive_many(self, ont):
+        # 最大
+        assert float(ont.answer("价格最大的设备")[0]["value"]) == 300.0
+        # 最高
+        r = ont.answer("价格最高的设备")[0]
+        assert r["extreme"] == "最高" and float(r["value"]) == 300.0
+        # 最贵
+        r = ont.answer("价格最贵的设备")[0]
+        assert r["extreme"] == "最贵" and float(r["value"]) == 300.0
+        # 最多
+        r = ont.answer("价格最多的设备")[0]
+        assert r["extreme"] == "最多" and float(r["value"]) == 300.0
+
+    def test_extreme_min_low_cheap_few(self, ont):
+        # 最小
+        assert float(ont.answer("价格最小的设备")[0]["value"]) == 100.0
+        # 最低
+        r = ont.answer("价格最低的设备")[0]
+        assert r["extreme"] == "最低" and float(r["value"]) == 100.0
+        # 最便宜
+        r = ont.answer("价格最便宜的设备")[0]
+        assert r["extreme"] == "最便宜" and float(r["value"]) == 100.0
+
+
+# ══════════════════════════════════════════════════════════════════════
+# P2-修复 列表问答无名称列时回退 id 列
+# ══════════════════════════════════════════════════════════════════════
+class TestListIdFallback:
+    def test_list_falls_back_to_id_when_no_name_col(self):
+        from solo.factory.ontology import Ontology
+        rows = [{"id": "1", "type": "车床"}, {"id": "2", "type": "铣床"}]
+        o = Ontology()
+        o.from_rows(rows, entity_name="设备")
+        o.build()
+        a = o.answer("有哪些设备")
+        assert a[0]["type"] == "list"
+        assert a[0]["column"] == "id"
+        assert set(a[0]["values"]) == {"1", "2"}
+
+
+# ══════════════════════════════════════════════════════════════════════
+# P3-修复 enterprise._build_graph 去重重复边（traverse 不再出重复边）
+# ══════════════════════════════════════════════════════════════════════
+class TestEnterpriseTraverseDedup:
+    SCHEMA = {
+        "entities": [
+            {"id": "sales", "table": "sales", "key": "id",
+             "attributes": [{"name": "id", "type": "integer"}, {"name": "product_id", "type": "integer"}]},
+            {"id": "product", "table": "product", "key": "id",
+             "attributes": [{"name": "id", "type": "integer"}, {"name": "name", "type": "string"}]},
+        ],
+        "relations": [
+            {"id": "sells", "from": "sales", "to": "product", "fk": "sales.product_id", "label": "售出"},
+        ],
+    }
+    DATA = {
+        # product_id P1 重复出现两次（同 id 多行）→ 本应只产生一条 sales→product 边
+        "sales": [{"id": 1, "product_id": "P1"}, {"id": 2, "product_id": "P1"}],
+        "product": [{"id": "P1", "name": "A"}, {"id": "P1", "name": "A"}],
+    }
+
+    def test_graph_edges_dedup(self):
+        from solo.factory.ontology import Ontology
+        o = Ontology()
+        model = o.from_schema(self.SCHEMA, self.DATA)
+        edges = model["graph"]["edges"]
+        keys = {(e["from"], e["to"], e["rel"]) for e in edges}
+        # 去重后：边数 == 去重键数（无重复边）
+        assert len(edges) == len(keys)
+        # sales:P1 实例能遍历到 product:P1，且每条边唯一
+        out = o.traverse("sales", 1)
+        tos = [x["to"] for x in out]
+        assert tos.count("product:P1") == 1
+
+
+# ══════════════════════════════════════════════════════════════════════
 # P2-6 industry-set 接线 review 队列
 # ══════════════════════════════════════════════════════════════════════
 class TestIndustryReviewWiring:

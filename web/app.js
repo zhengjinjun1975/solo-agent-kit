@@ -184,7 +184,7 @@ async function selectDataSource(cap, ex){
 
 // ===== 工作区切换：导航点击在右侧渲染对应工作区 =====
 function showWorkspace(ws){
-  ['status','clean','stats','ontology','decisions','writing','code','skill','config','setup','monitor','logs','remote','issue','site-panel'].forEach(id=>{
+  ['status','clean','stats','ontology','decisions','writing','code','skill','config','setup','monitor','logs','remote','issue','site-panel','task','memory','delivery'].forEach(id=>{
     const el=document.getElementById('ws-'+id);
     if(el) el.style.display = (id===ws)?'block':'none';
   });
@@ -226,7 +226,7 @@ document.querySelectorAll('.ni').forEach(n=>n.addEventListener('click',()=>{
   // 非写作能力 → 移除 Canvas 模式（回到三栏对话布局）
   document.querySelector('.app').classList.remove('writing');
   // 数据模块 + 工作区 → 右侧面板
-  if(['clean','stats','ontology','decisions','code','skill','config','setup','monitor','logs','remote','issue','site-panel'].includes(cap)){
+  if(['clean','stats','ontology','decisions','code','skill','config','setup','monitor','logs','remote','issue','site-panel','task','memory','delivery'].includes(cap)){
     showWorkspace(cap);
     // 数据工作区：恢复已选文件显示（不自动执行）
     if(['clean','stats','ontology','decisions'].includes(cap)){
@@ -1033,3 +1033,167 @@ async function runIssueList(){
   </div>`).join(''):'<div style="color:var(--green)">✅ 无未关闭工单</div>';
 }
 
+
+
+
+// ===== CLI→web 回归：任务控制面（task-new/gate/resolve/status）=====
+async function runTaskNew(){
+  const out=document.getElementById('task-result');
+  const goal=document.getElementById('tk-goal').value.trim();
+  if(!goal){out.innerHTML='⚠️ 请输入任务目标';return;}
+  out.innerHTML='⏳ 创建中…';
+  const res=await api('/api/task',{method:'POST',body:JSON.stringify({cmd:'new',goal})});
+  if(res.error){out.innerHTML='❌ '+res.error;return;}
+  out.innerHTML=`✅ 已创建任务 <b>${esc(res.id)}</b>，状态 ${res.state}`;
+  if(res.id) document.getElementById('tk-id').value=res.id;
+}
+async function runTaskList(){
+  const out=document.getElementById('task-result');
+  out.innerHTML='⏳ 加载中…';
+  const res=await api('/api/task',{method:'POST',body:JSON.stringify({cmd:'list_tasks'})});
+  const ts=res.tasks||[];
+  out.innerHTML=ts.length?ts.map(t=>`<div style="padding:5px 0;border-bottom:1px solid var(--border)"><b>${esc(t.id)}</b> <span style="color:var(--mute)">${esc(t.goal||'')}</span> <span style="color:var(--blue)">[${esc(t.state)}]</span></div>`).join(''):'<div style="color:var(--mute)">暂无任务</div>';
+}
+async function runTaskStatus(){
+  const out=document.getElementById('task-result');
+  const id=document.getElementById('tk-id').value.trim();
+  if(!id){out.innerHTML='⚠️ 请输入任务 id';return;}
+  const res=await api('/api/task',{method:'POST',body:JSON.stringify({cmd:'status',id})});
+  out.innerHTML=`<pre style="font-size:11px;white-space:pre-wrap;margin:0">${pretty(res)}</pre>`;
+}
+async function runTaskGate(){
+  const out=document.getElementById('task-result');
+  const id=document.getElementById('tk-id').value.trim(), q=document.getElementById('tk-gate-q').value.trim();
+  if(!id||!q){out.innerHTML='⚠️ 请输入任务 id 与决策门问题';return;}
+  const res=await api('/api/task',{method:'POST',body:JSON.stringify({cmd:'gate',id,question:q})});
+  out.innerHTML=res.error?('❌ '+res.error):`🚪 已设决策门「${esc(res.gate)}」，状态 ${res.state}`;
+}
+async function runTaskResolve(){
+  const out=document.getElementById('task-result');
+  const id=document.getElementById('tk-id').value.trim();
+  if(!id){out.innerHTML='⚠️ 请输入任务 id';return;}
+  const res=await api('/api/task',{method:'POST',body:JSON.stringify({cmd:'resolve_task',id})});
+  out.innerHTML=res.error?('❌ '+res.error):`✅ 已解决待确认门，状态 ${res.state}`;
+}
+
+// ===== CLI→web 回归：记忆（温域 note/search + OptMem note/search）=====
+async function runMemNote(kind){
+  const out=document.getElementById('mem-result');
+  const text=document.getElementById('mem-note').value.trim();
+  if(!text){out.innerHTML='⚠️ 请输入要记录的内容';return;}
+  out.innerHTML='⏳ 记录中…';
+  const res = kind==='optmem'
+    ? await api('/api/memory/optmem-note',{method:'POST',body:JSON.stringify({text})})
+    : await api('/api/memory-add',{method:'POST',body:JSON.stringify({text})});
+  out.innerHTML=res.error?('❌ '+res.error):`✅ 已记录（${kind==='optmem'?'OptMem 全局':res.message||'温域记忆'}）`;
+}
+async function runMemSearch(kind){
+  const out=document.getElementById('mem-result');
+  const q=document.getElementById('mem-q').value.trim();
+  if(!q){out.innerHTML='⚠️ 请输入检索关键词';return;}
+  out.innerHTML='⏳ 检索中…';
+  const res = kind==='optmem'
+    ? await api('/api/memory/optmem-search?q='+encodeURIComponent(q))
+    : await api('/api/memory-search?q='+encodeURIComponent(q));
+  const hits = kind==='optmem' ? (res.hits||[]) : (res.results||[]);
+  if(res.error){out.innerHTML='❌ '+res.error;return;}
+  out.innerHTML=hits.length
+    ? `<b>${kind==='optmem'?'🌍 OptMem':'🔍 温域'} 检索「${esc(q)}」命中 ${hits.length} 条：</b>`+hits.map(h=>
+        `<div style="padding:5px 0;border-bottom:1px solid var(--border);font-size:11px">${esc(typeof h==='string'?h:(h.text||h))}</div>`).join('')
+    : '<div style="color:var(--mute)">无匹配记忆</div>';
+}
+
+// ===== CLI→web 回归：交付辅助（draft-questions/lexicon/report/to-factory-lexicon/to-review-items + 行业联动）=====
+async function runDelivery(act){
+  const out=document.getElementById('delivery-result');
+  const ind=document.getElementById('dl-ind').value.trim()||null;
+  const sources=dsSelected['delivery']||'';
+  const csv=sources.split(';')[0];
+  out.innerHTML='⏳ 生成中…';
+  let body={action:act, industry:ind};
+  if(['draft-questions','lexicon-draft','to-factory-lexicon','to-review-items'].includes(act)){
+    if(!csv){out.innerHTML='⚠️ 请先选择数据文件';return;}
+    body.csv=csv;
+  }else{ // report-draft
+    body.hit=parseFloat(document.getElementById('dl-hit').value)||0;
+    body.questions=parseInt(document.getElementById('dl-qn').value)||0;
+    body.hits=parseInt(document.getElementById('dl-hits').value)||0;
+    body.asset_versions=parseInt(document.getElementById('dl-av').value)||0;
+  }
+  const res=await api('/api/delivery',{method:'POST',body:JSON.stringify(body)});
+  if(res.error){out.innerHTML='❌ '+res.error;return;}
+  let txt='';
+  if(act==='draft-questions') txt=(res.questions||[]).map(q=>`· ${q}`).join('\n');
+  else if(act==='lexicon-draft') txt=(res.draft?Object.entries(res.draft).map(([c,d])=>`${c} → ${d.cn||''} (${d.type||''})`):[]).join('\n');
+  else if(act==='report-draft') txt=res.report||'';
+  else if(act==='to-factory-lexicon') txt=JSON.stringify(res,null,2);
+  else if(act==='to-review-items') txt=(res.items||[]).map(i=>`· ${Array.isArray(i)?i.join(' | '):JSON.stringify(i)}`).join('\n');
+  out.innerHTML=(ind?`行业：<b>${esc(res.industry?.industry||ind)}</b>\n`:'')+txt;
+}
+async function runIndustryState(){
+  const out=document.getElementById('delivery-result');
+  out.innerHTML='⏳ 加载中…';
+  const res=await api('/api/industry');
+  out.innerHTML=`当前行业：<b>${esc(res.current||'')}</b>\n已登记：${(res.industries||[]).map(i=>esc(i.industry||'')).join('、')||'—'}`;
+}
+
+// ===== CLI→web 回归：本体问答/检索/NT 导出 =====
+function ontoSource(){
+  const s=dsSelected['ontology']||'examples/data/factory_equipment.csv';
+  return s.split(';')[0];
+}
+async function runOntoAnswer(){
+  const out=document.getElementById('onto-qa');
+  const q=document.getElementById('onto-q').value.trim();
+  if(!q){out.innerHTML='⚠️ 请输入问题';return;}
+  out.innerHTML='⏳ 问答中…';
+  const res=await api('/api/onto/answer',{method:'POST',body:JSON.stringify({csv:ontoSource(),question:q,entity:'设备',id:'id'})});
+  if(res.error){out.innerHTML='❌ '+res.error;return;}
+  out.innerHTML=`<b>Q：${esc(res.question)}</b><br>`+(res.answers||[]).map(a=>`<div style="margin-top:4px">${esc(JSON.stringify(a))}</div>`).join('');
+}
+async function runOntoSearch(){
+  const out=document.getElementById('onto-qa');
+  const q=document.getElementById('onto-q').value.trim();
+  if(!q){out.innerHTML='⚠️ 请输入检索词';return;}
+  out.innerHTML='⏳ 检索中…';
+  const res=await api('/api/onto/search',{method:'POST',body:JSON.stringify({csv:ontoSource(),term:q,entity:'设备',id:'id',top_k:8})});
+  if(res.error){out.innerHTML='❌ '+res.error;return;}
+  out.innerHTML=`<b>🔍 「${esc(res.term)}」命中 ${(res.hits||[]).length} 条：</b>`+(res.hits||[]).map(h=>`<div style="font-size:11px;margin-top:3px">${esc(h.join(' → '))}</div>`).join('');
+}
+async function runOntoNt(){
+  const out=document.getElementById('onto-qa');
+  out.innerHTML='⏳ 导出中…';
+  const res=await api('/api/onto/nt',{method:'POST',body:JSON.stringify({csv:ontoSource(),entity:'设备',id:'id'})});
+  if(res.error){out.innerHTML='❌ '+res.error;return;}
+  out.innerHTML=`🧾 ${res.entities.length} 实体，${res.triples} 三元组。<pre style="font-size:10px;white-space:pre-wrap;max-height:180px;overflow:auto;margin-top:6px">${esc((res.nt||'').slice(0,800))}${(res.nt||'').length>800?'\n…':''}</pre>`;
+}
+
+// ===== CLI→web 回归：代码审查（code_review.review_file 口径）=====
+async function runCodeReview(){
+  const out=document.getElementById('cr-result');
+  const file=document.getElementById('cr-file').value.trim();
+  if(!file){out.innerHTML='⚠️ 请输入待审文件路径';return;}
+  out.innerHTML='⏳ 审查中…';
+  const res=await api('/api/code-review-file',{method:'POST',body:JSON.stringify({file,max_complexity:20})});
+  if(res.error){out.innerHTML='❌ '+res.error;return;}
+  out.innerHTML=`${res.score>=85?'✅':res.score>=60?'⚠️':'🔴'} 静态评分 <b>${res.score}</b>/100，${(res.issues||[]).length} 项问题\n`+(res.issues||[]).map(i=>`[${i.severity}] ${i.title}${i.line?` (L${i.line})`:''}`).join('\n')+'';
+}
+
+// ===== 写作：AI 味自检（writing-ai-taste，评分+建议+自洽结论）=====
+async function wcAiTaste(){
+  const text=document.getElementById('wc-edit').value.trim();
+  const out=document.getElementById('wr-result');
+  if(!text){out.innerHTML='<div class="wc-check-card">⚠️ 请先写内容</div>';return;}
+  out.innerHTML='<div class="wc-check-card">⏳ AI味自检中…</div>';
+  const res=await api('/api/writing',{method:'POST',body:JSON.stringify({text,action:'ai-taste',style:wcStyle})});
+  const score=res.ai_score;
+  const level = score===null?'—':(score>=80?'自然':score>=60?'略AI腔':'AI腔明显');
+  const col = score===null?'var(--mute)':(score>=80?'var(--green)':score>=60?'var(--orange)':'var(--red)');
+  out.innerHTML=`<div class="wc-check-card">
+    <div class="c-title" style="color:${col}">🤖 AI味分：<b>${score}</b>/100（${level}）</div>
+    <div style="margin-top:4px">${esc(res.verdict||res.note||'')}</div>
+    ${res.hard_fails?`<div style="margin-top:6px;color:var(--red)">⚠️ L1 必改 ${res.hard_fails} 项</div>`:''}
+    ${res.suggestions&&res.suggestions.length?`<div style="margin-top:8px"><b>可执行建议：</b>${res.suggestions.slice(0,8).map(s=>`<div style="font-size:11px;margin-top:3px">· ${esc(s)}</div>`).join('')}</div>`:''}
+    ${res.issues&&res.issues.length?`<div style="margin-top:8px"><b>命中问题：</b>${res.issues.slice(0,8).map(i=>`<div style="font-size:11px;margin-top:3px;color:${i.severity==='fail'?'var(--red)':'var(--orange)'}">[${i.layer}] ${esc(i.type)}${i.count>1?'×'+i.count:''}</div>`).join('')}</div>`:''}
+  </div>`;
+}
