@@ -94,3 +94,32 @@ def ontology_report(entities: list, relations: list, path: str = None) -> dict:
     wb.save(out)
     return {"ok": True, "path": out.replace("\\", "/"),
             "entities": len(entities), "relations": len(relations)}
+
+
+def acceptance_report(items: list, title: str = "验收清单", path: str = None) -> dict:
+    """验收清单/签收单（survey 模块验收阶段导出）。
+
+    items: [{aid, rid, title, clause, result, evidence}, ...]
+    title: sheet 名（默认"验收清单"）
+    自动统计通过/未通过/待验收 行数写入表尾。
+    """
+    _require_xlsx()
+    wb = Workbook()
+    ws = wb.active
+    ws.title = title[:31] or "验收清单"
+    headers = ["验收编号", "需求编号", "需求标题", "验收条款", "结果", "证据"]
+    ws.append(headers)
+    for it in items or []:
+        ws.append([it.get("aid"), it.get("rid"), it.get("title"),
+                   it.get("clause"), it.get("result"), it.get("evidence")])
+    # 表尾统计
+    cnt = {}
+    for it in items or []:
+        cnt[it.get("result")] = cnt.get(it.get("result"), 0) + 1
+    ws.append([])
+    ws.append(["统计", f"共 {len(items or [])} 条",
+               f"通过 {cnt.get('通过', 0)} / 未通过 {cnt.get('未通过', 0)}"
+               f" / 待验收 {cnt.get('待验收', 0)}"])
+    out = path or os.path.join(_out_dir(), "acceptance_report.xlsx")
+    wb.save(out)
+    return {"ok": True, "path": out.replace("\\", "/"), "rows": len(items or [])}

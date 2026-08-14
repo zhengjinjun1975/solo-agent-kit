@@ -14,3 +14,4 @@
 from solo.factory import clean  # noqa: F401
 from solo.factory import stats  # noqa: F401
 from solo.factory import ontology  # noqa: F401
+from solo.factory import survey  # noqa: F401
