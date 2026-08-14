@@ -106,6 +106,17 @@ solo factory-stats <data.csv>      # 数据分析（描述/趋势/SPC，自动�
 solo factory-onto <data.csv>       # 工厂本体建模
 ```
 
+### 设备监测 P0（借鉴 DataBuff「指标→存储→告警→AI问数」骨架，零依赖）
+
+```bash
+solo monitor-demo --rounds 12 --temp-high 80.0   # 端到端演示：设备数据→告警→工单→AI问数
+solo monitor-ask "哪台设备温度过高"              # AI问数（自然语言查设备/告警/工单）
+solo monitor-ingest d1 temperature 95.0          # 接入一条设备指标（自动评估告警→建工单）
+```
+
+- 统一指标存储（`device_metric` 时序 + 分钟预聚合）、告警引擎（阈值 + 突变检测 + 恢复自动关闭）、工单状态机（open→in_progress→done）、MQTT 接入抽象、AI 问数。
+- 详见 `docs/databuff-P0-设备监测清单.md`。
+
 ## 真实场景示例
 
 `examples/` 演示一人公司加 FDE 的真实场景，零依赖跑通：
@@ -148,6 +159,7 @@ python examples/example_04_factory_ontology.py
 | `assist.py` | FDE 交付辅助 | 问题集/词典/工厂契约/审查队列/报告起草 |
 | `industry.py` | 行业→kb 联动 | 改行业自动重建全部 FDE 产物 |
 | `quote.py`/`train.py`/`support.py` | 报价/培训/工单运维 | FDE 全域交付能力 |
+| `monitor.py` | 设备数据监测 P0 | 指标存储/告警引擎/工单状态机/MQTT接入/AI问数（借鉴 DataBuff 骨架） |
 
 **插件**（`solo/plugins/`，可降级）：
 

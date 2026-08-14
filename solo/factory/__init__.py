@@ -24,3 +24,4 @@ from solo.factory import diagram  # noqa: F401
 from solo.factory import quote  # noqa: F401
 from solo.factory import train  # noqa: F401
 from solo.factory import support  # noqa: F401
+from solo.factory import monitor  # noqa: F401

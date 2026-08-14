@@ -224,6 +224,17 @@ def _add_memory_ontology_parsers(sub):
     p_tri.add_argument("csv")
     p_tri.add_argument("--industry", help="行业名(联动列名中文映射)")
 
+    # ---- 设备监测 P0（借鉴 DataBuff 骨架）----
+    p_md = sub.add_parser("monitor-demo", help="设备监测端到端演示（数据→告警→工单→AI问数）")
+    p_md.add_argument("--rounds", type=int, default=12, help="模拟采集轮数")
+    p_md.add_argument("--temp-high", type=float, default=80.0, help="温度告警阈值")
+    p_ma = sub.add_parser("monitor-ask", help="AI问数：自然语言查设备/告警/工单")
+    p_ma.add_argument("question", help="自然语言问题，如：哪台设备温度过高")
+    p_mi = sub.add_parser("monitor-ingest", help="接入一条设备指标(dev metric value)")
+    p_mi.add_argument("device_id", help="设备名，如 d1")
+    p_mi.add_argument("metric", help="指标名，如 temperature")
+    p_mi.add_argument("value", type=float, help="指标值")
+
 
 def main(argv=None):
     argv = argv if argv is not None else sys.argv[1:]
@@ -293,6 +304,9 @@ _HANDLERS = {
     "onto-search": lambda a: _onto_search(a),
     "to-factory-lexicon": lambda a: _assist_to_factory_lexicon(a),
     "to-review-items": lambda a: _assist_to_review_items(a),
+    "monitor-demo": lambda a: _h_monitor_demo(a),
+    "monitor-ask": lambda a: _h_monitor_ask(a),
+    "monitor-ingest": lambda a: _h_monitor_ingest(a),
 }
 
 
@@ -613,6 +627,35 @@ def _onto_search(args):
     if err:
         return err
     return {"term": args.term, "hits": o.search(args.term, top_k=args.top_k)}
+
+
+# ─── 设备监测 P0（借鉴 DataBuff 骨架：指标→存储→告警→工单→AI问数）───
+def _h_monitor_demo(args):
+    """设备监测端到端演示：模拟数据 → 存储 → 告警评估 → 触发工单 → AI问数。"""
+    from solo.factory.monitor import run_demo
+    r = run_demo(rounds=args.rounds, temp_high=args.temp_high)
+    return {"metrics": r["metrics"],
+            "firing_alerts": r["firing_alerts"],
+            "total_alerts": r["total_alerts"],
+            "tickets": r["tickets"],
+            "q_high_temp": r["q_high_temp"]["answer"],
+            "q_alerts": r["q_alerts"]["answer"],
+            "q_max_temp": r["q_max_temp"]["answer"]}
+
+
+def _h_monitor_ask(args):
+    """AI问数：自然语言查设备/告警/工单（确定性路由，先查库再回答）。"""
+    from solo.factory.monitor import MonitorAsk
+    return MonitorAsk().ask(args.question)
+
+
+def _h_monitor_ingest(args):
+    """接入一条设备指标：写入存储并评估告警（自动触发工单）。"""
+    from solo.factory.monitor import Source
+    s = Source(auto_ticket=True)
+    r = s.feed(args.device_id, args.metric, args.value)
+    return {"ingested": args.device_id + "." + args.metric + "=" + str(args.value),
+            "alerts": r["alerts"], "tickets": r["tickets"]}
 
 
 if __name__ == "__main__":
