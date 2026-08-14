@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """solo.factory — 工厂现场套件（与个人套件分离）。
 
-给工厂级 FDE 的现场数据处理套件：数据审视 / 建模 / 需求验收 / 现场运维 / 图件。
+给工厂级 FDE 的现场数据处理套件：数据审视 / 建模 / 需求验收 / 现场运维 / 图件
++ FDE 全域能力（商务报价 quote / 培训材料 train / 工单运维 support）。
 零依赖，标准库实现。
 
     from solo.factory import data, ontology, survey, ops, diagram
@@ -20,3 +21,6 @@ from solo.factory import ontology  # noqa: F401
 from solo.factory import survey  # noqa: F401
 from solo.factory import ops  # noqa: F401
 from solo.factory import diagram  # noqa: F401
+from solo.factory import quote  # noqa: F401
+from solo.factory import train  # noqa: F401
+from solo.factory import support  # noqa: F401

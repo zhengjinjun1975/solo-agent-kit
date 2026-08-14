@@ -123,3 +123,47 @@ def acceptance_report(items: list, title: str = "验收清单", path: str = None
     out = path or os.path.join(_out_dir(), "acceptance_report.xlsx")
     wb.save(out)
     return {"ok": True, "path": out.replace("\\", "/"), "rows": len(items or [])}
+
+
+def quote_report(quote: dict, path: str = None) -> dict:
+    """报价单导出（quote 模块商务报价用）。明细 + 汇总 + 条款 三个 sheet。
+
+    quote: build_quote 输出（含 lines/totals/terms/effort）。
+    path: 输出路径，None 用 ~/.solo/reports/quote_<project>.xlsx
+    """
+    _require_xlsx()
+    wb = Workbook()
+    # 明细
+    ws = wb.active
+    ws.title = "报价明细"
+    ws.append(["项目", "范围"])
+    ws.append([quote.get("project"), quote.get("scope")])
+    ws.append([])
+    headers = ["报价项", "人天", "单价", "金额"]
+    ws.append(headers)
+    for ln in quote.get("lines", []):
+        ws.append([ln.get("item"), ln.get("days"), ln.get("unit_price"), ln.get("amount")])
+    ws.append([])
+    ws.append(["小计", "", "", quote["totals"]["subtotal"]])
+    ws.append(["税费", "", "", quote["totals"]["tax"]])
+    ws.append(["含税总额", "", "", quote["totals"]["total"]])
+    # 汇总
+    ws2 = wb.create_sheet("汇总")
+    ws2.append(["项目", quote.get("project")])
+    ws2.append(["范围", quote.get("scope")])
+    ws2.append(["总人天", quote["totals"]["days"]])
+    ws2.append(["质量分", quote["effort"]["quality"]])
+    ws2.append(["质量档位", quote["effort"]["quality_level"]])
+    ws2.append(["复杂度", quote["effort"]["complexity"]])
+    ws2.append(["报价时间", quote.get("quoted_at")])
+    # 条款
+    ws3 = wb.create_sheet("条款")
+    ws3.append(["条款", "内容"])
+    for k, v in quote.get("terms", {}).items():
+        ws3.append([k, v])
+    proj = str(quote.get("project", "quote"))
+    safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in proj)[:30] or "quote"
+    out = path or os.path.join(_out_dir(), f"quote_{safe}.xlsx")
+    wb.save(out)
+    return {"ok": True, "path": out.replace("\\", "/"),
+            "total": quote["totals"]["total"], "lines": len(quote.get("lines", []))}
