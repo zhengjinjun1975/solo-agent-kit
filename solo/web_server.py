@@ -230,8 +230,9 @@ class SoloHandler(BaseHTTPRequestHandler):
                 from solo import data_connector as dc
                 src = {"type": "device", "device": body.get("device", ""),
                        "remote_path": body.get("remote_path", ""),
-                       "path_type": body.get("path_type", "csv")}
-                rows = dc.connect(src, limit=body.get("limit", 10))
+                       "path_type": body.get("path_type", "csv"),
+                       "limit": body.get("limit", 10)}
+                rows = dc.connect(src)
                 self._json({"rows": rows[:body.get("limit", 10)], "count": len(rows)})
             except Exception as e:
                 self._json({"error": str(e)}, 500)
