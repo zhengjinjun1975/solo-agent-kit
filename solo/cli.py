@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """cli.py — solo 命令入口（agent-first，JSON out + 分级退出码）。
 
+薄壳化：只做 argparse 解析 + 一行调 app 门面（业务逻辑下沉 solo/app.py）。
 命令：
     solo init                   初始化记忆库
     solo run "<任务>"            走方法论（记忆装载→推理→行动→记忆提交）
@@ -24,9 +25,7 @@ import sys
 from solo import __version__
 from solo import memory as memory_mod
 from solo import provider as provider_mod
-from solo.factory import clean as clean_mod
-from solo.factory import stats as stats_mod
-from solo.factory import ontology as ontology_mod
+from solo import app as app_mod
 
 
 def main(argv=None):
@@ -130,6 +129,12 @@ def main(argv=None):
         return provider_mod.EXIT_OTHER
 
 
+def _load_rows_csv(csv_path):
+    import csv
+    with open(csv_path, encoding="utf-8-sig") as f:
+        return list(csv.DictReader(f))
+
+
 def _dispatch(args):
     cmd = args.cmd
     if cmd == "version":
@@ -139,9 +144,9 @@ def _dispatch(args):
         m.set_profile("created", _now())
         return {"init": True, "mem_dir": m.dir}
     if cmd == "setup":
-        return _setup()
+        return app_mod.check_environment()
     if cmd == "config":
-        return _config()
+        return app_mod.config_view()
     if cmd == "import-obsidian":
         m = memory_mod.Memory()
         return {"imported": m.import_markdown(args.dir)}
@@ -153,13 +158,15 @@ def _dispatch(args):
         m = memory_mod.Memory()
         return {"added": m.add_fact(args.exp, tags=["skill"])}
     if cmd == "run":
-        return _run(args.task, args.tier)
+        from solo import agent as agent_mod
+        return agent_mod.run(args.task, tier=args.tier)
     if cmd == "factory-clean":
-        return _factory_clean(args)
+        return app_mod.data_clean(_load_rows_csv(args.csv), method=args.method, outlier=args.outlier)
     if cmd == "factory-stats":
-        return _factory_stats(args)
+        return app_mod.data_stats(_load_rows_csv(args.csv), col=args.col)
     if cmd == "factory-onto":
-        return _factory_onto(args)
+        return app_mod.build_ontology(_load_rows_csv(args.csv), entity=args.entity,
+                                      id_col=args.id_col, relations=args.relations)
     if cmd == "draft-questions":
         return _assist_draft_questions(args)
     if cmd == "lexicon-draft":
@@ -234,126 +241,9 @@ def _restore(src: str) -> dict:
     return {"restored": restored, "from": src}
 
 
-def _run(task: str, tier: str = "auto"):
-    """循环五态：记忆装载 → skill 注入 → 推理 → 记忆提交。"""
-    from solo import agent as agent_mod
-    return agent_mod.run(task, tier=tier)
-
-
-def _setup():
-    """部署检查：环境 / 本地模型 / 配置 / 初始化。"""
-    import subprocess
-    checks = {}
-    # 1. Python 版本
-    checks["python"] = {"ok": sys.version_info >= (3, 9), "version": f"{sys.version_info.major}.{sys.version_info.minor}"}
-    # 2. 本地 Ollama
-    try:
-        import urllib.request
-        with urllib.request.urlopen("http://127.0.0.1:11434/api/tags", timeout=3) as r:
-            models = [m.get("name", "") for m in json.load(r).get("models", [])]
-        checks["ollama"] = {"ok": True, "models": models[:5]}
-    except Exception:
-        checks["ollama"] = {"ok": False, "error": "本地 Ollama 未运行（记忆语义检索需要）"}
-    # 3. 配置
-    cfg = provider_mod.load_config()
-    checks["config"] = {"ok": bool(cfg), "has_model_config": bool(cfg)}
-    # 4. 记忆库
-    m = memory_mod.Memory()
-    checks["memory"] = {"ok": True, "dir": m.dir, "facts": len(m._load(m._facts_path, []))}
-    return {"checks": checks,
-            "all_ok": all(c.get("ok", True) for c in checks.values())}
-
-
-def _config():
-    """查看/校验 provider.yaml 配置（脱敏显示）。"""
-    cfg = provider_mod.load_config()
-    if not cfg:
-        return {"configured": False,
-                "hint": "未找到 provider.yaml。复制 provider.yaml.example 为 provider.yaml 并填写。"}
-    p = cfg.get("provider", {})
-    out = {"configured": True}
-    for k in ("local", "remote", "embed"):
-        item = p.get(k, {})
-        clean_item = dict(item)
-        if "api_key_env" in clean_item:  # 只显示 env 名，不显示 key
-            clean_item["api_key_env"] = clean_item["api_key_env"] + " (从环境变量读)"
-        out[k] = clean_item
-    return out
-
-
-def _factory_clean(args):
-    """工厂数据清洗。"""
-    cl = clean_mod.DataCleaner()
-    rows = cl.load_csv(args.csv)
-    out = cl.clean(rows, fill_missing=args.method, outlier_method=args.outlier)
-    return {"input": len(rows), "output": len(out), "report": cl.report}
-
-
-def _factory_stats(args):
-    """工厂数据分析。"""
-    cl = clean_mod.DataCleaner()
-    rows = cl.load_csv(args.csv)
-    col = args.col
-    if not col:  # 自动选第一个数值列
-        types = {}
-        for c in rows[0].keys():
-            if rows[0].get(c, "").strip():
-                types[c] = cl.report.get("types", {}).get(c) or "text"
-        col = next((c for c, t in types.items() if t in ("integer", "float")), None)
-    if not col:
-        return {"error": "未找到数值列，用 --col 指定"}
-    values = [float(r[col]) for r in rows if r.get(col, "").strip() and _num(r.get(col))]
-    return {
-        "column": col,
-        "describe": stats_mod.describe(values),
-        "anomalies": stats_mod.detect_anomaly(values, method="iqr"),
-        "control_chart": stats_mod.control_chart(values),
-        "trend": stats_mod.trend(values),
-    }
-
-
-def _factory_onto(args):
-    """工厂本体建模。"""
-    o = ontology_mod.Ontology()
-    relations = None
-    if args.relations:
-        with open(args.relations, encoding="utf-8") as f:
-            relations = json.load(f)
-        # 兼容多种结构：
-        #   {列: {rel,target_class,label}}                          直接对象属性
-        #   {实体名: {object_properties: {...}}}                   多实体关系配置
-        #   {object_properties: {...}}                             单实体配置
-        if isinstance(relations, dict):
-            if "object_properties" in relations:
-                relations = relations["object_properties"]
-            elif relations and all(isinstance(v, dict) and "object_properties" in v
-                                   for v in relations.values() if isinstance(v, dict)):
-                # 取匹配实体名的那份；若 args.entity 不在 relations 键里则用第一个
-                ent = args.entity if (args.entity and args.entity in relations) else next(iter(relations))
-                relations = relations[ent].get("object_properties", relations[ent])
-    o.from_csv(args.csv, entity_name=args.entity, id_col=args.id_col, relations=relations)
-    o.build()
-    return {"entities": list(o.entities.keys()), "triples": len(o.triples),
-            "summary": o.entity_summary()}
-
-
-def _num(v):
-    try:
-        float(v)
-        return True
-    except (ValueError, TypeError):
-        return False
-
-
 def _now():
     import datetime
     return datetime.datetime.now().isoformat(timespec="seconds")
-
-
-def _load_rows_csv(csv_path):
-    import csv
-    with open(csv_path, encoding="utf-8-sig") as f:
-        return list(csv.DictReader(f))
 
 
 def _assist_draft_questions(args):
@@ -387,16 +277,13 @@ def _assist_lexicon_draft(args):
 
 
 def _assist_report_draft(args):
-    """起草交付报告(FDE D4)。--json 输出结构化 dict(对齐闭源 deliver, 供闭源消费)。
-    行业联动：--kb 缺省时按 --industry 自动解析；--industry 缺省时用默认实体名。"""
+    """起草交付报告(FDE D4)。--json 输出结构化 dict(对齐闭源 deliver, 供闭源消费)。"""
     from solo.factory.assist import report_draft, report_draft_dict
-    from solo import writing as _w
     ind = getattr(args, "industry", None)
     if getattr(args, "json", False):
-        d = report_draft_dict(kb=args.kb, industry=ind, hit=args.hit,
-                              questions_n=args.questions, hits=args.hits,
-                              asset_versions=args.asset_versions)
-        return d
+        return report_draft_dict(kb=args.kb, industry=ind, hit=args.hit,
+                                  questions_n=args.questions, hits=args.hits,
+                                  asset_versions=args.asset_versions)
     md, ai = report_draft(kb=args.kb, industry=ind, hit=args.hit,
                           questions_n=args.questions, hits=args.hits,
                           asset_versions=args.asset_versions, note=args.note)
@@ -415,13 +302,7 @@ def _industry_list():
 
 
 def _industry_set(args):
-    """改行业事件驱动：设置当前行业 + 自动重建 FDE 产物（问题集/词典/报告/决策）。
-
-    镜像 factory-ontology 的"改行业→自动建模"：industry-set <行业> [csv] 一步完成
-    ①持久化当前行业 ②重建 D0问题集/D1词典(工厂lexicon)/D4报告/决策阈值。
-    给出 csv 才重建问题集/词典（需要数据）；不给则只重建报告/阈值。
-    之后任何省略 --industry 的 draft-questions/lexicon-draft/report-draft/决策都自动跟随新行业。
-    """
+    """改行业事件驱动：设置当前行业 + 自动重建 FDE 产物（问题集/词典/报告/决策）。"""
     from solo.factory.industry import rebuild_industry_artifacts
     rows = None
     if args.csv:

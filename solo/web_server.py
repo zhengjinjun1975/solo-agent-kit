@@ -27,26 +27,13 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from solo import provider as provider_mod
 from solo import memory as memory_mod
 from solo import skill as skill_mod
-from solo.factory import stats as stats_mod
-from solo.factory import clean as clean_mod
 from solo import web_api as api  # 业务逻辑层（拆自本文件的辅助函数/端点处理）
+from solo import app as app_mod  # 统一服务门面（业务单一事实来源）
 
 PORT = 8743
 
-# 能力清单（双套件）
-CAPABILITIES = {
-    "factory": {
-        "clean": {"desc": "数据清洗（缺失/重复/异常值）", "enabled": True},
-        "stats": {"desc": "数据分析（描述/趋势/SPC）", "enabled": True},
-        "ontology": {"desc": "本体建模（设备/工单关系）", "enabled": True},
-    },
-    "personal": {
-        "memory": {"desc": "三层两域记忆", "enabled": True},
-        "skill": {"desc": "可复用经验提取", "enabled": True},
-        "writing": {"desc": "六维写作检查", "enabled": True},
-        "code": {"desc": "代码生成/审查/库理解", "enabled": True},
-    },
-}
+# 能力清单（唯一来源 = app.CAPABILITIES，取代本文件硬编码 dict）
+CAPABILITIES = app_mod.CAPABILITIES
 
 
 class SoloHandler(BaseHTTPRequestHandler):
@@ -130,20 +117,11 @@ class SoloHandler(BaseHTTPRequestHandler):
         self._json({"error": "内部错误，请查看日志", "code": 500}, 500)
 
     def _handle_api_get(self, path, qs):
-        from solo import registry as registry_mod
-        from solo import diagnostics as diag_mod
         if path == "/api/capabilities":
-            self._json(registry_mod.capabilities())
+            self._json(app_mod.capabilities())
         elif path == "/api/config":
-            # 仿工厂本体：返回扁平模型列表 + active + embedding（api_key 脱敏，has_key/api_key_status 占位）。
-            # 兼容：同时带 config（旧 provider 形状）供旧调用点读取。
-            payload = provider_mod.model_config_payload()
-            if not payload.get("configured"):
-                self._json({"configured": False, "config": {}, "hint": "未配置",
-                            "active": "", "models": [], "embedding": {}})
-            else:
-                payload["config"] = provider_mod.load_config()  # 旧 provider 形状兜底
-                self._json(payload)
+            # 唯一脱敏配置视图（app.config_view）
+            self._json(app_mod.config_view())
         elif path == "/api/memory":
             m = memory_mod.Memory()
             facts = m._load(m._facts_path, [])
@@ -179,33 +157,19 @@ class SoloHandler(BaseHTTPRequestHandler):
             if not rows:
                 self._json({"error": "数据源无效或为空"}, 400)
                 return
-            if not col:
-                for r in rows:
-                    for k in r:
-                        if r.get(k, "").strip() and api.num(r.get(k)):
-                            col = k
-                            break
-                    if col:
-                        break
-            if not col:
-                self._json({"error": "未找到数值列，用 --col 指定"}, 400)
+            res = app_mod.data_stats(rows, col)
+            if "error" in res:
+                self._json({"error": res["error"]}, 400)
                 return
-            vals = [float(r[col]) for r in rows if col and r.get(col, "").strip() and api.num(r.get(col))]
-            if not vals:
-                self._json({"error": "column not found or no numeric data"}, 400)
-                return
-            self._json({"column": col, "describe": stats_mod.describe(vals),
-                        "anomalies": stats_mod.detect_anomaly(vals, method="iqr"),
-                        "control_chart": stats_mod.control_chart(vals)})
+            self._json(res)
         elif path == "/api/setup":
-            from solo import diagnostics as diag_mod
-            self._json(diag_mod.check_environment())
+            self._json(app_mod.check_environment())
         elif path == "/api/task":
             # 工单列表（GET：FDE 现场看未闭环问题）
             from solo.task import Task
             self._json({"issues": Task().list_issues()})
         elif path == "/api/deploy":
-            self._json(api.deploy())
+            self._json(app_mod.deploy())
         elif path == "/api/monitor":
             # 环境监控（FDE 现场资源看板）
             from solo.factory import monitor as mon_mod
@@ -379,31 +343,11 @@ class SoloHandler(BaseHTTPRequestHandler):
             if not rows:
                 self._json({"error": "数据源无效或为空"}, 400)
                 return
-            if not col:
-                for r in rows:
-                    for k in r:
-                        if r.get(k, "").strip() and api.num(r.get(k)):
-                            col = k
-                            break
-                    if col:
-                        break
-            vals = [float(r[col]) for r in rows if col and r.get(col, "").strip() and api.num(r.get(col))]
-            # 若指定列无数值，自动回退找第一个数值列（避免 400）
-            if not vals and col:
-                for r in rows:
-                    for k in r:
-                        if k != col and r.get(k, "").strip() and api.num(r.get(k)):
-                            col = k
-                            break
-                    if col and any(api.num(r.get(col, "")) for r in rows[:5]):
-                        break
-                vals = [float(r[col]) for r in rows if col and r.get(col, "").strip() and api.num(r.get(col))]
-            if not vals:
-                self._json({"error": "column not found or no numeric data"}, 400)
+            res = app_mod.data_stats(rows, col)
+            if "error" in res:
+                self._json({"error": res["error"]}, 400)
                 return
-            self._json({"column": col, "describe": stats_mod.describe(vals),
-                        "anomalies": stats_mod.detect_anomaly(vals, method="iqr"),
-                        "control_chart": stats_mod.control_chart(vals)})
+            self._json(res)
         elif path == "/api/remote":
             # 远程运维（FDE 现场 SSH 连接/执行/部署/日志）
             from solo.factory import remote as remote_mod
@@ -505,16 +449,14 @@ class SoloHandler(BaseHTTPRequestHandler):
                 self._json({"error": "invalid capability"}, 400)
         elif path == "/api/clean":
             body = self._read_body()
-            from solo import data_connector as dc
             rows = api.load_rows(body)
             if not rows:
                 self._json({"error": "数据源无效或为空（CSV路径或数据库表）"}, 400)
                 return
-            cl = clean_mod.DataCleaner()
-            out = cl.clean(rows, fill_missing=body.get("method", "drop"),
-                           outlier_method=body.get("outlier", "iqr"))
-            self._json({"input": len(rows), "output": len(out), "report": cl.report,
-                        "sample": out[:5]})
+            res = app_mod.data_clean(rows, method=body.get("method", "drop"),
+                                     outlier=body.get("outlier", "iqr"))
+            self._json({"input": res["input"], "output": res["output"],
+                        "report": res["report"], "sample": res["sample"]})
         elif path == "/api/report":
             # P0-5: 生成数据概览 HTML 报告（对标 pandas-profiling）
             body = self._read_body()
@@ -522,9 +464,7 @@ class SoloHandler(BaseHTTPRequestHandler):
             if not rows:
                 self._json({"error": "数据源无效或为空"}, 400)
                 return
-            cols = list(rows[0].keys()) if rows else []
-            report = api.build_report(rows, cols)
-            self._json(report)
+            self._json(app_mod.data_report(rows))
         elif path == "/api/export":
             # P0-5: 导出 CSV（清洗后数据 / 原始数据）
             body = self._read_body()
@@ -569,36 +509,25 @@ class SoloHandler(BaseHTTPRequestHandler):
             self._json({"columns": cols, "types": types, "total_rows": len(rows),
                         "preview": rows[:3]})
         elif path == "/api/ontology":
-            from solo.factory import ontology as onto_mod
             body = self._read_body()
-            o = onto_mod.Ontology()
-            relations = None
-            # 数据源：csv 或 db+table
             rows = api.load_rows(body)
             if not rows:
                 self._json({"error": "数据源无效或为空（CSV路径或数据库表）"}, 400)
                 return
-            if body.get("relations"):
-                import json as _json
-                rel_path = api.safe_path(body["relations"])
+            # 安全：relations 路径必须项目内（防任意文件读）
+            relations = body.get("relations")
+            if isinstance(relations, str):
+                rel_path = api.safe_path(relations)
                 if not rel_path:
                     self._json({"error": "relations outside project"}, 400)
                     return
-                with open(rel_path, encoding="utf-8") as f:
-                    relations = _json.load(f)
-                if isinstance(relations, dict) and "object_properties" in relations:
-                    relations = relations["object_properties"]
-                elif relations and all(isinstance(v, dict) and "object_properties" in v
-                                       for v in relations.values() if isinstance(v, dict)):
-                    ent = body.get("entity")
-                    if ent not in relations:
-                        ent = next(iter(relations))
-                    relations = relations[ent].get("object_properties", relations[ent])
-            o.from_rows(rows, entity_name=body.get("entity"),
-                        id_col=body.get("id"), relations=relations)
-            o.build()
-            self._json({"entities": list(o.entities.keys()), "triples": len(o.triples),
-                        "summary": o.entity_summary()})
+                relations = rel_path
+            res = app_mod.build_ontology(rows, entity=body.get("entity"),
+                                         id_col=body.get("id"), relations=relations)
+            if "error" in res:
+                self._json({"error": res["error"]}, 400)
+                return
+            self._json(res)
         elif path == "/api/ontology-multi":
             # 企业级本体：多表 + 自动推断实体/外键
             from solo.factory import ontology as onto_mod

@@ -15,9 +15,8 @@ import os
 from solo import memory as memory_mod
 from solo import provider as provider_mod
 from solo import skill as skill_mod
+from solo import app as app_mod  # 统一服务门面（业务单一事实来源）
 from solo.factory import clean as clean_mod
-from solo.factory import stats as stats_mod
-from solo.factory import ontology as ontology_mod
 
 # 意图 → 处理函数 路由表
 INTENTS = {
@@ -79,41 +78,32 @@ def run(task: str, mem_dir: str = None, skill_dir: str = None, tier: str = "auto
         if llm_intent != "chat":
             intent = llm_intent
 
-    # ---- 套件模块路由 ----
+    # ---- 套件模块路由 ----（业务单一事实来源 = solo.app 门面）
     if intent == "clean":
         path = csv_path or "examples/data/factory_sensor.csv"
         cl = clean_mod.DataCleaner()
         rows = cl.load_csv(path)
-        out = cl.clean(rows, fill_missing="drop", outlier_method="iqr")
-        return {"intent": "clean", "summary": f"清洗完成 {len(rows)}→{len(out)} 行",
-                "report": cl.report, "memory_dir": m.dir}
+        res = app_mod.data_clean(rows, method="drop", outlier="iqr")
+        return {"intent": "clean", "summary": f"清洗完成 {res['input']}→{res['output']} 行",
+                "report": res["report"], "memory_dir": m.dir}
     if intent == "stats":
         path = csv_path or "examples/data/factory_sensor.csv"
         cl = clean_mod.DataCleaner()
         rows = cl.load_csv(path)
-        target = col
-        if not target:
-            for r in rows:
-                for k in r:
-                    if r.get(k, "").strip().replace(".", "").isdigit():
-                        target = k
-                        break
-                if target:
-                    break
-        if not target:
-            return {"intent": "stats", "error": "未找到数值列", "memory_dir": m.dir}
-        vals = [float(r[target]) for r in rows if r.get(target, "").strip()]
-        return {"intent": "stats", "column": target,
-                "describe": stats_mod.describe(vals),
-                "anomalies": stats_mod.detect_anomaly(vals, method="iqr"),
-                "control_chart": stats_mod.control_chart(vals), "memory_dir": m.dir}
+        res = app_mod.data_stats(rows, col)
+        if "error" in res:
+            return {"intent": "stats", "error": res["error"], "memory_dir": m.dir}
+        return {"intent": "stats", "column": res["column"],
+                "describe": res["describe"],
+                "anomalies": res["anomalies"],
+                "control_chart": res["control_chart"], "memory_dir": m.dir}
     if intent == "ontology":
         path = csv_path or "examples/data/factory_equipment.csv"
-        o = ontology_mod.Ontology()
-        o.from_csv(path, entity_name="equip", id_col="id")
-        o.build()
-        return {"intent": "ontology", "entities": list(o.entities.keys()),
-                "triples": len(o.triples), "memory_dir": m.dir}
+        cl = clean_mod.DataCleaner()
+        rows = cl.load_csv(path)
+        res = app_mod.build_ontology(rows, entity="equip", id_col="id")
+        return {"intent": "ontology", "entities": res.get("entities", []),
+                "triples": res.get("triples", 0), "memory_dir": m.dir}
     if intent == "memory_search":
         results = [{"text": f["text"], "ts": f.get("ts", "")} for f in m.search(task, top_k=5)]
         return {"intent": "memory_search", "results": results, "memory_dir": m.dir}
@@ -132,8 +122,7 @@ def run(task: str, mem_dir: str = None, skill_dir: str = None, tier: str = "auto
         out = gen_mod.generate_doc(task, kind=kind) if kind != "code" else gen_mod.generate_code(task)
         return {"intent": "gen", "output": out, "memory_dir": m.dir}
     if intent == "setup":
-        from solo import diagnostics as diag_mod
-        res = diag_mod.check_environment()
+        res = app_mod.check_environment()
         res["intent"] = "setup"
         return res
     if intent == "task":
@@ -145,27 +134,14 @@ def run(task: str, mem_dir: str = None, skill_dir: str = None, tier: str = "auto
         return {"intent": "task", "id": task["id"], "goal": task["goal"],
                 "state": task["state"], "prediction": task["id"]}
     if intent == "config":
-        from solo import provider as p_mod
-        cfg = p_mod.load_config()
-        if not cfg:
-            return {"intent": "config", "configured": False,
-                    "hint": "未配置 provider.yaml。运行 `solo setup` 检查环境，复制 provider.yaml.example 为 provider.yaml 并填写。",
-                    "memory_dir": m.dir}
-        p = cfg.get("provider", {})
-        out = {"intent": "config", "configured": True}
-        for k in ("local", "remote", "embed"):
-            item = p.get(k, {})
-            clean = dict(item)
-            if "api_key_env" in clean:
-                clean["api_key_env"] = clean["api_key_env"] + " (从环境变量读, 不落盘)"
-            out[k] = clean
+        res = app_mod.config_view()
+        out = {"intent": "config", **res, "memory_dir": m.dir}
         return out
     if intent == "skill":
         sk = skill_mod.Skill(skill_dir or skill_mod.DEFAULT_DIR)
         return {"intent": "skill", "skills": sk.list(), "memory_dir": m.dir}
     if intent == "capabilities":
-        from solo import registry as registry_mod
-        return {"intent": "capabilities", "capabilities": registry_mod.capabilities(), "memory_dir": m.dir}
+        return {"intent": "capabilities", "capabilities": app_mod.capabilities(), "memory_dir": m.dir}
 
     # ---- 兜底：对话（记忆装载 → 推理 → 记忆提交）----
     profile = m.profile_text()
