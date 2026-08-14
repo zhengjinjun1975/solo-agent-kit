@@ -34,13 +34,15 @@ def connect(source: dict) -> list:
     offset = source.get("offset", 0)
     try:
         if stype == "csv":
-            return _read_csv(source.get("path", ""))
+            rows = _read_csv(source.get("path", ""))
+            return rows[offset:offset + limit] if limit else rows
         if stype == "sqlite":
             return _read_sqlite(source.get("path", ""), source.get("table", ""), limit, offset)
         if stype == "sql":
             return _read_sql(source)
         if stype == "xlsx":
-            return _read_xlsx(source.get("path", ""))
+            rows = _read_xlsx(source.get("path", ""))
+            return rows[offset:offset + limit] if limit else rows
         if stype == "device":
             return _read_device(source, limit, offset)
         if stype in ("mysql", "postgres"):
