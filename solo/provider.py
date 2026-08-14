@@ -285,6 +285,125 @@ def _json_to_provider_shape(mc: dict) -> dict:
     }
 
 
+def model_config_payload(path: str = None) -> dict:
+    """返回仿工厂本体的前端可编辑配置（扁平 + api_key 脱敏）。
+
+    结构：{configured, active, models:[{key,name,type,base_url,model,has_key,api_key_status}],
+           embedding, routing, local, remote, embed}
+    - models 为模型列表（每项含 key）；api_key 不泄露原文，用 has_key/api_key_status 占位，
+      前端输入新值时后端保留原值。
+    - 优先读新格式 config/model_config.json；回退旧 provider.yaml（active 取 remote）。
+    - local/remote/embed 为旧字段兜底，供聊天摘要 fmtResult('config') 复用。
+    """
+    mc = load_model_config(path)
+    if mc and isinstance(mc.get("models"), dict):
+        models = []
+        for key, m in (mc.get("models") or {}).items():
+            has = bool(m.get("api_key"))
+            models.append({
+                "key": key,
+                "name": m.get("name") or key,
+                "type": m.get("type") or "ollama",
+                "base_url": m.get("base_url") or "",
+                "model": m.get("model") or "",
+                "has_key": has,
+                "api_key_status": "已配置" if has else "",
+            })
+        emb = dict(mc.get("embedding") or {})
+        return {
+            "configured": True,
+            "active": mc.get("active") or "",
+            "active_model": mc.get("active") or "",
+            "models": models,
+            "embedding": emb,
+            "routing": mc.get("routing") or {},
+            "local": {"type": (mc.get("models", {}).get("local") or {}).get("type", "ollama"),
+                      "model": (mc.get("models", {}).get("local") or {}).get("model", "")},
+            "remote": {"type": (mc.get("models", {}).get("cloud") or {}).get("type", ""),
+                       "model": (mc.get("models", {}).get("cloud") or {}).get("model", "")},
+            "embed": {"model": (mc.get("embedding") or {}).get("model", "")},
+        }
+    # 旧 provider.yaml 回退：local/remote/embed → 扁平模型列表
+    cfg = load_config(path)
+    p = cfg.get("provider", {})
+    local = p.get("local") or {}
+    remote = p.get("remote") or {}
+    embed = p.get("embed") or {}
+    remote_has = bool(resolve_remote_key(remote))
+    models = [
+        {"key": "local", "name": "本地模型", "type": local.get("type", "ollama"),
+         "base_url": local.get("base_url", ""), "model": local.get("model", ""),
+         "has_key": False, "api_key_status": ""},
+        {"key": "cloud", "name": "云端模型", "type": remote.get("type", "openai"),
+         "base_url": remote.get("base_url", ""), "model": remote.get("model", ""),
+         "has_key": remote_has, "api_key_status": "已配置" if remote_has else ""},
+    ]
+    return {
+        "configured": bool(p),
+        "active": "remote" if remote else "local",
+        "active_model": "remote" if remote else "local",
+        "models": models,
+        "embedding": {"type": embed.get("type", "ollama"), "base_url": embed.get("base_url", "http://127.0.0.1:11434"),
+                      "model": embed.get("model", "nomic-embed-text")},
+        "routing": {},
+        "local": {"type": local.get("type", "ollama"), "model": local.get("model", "")},
+        "remote": {"type": remote.get("type", ""), "model": remote.get("model", "")},
+        "embed": {"model": embed.get("model", "")},
+    }
+
+
+def save_model_config(payload: dict, path: str = None) -> dict:
+    """把前端编辑结果写回 config/model_config.json（新格式，仿工厂本体）。
+
+    payload: {active, models:[{key,name,type,base_url,model,api_key}], embedding}
+    - models 列表按 key 合并进 models dict；api_key 留空 = 保留原值，仅输入新值才更新。
+    - active/embedding 一并更新；保留 routing 与 _comment 等既有字段。
+    返回 {ok, active}（失败时 {ok:False, error}）。
+    """
+    mc = load_model_config(path)
+    if not isinstance(mc, dict):
+        mc = {}
+    # 目标路径：显式 path，否则优先写新格式 config/model_config.json
+    if not path:
+        p = _find_config_file(None)
+        path = p if (p and p.endswith(".json")) else "config/model_config.json"
+    models = dict(mc.get("models") or {})
+    for m in (payload.get("models") or []):
+        key = m.get("key", "")
+        if not key:
+            continue
+        entry = dict(models.get(key) or {})
+        entry["name"] = m.get("name", entry.get("name", key))
+        entry["type"] = m.get("type", entry.get("type", "ollama"))
+        entry["base_url"] = m.get("base_url", entry.get("base_url", ""))
+        entry["model"] = m.get("model", entry.get("model", ""))
+        if m.get("api_key"):  # 留空 = 保留原值，仅输入新值才更新
+            entry["api_key"] = m["api_key"]
+        models[key] = entry
+    mc["models"] = models
+    if payload.get("active") in models:
+        mc["active"] = payload["active"]
+    elif not mc.get("active"):
+        mc["active"] = next(iter(models), "")
+    if payload.get("embedding") is not None:
+        emb = payload["embedding"]
+        old = mc.get("embedding") or {}
+        mc["embedding"] = {
+            "name": emb.get("name", old.get("name", "本地向量模型")),
+            "type": emb.get("type", old.get("type", "ollama")),
+            "base_url": emb.get("base_url", old.get("base_url", "http://127.0.0.1:11434")),
+            "model": emb.get("model", old.get("model", "nomic-embed-text")),
+            "api_key": emb.get("api_key", old.get("api_key", "")),
+        }
+    try:
+        os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(mc, f, ensure_ascii=False, indent=2)
+        return {"ok": True, "active": mc.get("active", "")}
+    except OSError:
+        return {"ok": False, "error": "模型配置写入失败"}
+
+
 def load_config(path: str = None) -> dict:
     """读取模型配置为 dict。优先新格式 config/model_config.json，找不到回退 provider.yaml。
 

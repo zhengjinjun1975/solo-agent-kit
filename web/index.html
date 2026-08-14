@@ -302,11 +302,33 @@
       <button class="btn pri" style="margin-top:6px;width:100%" onclick="addSkill()">添加技能</button>
     </div>
 
-    <!-- 配置工作区 -->
+    <!-- 配置工作区（仿工厂本体：模型列表 + active radio + 保存） -->
     <div id="ws-config" style="display:none">
-      <div class="lbl">配置 — 工具必需配置项</div>
-      <div id="config-result" style="font-size:11px;max-height:280px;overflow:auto;white-space:pre-wrap;background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:8px"></div>
-      <button class="btn" style="margin-top:8px;width:100%" onclick="loadConfigPanel()">刷新配置</button>
+      <div class="lbl">配置 — 模型配置管理</div>
+      <div id="config-result" style="display:none"></div>
+      <div id="config-body" style="display:none">
+        <div class="mc-hint">模型配置持久化到 config/model_config.json。api_key 仅在输入新值时更新，留空/不改则保留原值。本地优先：默认 ornith/qwen 可直连 Ollama。</div>
+        <div id="config-models" style="display:flex;flex-direction:column;gap:8px"></div>
+        <div class="mc-embed">
+          <div class="mc-embed-title">🔎 向量检索模型（embedding，默认本地）</div>
+          <div class="mc-row">
+            <div class="mc-fg">
+              <span class="mc-label">Base URL</span>
+              <input class="mc-input" id="mc-emb-url" placeholder="http://127.0.0.1:11434">
+            </div>
+            <div class="mc-fg">
+              <span class="mc-label">Model</span>
+              <input class="mc-input" id="mc-emb-model" placeholder="nomic-embed-text">
+            </div>
+          </div>
+          <div class="mc-hint" style="background:transparent;border-color:var(--border)">向量语义检索用本地 embedding，零 API 成本。改这里可切换向量模型/地址。</div>
+        </div>
+        <div class="mc-actions">
+          <button class="btn" onclick="addModel()">＋ 新增模型</button>
+          <button class="btn pri" id="mc-save" onclick="saveModelConfig()">💾 保存配置</button>
+        </div>
+        <div id="mc-status" style="font-size:11px;color:var(--mute);margin-top:6px"></div>
+      </div>
     </div>
 
     <!-- 部署工作区（真实部署） -->

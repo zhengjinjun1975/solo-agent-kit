@@ -167,3 +167,23 @@ body{font-family:-apple-system,"Segoe UI","Microsoft YaHei",system-ui,sans-serif
 .writing-panel .style-card:hover{background:#f5f3ff;border-color:var(--orange);box-shadow:var(--shadow)}
 .writing-panel .style-card.on{border-color:var(--orange);background:linear-gradient(90deg,rgba(237,233,254,.6),#fff);font-weight:600}
 .writing-panel .style-card .s-desc{font-size:11px;color:var(--mute);margin-top:3px;line-height:1.5}
+
+/* ─── 模型配置管理（仿工厂本体前端）─── */
+.mc-hint{font-size:11px;color:var(--dim);background:rgba(13,148,136,.06);border:1px solid var(--blue-border);border-radius:6px;padding:7px 10px;margin-bottom:8px}
+.mc-edit{border:1px solid var(--border);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:8px;background:#fbfcfe}
+.mc-edit-head{display:flex;align-items:center;gap:10px}
+.mc-radio{display:flex;align-items:center;gap:4px;cursor:pointer;font-size:12px;color:var(--text)}
+.mc-active-tag{font-size:11px;font-weight:700;color:#16a34a;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:4px;padding:2px 8px}
+.mc-key{flex:1;font-size:11px;color:var(--mute);font-family:'Consolas',monospace;overflow:hidden;text-overflow:ellipsis}
+.mc-del{flex-shrink:0;width:20px;height:20px;border:none;border-radius:4px;background:#fef2f2;color:#dc2626;cursor:pointer;font-size:12px;line-height:1}
+.mc-del:hover{background:#fee2e2}
+.mc-row{display:flex;gap:10px}
+.mc-row .mc-fg{flex:1}
+.mc-fg{display:flex;flex-direction:column;gap:4px}
+.mc-label{font-size:11px;color:var(--dim)}
+.mc-input{width:100%;background:#fff;border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-size:12px;color:var(--text);outline:none;box-sizing:border-box;transition:border-color .15s}
+.mc-input:focus{border-color:var(--blue)}
+.mc-embed{border:1px dashed var(--blue-border);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:8px;background:rgba(13,148,136,.04);margin-top:8px}
+.mc-embed-title{font-size:12px;font-weight:700;color:var(--blue)}
+.mc-actions{display:flex;gap:8px;margin-top:10px}
+.mc-actions .btn{flex:1}

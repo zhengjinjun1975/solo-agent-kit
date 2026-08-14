@@ -135,11 +135,15 @@ class SoloHandler(BaseHTTPRequestHandler):
         if path == "/api/capabilities":
             self._json(registry_mod.capabilities())
         elif path == "/api/config":
-            cfg = provider_mod.load_config()
-            if not cfg:
-                self._json({"configured": False, "config": {}, "hint": "未配置"})
+            # 仿工厂本体：返回扁平模型列表 + active + embedding（api_key 脱敏，has_key/api_key_status 占位）。
+            # 兼容：同时带 config（旧 provider 形状）供旧调用点读取。
+            payload = provider_mod.model_config_payload()
+            if not payload.get("configured"):
+                self._json({"configured": False, "config": {}, "hint": "未配置",
+                            "active": "", "models": [], "embedding": {}})
             else:
-                self._json({"configured": True, "config": cfg})
+                payload["config"] = provider_mod.load_config()  # 旧 provider 形状兜底
+                self._json(payload)
         elif path == "/api/memory":
             m = memory_mod.Memory()
             facts = m._load(m._facts_path, [])
@@ -360,8 +364,13 @@ class SoloHandler(BaseHTTPRequestHandler):
     def _handle_api_post(self, path):
         if path == "/api/config":
             body = self._read_body()
-            ok = api.write_config(body.get("config", {}))
-            self._json({"saved": ok})
+            # 仿工厂本体：前端提交 {models:[...], active, embedding} → 写回 config/model_config.json。
+            # 兼容旧调用点：仍接受 {config: {provider: {...}}} 写 provider.yaml。
+            if "models" in body or "active" in body:
+                self._json(provider_mod.save_model_config(body))
+            else:
+                ok = api.write_config(body.get("config", {}))
+                self._json({"saved": ok})
         elif path == "/api/stats":
             # POST 数据分析（数据源对象：csv 或 db+table）
             body = self._read_body()

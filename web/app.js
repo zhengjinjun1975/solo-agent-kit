@@ -664,18 +664,104 @@ async function addSkill(){
   loadSkillPanel(); loadOverview();
 }
 
-// ===== 配置工作区 =====
+// ===== 配置工作区（仿工厂本体：模型列表 + active radio + 保存） =====
+window.editModels = [];   // [{key,name,type,base_url,model,api_key,has_key}]
+window.editActive = '';   // active 模型 key
 async function loadConfigPanel(){
-  const res=await api('/api/config');
-  const el=document.getElementById('config-result');
-  if(!res.configured){el.textContent=res.hint||'未配置';return;}
-  const p=res.config?.provider||{};
-  let html='⚙️ 模型分层配置：';
-  for(const [tier,meta] of Object.entries(p)){
-    html+=`\n【${tier}】\n`;
-    for(const [k,v] of Object.entries(meta))html+=`  ${k}: ${v}\n`;
+  const res = await api('/api/config');
+  const result = document.getElementById('config-result');
+  const body = document.getElementById('config-body');
+  if(!res.configured){
+    body.style.display='none'; result.style.display='block';
+    result.textContent = res.hint||'未配置';
+    return;
   }
-  el.textContent=html;
+  result.style.display='none'; body.style.display='block';
+  editActive = res.active || (res.models && res.models.length ? res.models[0].key : '');
+  editModels = (res.models||[]).map(m=>({
+    key:m.key, name:m.name||m.key, type:m.type||'ollama',
+    base_url:m.base_url||'', model:m.model||'', api_key:'', has_key:!!m.has_key,
+  }));
+  const emb = res.embedding||{};
+  document.getElementById('mc-emb-url').value = emb.base_url||'http://127.0.0.1:11434';
+  document.getElementById('mc-emb-model').value = emb.model||'nomic-embed-text';
+  renderModels();
+  setStatus('','');
+}
+function renderModels(){
+  const box = document.getElementById('config-models');
+  box.innerHTML = (editModels||[]).map((m,i)=>`
+    <div class="mc-edit">
+      <div class="mc-edit-head">
+        <label class="mc-radio">
+          <input type="radio" ${editActive===m.key?'checked':''} onclick="setEditActive('${m.key}')">
+          <span class="mc-active-tag">${editActive===m.key?'✓ 生效':'设为生效'}</span>
+        </label>
+        <span class="mc-key">key: ${esc(m.key)}</span>
+        <button class="mc-del" onclick="removeModel(${i})" aria-label="删除">✕</button>
+      </div>
+      <div class="mc-row">
+        <div class="mc-fg"><span class="mc-label">名称</span>
+          <input class="mc-input" value="${esc(m.name)}" placeholder="模型名称" oninput="mcName(${i},this.value)"></div>
+        <div class="mc-fg"><span class="mc-label">类型</span>
+          <select class="mc-input" onchange="mcType(${i},this.value)">
+            <option value="ollama" ${m.type==='ollama'?'selected':''}>ollama</option>
+            <option value="openai" ${m.type==='openai'?'selected':''}>openai</option>
+          </select></div>
+      </div>
+      <div class="mc-row">
+        <div class="mc-fg"><span class="mc-label">Base URL</span>
+          <input class="mc-input" value="${esc(m.base_url)}" placeholder="http://127.0.0.1:11434" oninput="mcBase(${i},this.value)"></div>
+        <div class="mc-fg"><span class="mc-label">Model</span>
+          <input class="mc-input" value="${esc(m.model)}" placeholder="ornith:latest" oninput="mcModel(${i},this.value)"></div>
+      </div>
+      <div class="mc-fg"><span class="mc-label">API Key（${m.has_key?'已配置，输入新值可更新':'未配置'}）</span>
+        <input class="mc-input" type="password" placeholder="留空 = 保留原值" oninput="mcKey(${i},this.value)"></div>
+    </div>`).join('') || '<div style="color:var(--mute);font-size:12px">暂无模型，点「＋ 新增模型」添加</div>';
+}
+function mcName(i,v){ if(editModels[i])editModels[i].name=v; }
+function mcType(i,v){ if(editModels[i])editModels[i].type=v; }
+function mcBase(i,v){ if(editModels[i])editModels[i].base_url=v; }
+function mcModel(i,v){ if(editModels[i])editModels[i].model=v; }
+function mcKey(i,v){ if(editModels[i])editModels[i].api_key=v; }
+function setEditActive(key){
+  editActive = key;
+  renderModels();
+}
+function addModel(){
+  const key = 'model_' + Date.now();
+  editModels.push({ key, name:'新模型', type:'ollama', base_url:'http://127.0.0.1:11434', model:'', api_key:'', has_key:false });
+  renderModels();
+}
+function removeModel(i){
+  if(editModels.length <= 1){ setStatus('err','至少保留一个模型'); return; }
+  editModels.splice(i,1);
+  if(editActive === editModels[i]?.key) editActive = editModels[0]?.key||'';
+  renderModels();
+}
+function setStatus(cls,msg){
+  const el = document.getElementById('mc-status');
+  if(!el) return;
+  el.style.color = cls==='err' ? 'var(--red)' : 'var(--green)';
+  el.textContent = msg;
+}
+async function saveModelConfig(){
+  if(!editModels.length){ setStatus('err','至少保留一个模型'); return; }
+  const list = editModels.map(m=>({
+    key:m.key, name:m.name, type:m.type, base_url:m.base_url, model:m.model, api_key:m.api_key,
+  }));
+  const btn = document.getElementById('mc-save');
+  const old = btn.textContent; btn.textContent='保存中…'; btn.disabled=true;
+  try{
+    const emb = {
+      base_url: document.getElementById('mc-emb-url').value,
+      model: document.getElementById('mc-emb-model').value,
+    };
+    const res = await api('/api/config',{method:'POST',body:JSON.stringify({models:list, active:editActive, embedding:emb})});
+    if(res.ok){ setStatus('ok', `模型配置已保存，当前生效：${res.active||editActive}`); loadConfigPanel(); }
+    else setStatus('err', res.error||'保存失败');
+  }catch(e){ setStatus('err', '保存失败: '+e.message); }
+  finally{ btn.textContent=old; btn.disabled=false; }
 }
 
 // ===== 部署工作区 =====
