@@ -148,21 +148,28 @@ solo plugins list          # 查看各插件可用性（obsidian/visualize 等�
 
 ## 配置
 
-本地与远端模型分层。复制 `provider.yaml.example` 为 `provider.yaml`：
+模型配置仿工厂本体开源风格，位于 **`config/model_config.json`**（仓库内已带默认值，一般无需改动即可用）。
 
-```yaml
-provider:
-  local:   # 轻量推理：记忆/写作/审查
-    type: ollama
-    model: ornith:latest
-  remote:  # 复杂推理：代码生成/复杂分析
-    type: openai-compatible
-    base_url: https://api.deepseek.com
-    api_key_env: DEEPSEEK_API_KEY
-  embed:   # 语义嵌入：记忆检索，本地
-    type: ollama
-    model: nomic-embed-text:latest
+```jsonc
+{
+  "active": "cloud",        // 默认路由：cloud（复杂任务走云端）/ local（全程本地）
+  "routing": {              // 智能路由：simple→local，complex→cloud，离线降级 local
+    "policy": "simple->local ; complex->cloud ; offline->fallback local ; all-down->rule/retrieval",
+    "complex_models": ["cloud", "local"],
+    "simple_models": ["local"],
+    "offline_fallback": true
+  },
+  "embedding": { "type": "ollama", "base_url": "http://127.0.0.1:11434", "model": "nomic-embed-text" },
+  "models": {
+    "local":  { "type": "ollama", "base_url": "http://127.0.0.1:11434", "model": "ornith:latest" },
+    "cloud":  { "type": "openai", "base_url": "https://api.deepseek.com", "model": "deepseek-chat", "api_key": "" }
+  }
+}
 ```
+
+- **本地 ornith**（Ollama，无需 key）跑轻量推理；**云端 DeepSeek**（`api_key` 留空则读 `DEEPSEEK_API_KEY` 环境变量）跑复杂推理。
+- 旧版 `provider.yaml`（`provider.local/remote/embed`）**仍兼容**，读取顺序：`config/model_config.json` → `provider.yaml` → `~/.solo/provider.yaml`。
+- 完整部署说明见 **`docs/部署手册.md`**。
 
 ## 项目结构
 

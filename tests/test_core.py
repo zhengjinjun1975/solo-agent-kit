@@ -269,3 +269,73 @@ def test_provider_local_down_network_error():
     with pytest.raises(provider_mod.ProviderError) as ei:
         p.complete("hi", tier="local")
     assert ei.value.code == provider_mod.EXIT_NETWORK
+
+
+# ---- provider：工厂本体风格 model_config.json + 智能路由 ----
+def test_provider_from_config_new_json_style():
+    """新格式 config/model_config.json（active/routing/models）应正确解析并保留路由。"""
+    mc = {
+        "active": "cloud",
+        "routing": {"complex_models": ["cloud", "local"], "simple_models": ["local"],
+                    "offline_fallback": True},
+        "embedding": {"type": "ollama", "base_url": "http://127.0.0.1:11434", "model": "nomic-embed-text"},
+        "models": {
+            "local": {"type": "ollama", "base_url": "http://127.0.0.1:11434", "model": "ornith:latest", "api_key": ""},
+            "cloud": {"type": "openai", "base_url": "https://api.deepseek.com", "model": "deepseek-chat", "api_key": ""},
+        },
+    }
+    p = provider_mod.Provider.from_config(mc)
+    assert p.active == "cloud"
+    assert p.routing.get("complex_models") == ["cloud", "local"]
+    assert p.local.get("model") == "ornith:latest"
+    assert p.remote.get("model") == "deepseek-chat"
+    assert p.embed_cfg.get("model") == "nomic-embed-text"
+    # 空 api_key 被清理，不残留空字符串
+    assert "api_key" not in p.remote
+
+
+def test_provider_routing_simple_local_complex_cloud():
+    """auto 路由：简单任务→local，复杂任务→cloud；active=local 恒走本地。"""
+    mc = {
+        "active": "cloud",
+        "routing": {"complex_models": ["cloud", "local"], "simple_models": ["local"],
+                    "offline_fallback": True},
+        "models": {
+            "local": {"type": "ollama", "model": "ornith:latest"},
+            "cloud": {"type": "openai", "model": "deepseek-chat"},
+        },
+    }
+    p = provider_mod.Provider.from_config(mc)
+    assert p._pick("今天几号", "auto").get("model") == "ornith:latest"          # simple → local
+    assert p._pick("帮我做本体建模并写方案", "auto").get("model") == "deepseek-chat"  # complex → cloud
+    assert p._is_complex("写一篇深度分析报告") is True
+    assert p._is_complex("你好") is False
+    # active=local 时即使复杂任务也走本地
+    p_local = provider_mod.Provider.from_config({**mc, "active": "local"})
+    assert p_local._pick("做本体建模", "auto").get("model") == "ornith:latest"
+
+
+def test_provider_model_config_json_file(tmp):
+    """仓库内 config/model_config.json 应能被 load_model_config/load_config 读取（归一化）。"""
+    import json
+    mc = {
+        "active": "cloud",
+        "routing": {"policy": "simple->local", "complex_models": ["cloud"], "simple_models": ["local"]},
+        "embedding": {"type": "ollama", "base_url": "http://127.0.0.1:11434", "model": "nomic-embed-text"},
+        "models": {
+            "local": {"type": "ollama", "base_url": "http://127.0.0.1:11434", "model": "ornith:latest"},
+            "cloud": {"type": "openai", "base_url": "https://api.deepseek.com", "model": "deepseek-chat"},
+        },
+    }
+    path = os.path.join(tmp, "model_config.json")
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(mc, f, ensure_ascii=False)
+
+    raw = provider_mod.load_model_config(path)
+    assert raw["active"] == "cloud"
+    assert raw["models"]["cloud"]["model"] == "deepseek-chat"
+    # load_config 归一化为旧 provider 形状，供 agent/cli/web 兼容
+    normalized = provider_mod.load_config(path)
+    assert normalized["provider"]["local"]["model"] == "ornith:latest"
+    assert normalized["provider"]["remote"]["model"] == "deepseek-chat"
+    assert normalized["provider"]["embed"]["model"] == "nomic-embed-text"

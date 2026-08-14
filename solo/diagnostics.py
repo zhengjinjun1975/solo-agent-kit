@@ -26,7 +26,7 @@ def check_environment() -> dict:
     except Exception:
         checks["ollama"] = {"ok": False, "error": "本地 Ollama 未运行"}
     cfg = provider_mod.load_config()
-    checks["config"] = {"ok": bool(cfg), "has_provider_yaml": bool(cfg)}
+    checks["config"] = {"ok": bool(cfg), "has_model_config": bool(cfg)}
     m = memory_mod.Memory()
     checks["memory"] = {"ok": True, "dir": m.dir,
                         "facts": len(m._load(m._facts_path, []))}

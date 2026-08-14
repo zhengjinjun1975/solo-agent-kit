@@ -199,8 +199,7 @@ def run(task: str, mem_dir: str = None, skill_dir: str = None, tier: str = "auto
     # agent 层模型分层（P1-9）：按任务复杂度选模型，而非 context 长度
     # 简单对话/短任务 → 本地(快/免费)；复杂任务(长文/报告/复杂分析) → 远端(强)
     complex_task = any(w in task for w in ("写一篇", "报告", "深度分析", "长文", "方案", "复盘", "论文"))
-    remote_ready = bool(p.remote and p.remote.get("api_key_env")
-                        and os.environ.get(p.remote.get("api_key_env")))
+    remote_ready = bool(p.remote and provider_mod.resolve_remote_key(p.remote))
     tier = "remote" if (complex_task and remote_ready) else "local"
     # 配置健康检查：防止模型编造配置类信息（如 API key 名）
     cfg_ok = bool(provider_mod.load_config())

@@ -256,7 +256,7 @@ def _setup():
         checks["ollama"] = {"ok": False, "error": "本地 Ollama 未运行（记忆语义检索需要）"}
     # 3. 配置
     cfg = provider_mod.load_config()
-    checks["config"] = {"ok": bool(cfg), "has_provider_yaml": bool(cfg)}
+    checks["config"] = {"ok": bool(cfg), "has_model_config": bool(cfg)}
     # 4. 记忆库
     m = memory_mod.Memory()
     checks["memory"] = {"ok": True, "dir": m.dir, "facts": len(m._load(m._facts_path, []))}

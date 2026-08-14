@@ -272,12 +272,14 @@ class SoloHandler(BaseHTTPRequestHandler):
                     out["local"] = {"ok": False, "error": str(e)[:60]}
             # 测试远端
             if p.remote:
-                key_env = p.remote.get("api_key_env","")
-                key = os.environ.get(key_env,"")
+                from solo import provider as prov_mod
+                key = prov_mod.resolve_remote_key(p.remote)
                 if not key:
-                    out["remote"] = {"ok": False, "error": f"环境变量 {key_env} 未设置"}
+                    env_name = p.remote.get("api_key_env", "DEEPSEEK_API_KEY")
+                    out["remote"] = {"ok": False, "error": f"云端未配置 API key（设环境变量 {env_name}）"}
                 else:
-                    out["remote"] = {"ok": True, "model": p.remote.get("model"), "api_key_env": key_env}
+                    out["remote"] = {"ok": True, "model": p.remote.get("model"),
+                                     "api_key_env": p.remote.get("api_key_env", "DEEPSEEK_API_KEY")}
             self._json(out)
         elif path == "/api/datasource":
             # 列出数据源信息：SQLite 表 / 检查 CSV

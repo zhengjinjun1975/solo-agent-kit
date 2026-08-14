@@ -31,25 +31,56 @@ class ProviderError(Exception):
 
 
 class Provider:
-    """本地/远端模型的分层抽象。
+    """本地/云端模型的分层抽象（零依赖，标准库 urllib）。
 
     用法：
-        p = Provider.from_config(config)   # 读 config dict
-        p = Provider.from_file()           # 从 provider.yaml 读（推荐）
-        text = p.complete("轻量任务", tier="local")     # 本地
-        text = p.complete("复杂任务", tier="remote")    # 远端
-        vec = p.embed("文本")                            # 嵌入（本地）
+        p = Provider.from_config(config)     # 读 config dict（支持新旧两种格式）
+        p = Provider.from_file()             # 读 config/model_config.json 或 provider.yaml（推荐）
+        text = p.complete("轻量任务", tier="auto")  # auto 按 routing 智能路由
+        text = p.complete("复杂任务", tier="remote") # 强制云端
+        vec = p.embed("文本")                 # 嵌入（本地）
+
+    新格式 config/model_config.json（仿工厂本体风格）：
+        {"active","routing","embedding","models":{local,cloud}}。
+    旧格式 provider.yaml 仍兼容，找不到新 JSON 时回退读取。
     """
 
-    def __init__(self, local=None, remote=None, embed=None):
+    # 复杂任务关键词：命中即升云端（与 routing 的 complex_models 语义一致）
+    COMPLEX_KEYWORDS = ("本体", "建模", "重构", "架构", "代码生成", "长文",
+                        "报告", "写一篇", "深度分析", "方案", "复盘", "论文")
+
+    def __init__(self, local=None, remote=None, embed=None, active=None, routing=None):
         self.local = local or {"type": "ollama", "base_url": "http://127.0.0.1:11434", "model": "ornith:latest"}
         self.remote = remote or {}
         # 注意: 不能叫 self.embed——会遮蔽同名方法 embed()。配置用 embed_cfg。
         self.embed_cfg = embed or {"type": "ollama", "base_url": "http://127.0.0.1:11434", "model": "nomic-embed-text:latest"}
+        # 工厂本体风格：active 默认路由开关 + routing 智能路由策略
+        self.active = active or "cloud"
+        self.routing = routing or {}
 
     @classmethod
     def from_config(cls, config: dict) -> "Provider":
-        """从 config dict 构造。config 通常来自 provider.yaml。"""
+        """从 config dict 构造。支持两种格式：
+
+        旧格式（provider.yaml 解析结果）：{"provider": {"local":..., "remote":..., "embed":...}}
+        新格式（config/model_config.json）：{"active", "routing", "embedding", "models": {"local","cloud"}}
+        """
+        # 新格式：仿工厂本体 —— active/routing/embedding/models
+        if "models" in config and isinstance(config.get("models"), dict):
+            models = config["models"]
+            local = dict(models.get("local") or {})
+            cloud = dict(models.get("cloud") or {})
+            # api_key 空值清理：留空则后续走环境变量 DEEPSEEK_API_KEY
+            local = {k: v for k, v in local.items() if v != ""}
+            cloud = {k: v for k, v in cloud.items() if v != ""}
+            return cls(
+                local=local,
+                remote=cloud,
+                embed=dict(config.get("embedding") or {}),
+                active=config.get("active", "cloud"),
+                routing=config.get("routing") or {},
+            )
+        # 旧格式：provider.yaml 形状
         p = config.get("provider", {})
         return cls(
             local=p.get("local", {}),
@@ -59,23 +90,29 @@ class Provider:
 
     @classmethod
     def from_file(cls, path: str = None) -> "Provider":
-        """从 provider.yaml 文件构造。path 缺省找 ./provider.yaml 或 ~/.solo/provider.yaml。
+        """从配置文件构造。path 缺省自动探测：
 
-        零依赖解析（极简缩进 yaml 子集），找不到返回默认（本地 ollama）。
+        1) config/model_config.json（新，仿工厂本体风格，含 active/routing）
+        2) ./provider.yaml 或 ~/.solo/provider.yaml（旧，兼容）
+
+        找不到返回默认（本地 ollama）。
         """
+        mc = load_model_config(path)
+        if mc:
+            return cls.from_config(mc)  # 新格式：保留 active/routing 智能路由
         config = load_config(path)
         return cls.from_config(config or {})
 
     def complete(self, prompt: str, tier: str = "auto") -> str:
         """生成文本。tier: local / remote / auto。
 
-        auto = 由 prompt 长度和是否含复杂关键词启发式选层（轻量优先）。
-        远端不可用时降级本地；本地不可用时明确报错（不静默）。
+        auto = 按 routing 智能路由（simple→local，complex→cloud）。
+        云端不可用时降级本地；本地不可用时明确报错（不静默）。
         """
         cfg = self._pick(prompt, tier)
         if cfg.get("type") == "ollama":
             return self._ollama_generate(cfg, prompt)
-        # 远端 = OpenAI 兼容端点；网络/服务不可用时降级本地，认证缺失(无 key)不降级(模型闭环铁律)
+        # 云端 = OpenAI 兼容端点；网络/服务不可用时降级本地，认证缺失(无 key)不降级(模型闭环铁律)
         try:
             return self._remote_generate(cfg, prompt)
         except ProviderError as e:
@@ -92,18 +129,34 @@ class Provider:
             return self._ollama_embed(cfg, text)
         raise ProviderError("嵌入仅支持本地 ollama", EXIT_USER_ERR)
 
-    # ---- 内部：分层选择 ----
+    # ---- 内部：分层选择（智能路由）----
     def _pick(self, prompt: str, tier: str) -> dict:
+        """按 tier 与 routing 选模型层。
+
+        - local  → 强制本地
+        - remote → 强制云端（无则降级本地）
+        - auto   → routing：active=local 恒走本地；否则 simple→local，
+                   complex（长 prompt 或含复杂关键词）→ cloud，云端无则本地。
+        """
         if tier == "local":
             return self.local
         if tier == "remote":
             return self.remote or self.local
-        # auto：启发式——长 prompt 或含复杂任务词 → 远端
-        if self.remote:
-            COMPLEX = ("本体", "建模", "重构", "架构", "代码生成", "长文", "报告")
-            if len(prompt) > 2000 or any(w in prompt for w in COMPLEX):
+        # auto：启用工厂本体风格 routing
+        if self.routing:
+            if self.active == "local":
+                return self.local
+            if self.remote and self._is_complex(prompt):
                 return self.remote
+            return self.local
+        # 旧启发式兜底：长 prompt 或含复杂任务词 → 云端
+        if self.remote and self._is_complex(prompt):
+            return self.remote
         return self.local
+
+    def _is_complex(self, prompt: str) -> bool:
+        """判断任务是否复杂（simple→local / complex→cloud）。"""
+        return len(prompt) > 2000 or any(w in prompt for w in self.COMPLEX_KEYWORDS)
 
     # ---- 本地 Ollama ----
     def _ollama_generate(self, cfg, prompt: str) -> str:
@@ -130,14 +183,17 @@ class Provider:
             reason = getattr(e, "reason", e)
             raise ProviderError(f"嵌入模型不可用（{reason}）", EXIT_NETWORK)
 
-    # ---- 远端 OpenAI 兼容 ----
+    # ---- 云端 OpenAI 兼容 ----
     def _remote_generate(self, cfg, prompt: str) -> str:
         url = cfg.get("base_url", "").rstrip("/") + "/chat/completions"
-        api_key = os.environ.get(cfg.get("api_key_env", "DEEPSEEK_API_KEY"), "") or \
-            _read_env_key(cfg.get("api_key_env", "DEEPSEEK_API_KEY"))
+        # key 优先级：config 内 api_key 字段 > 环境变量 api_key_env > 兜底读 .env
+        env_name = cfg.get("api_key_env", "DEEPSEEK_API_KEY")
+        api_key = resolve_remote_key(cfg)
         if not api_key:
             # 模型闭环铁律：云端无 key 明确报错，不静默降级
-            raise ProviderError("远端模型未配置 API key（设环境变量 %s）" % cfg.get("api_key_env"), EXIT_AUTH)
+            raise ProviderError(
+                "云端模型未配置 API key（设环境变量 %s，或在 config/model_config.json 填 api_key）" % env_name,
+                EXIT_AUTH)
         payload = {"model": cfg.get("model"), "messages": [{"role": "user", "content": prompt}]}
         headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}
         try:
@@ -146,11 +202,21 @@ class Provider:
                 return json.load(r)["choices"][0]["message"]["content"]
         except urllib.error.HTTPError as e:
             if e.code == 401:
-                raise ProviderError("远端认证失败（API key 无效）", EXIT_AUTH)
-            raise ProviderError(f"远端请求失败 HTTP {e.code}", EXIT_NETWORK)
+                raise ProviderError("云端认证失败（API key 无效）", EXIT_AUTH)
+            raise ProviderError(f"云端请求失败 HTTP {e.code}", EXIT_NETWORK)
         except (urllib.error.URLError, ConnectionError, OSError) as e:
             reason = getattr(e, "reason", e)
-            raise ProviderError(f"远端不可用（{reason}）", EXIT_NETWORK)
+            raise ProviderError(f"云端不可用（{reason}）", EXIT_NETWORK)
+
+
+def resolve_remote_key(remote_cfg: dict) -> str:
+    """解析云端模型可用 key：配置内 api_key 字段 > 环境变量 api_key_env > 兜底读 .env。
+
+    同时兼容新格式 model_config.json（api_key 字段）与旧格式 provider.yaml（api_key_env）。
+    """
+    env_name = remote_cfg.get("api_key_env", "DEEPSEEK_API_KEY")
+    return (remote_cfg.get("api_key", "") or
+            os.environ.get(env_name, "") or _read_env_key(env_name))
 
 
 def _read_env_key(key: str) -> str:
@@ -167,19 +233,75 @@ def _read_env_key(key: str) -> str:
     return ""
 
 
-def load_config(path: str = None) -> dict:
-    """读取 provider.yaml 为 dict。零依赖极简 YAML 解析（按缩进层级）。
+def _find_config_file(path: str = None) -> str:
+    """定位配置文件。显式 path 优先；缺省按新→旧顺序探测：
 
-    支持：顶层键(provider) → 二级(local/remote/embed) → 三级(type/base_url/model/api_key_env)。
-    找文件顺序：显式 path → ./provider.yaml → ~/.solo/provider.yaml
-    找不到返回空 dict。
+    1) config/model_config.json（新，仿工厂本体风格）
+    2) ./provider.yaml
+    3) ~/.solo/provider.yaml（旧，兼容）
+
+    找不到返回 None。
     """
-    if path is None:
-        candidates = ["provider.yaml",
-                      os.path.join(os.path.expanduser("~"), ".solo", "provider.yaml")]
-        path = next((p for p in candidates if os.path.exists(p)), None)
-    if not path or not os.path.exists(path):
+    if path:
+        return path if os.path.exists(path) else None
+    for cand in ("config/model_config.json",
+                 "provider.yaml",
+                 os.path.join(os.path.expanduser("~"), ".solo", "provider.yaml")):
+        if os.path.exists(cand):
+            return cand
+    return None
+
+
+def load_model_config(path: str = None) -> dict:
+    """读取 config/model_config.json（工厂本体风格）为 dict。
+
+    返回 {"active","routing","embedding","models":{local,cloud}}；
+    找不到（或非 json）返回空 dict。
+    """
+    p = _find_config_file(path)
+    if not p or not p.endswith(".json"):
         return {}
+    try:
+        with open(p, encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def _json_to_provider_shape(mc: dict) -> dict:
+    """把新格式 model_config.json 归一化为旧 provider.yaml 形状（供既有调用点兼容）。"""
+    models = mc.get("models", {})
+
+    def _norm(m):
+        return {k: m[k] for k in ("type", "base_url", "model") if k in m}
+
+    return {
+        "provider": {
+            "local": _norm(models.get("local") or {}),
+            "remote": _norm(models.get("cloud") or {}),
+            "embed": _norm(mc.get("embedding") or {}),
+        }
+    }
+
+
+def load_config(path: str = None) -> dict:
+    """读取模型配置为 dict。优先新格式 config/model_config.json，找不到回退 provider.yaml。
+
+    返回归一化为旧形状 {"provider": {local/remote/embed}}，
+    使 agent/cli/web 等既有调用点无需改动即可兼容。
+    """
+    p = _find_config_file(path)
+    if not p or not os.path.exists(p):
+        return {}
+    # 新格式：JSON → 归一化为 provider 形状
+    if p.endswith(".json"):
+        mc = load_model_config(p)
+        return _json_to_provider_shape(mc) if mc else {}
+    # 旧格式：零依赖极简 YAML 解析（按缩进层级）。
+    # 支持：顶层键(provider) → 二级(local/remote/embed) → 三级(type/base_url/model/api_key_env)。
+    with open(p, encoding="utf-8") as f:
+        lines = f.readlines()
 
     def _parse_into(node, lines, idx, parent_indent=-1):
         while idx < len(lines):
@@ -203,8 +325,6 @@ def load_config(path: str = None) -> dict:
                 idx = _parse_into(child, lines, idx + 1, indent)
         return idx
 
-    with open(path, encoding="utf-8") as f:
-        lines = f.readlines()
     cfg = {}
     _parse_into(cfg, lines, 0, parent_indent=-1)
     return cfg
