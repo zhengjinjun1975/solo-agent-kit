@@ -75,8 +75,15 @@ class Provider:
         cfg = self._pick(prompt, tier)
         if cfg.get("type") == "ollama":
             return self._ollama_generate(cfg, prompt)
-        # 远端 = OpenAI 兼容端点
-        return self._remote_generate(cfg, prompt)
+        # 远端 = OpenAI 兼容端点；网络/服务不可用时降级本地，认证缺失(无 key)不降级(模型闭环铁律)
+        try:
+            return self._remote_generate(cfg, prompt)
+        except ProviderError as e:
+            if e.code == EXIT_AUTH:
+                raise  # 云端无 key/认证失败：明确报错，不静默降级
+            if self.local:
+                return self._ollama_generate(self.local, prompt)
+            raise
 
     def embed(self, text: str) -> list:
         """文本嵌入向量（本地，记忆不泄露）。"""

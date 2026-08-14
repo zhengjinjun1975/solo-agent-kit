@@ -83,6 +83,7 @@ def main(argv=None):
     p_rd.add_argument("--hits", type=int, default=0, help="命中题数")
     p_rd.add_argument("--asset-versions", type=int, default=0, help="资产版本数")
     p_rd.add_argument("--note", default="", help="补充说明")
+    p_rd.add_argument("--json", action="store_true", help="输出结构化 dict(对齐闭源 deliver 报告, 供 FDE D4 消费)")
 
     # 任务状态控制面
     p_tn = sub.add_parser("task-new", help="新建任务")
@@ -357,9 +358,14 @@ def _assist_lexicon_draft(args):
 
 
 def _assist_report_draft(args):
-    """起草交付报告(FDE D4)。"""
-    from solo.factory.assist import report_draft
+    """起草交付报告(FDE D4)。--json 输出结构化 dict(对齐闭源 deliver, 供闭源消费)。"""
+    from solo.factory.assist import report_draft, report_draft_dict
     from solo import writing as _w
+    if getattr(args, "json", False):
+        d = report_draft_dict(kb=args.kb, industry=args.industry, hit=args.hit,
+                              questions_n=args.questions, hits=args.hits,
+                              asset_versions=args.asset_versions)
+        return d
     md, ai = report_draft(kb=args.kb, industry=args.industry, hit=args.hit,
                           questions_n=args.questions, hits=args.hits,
                           asset_versions=args.asset_versions, note=args.note)
