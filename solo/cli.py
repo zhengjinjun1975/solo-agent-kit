@@ -171,16 +171,19 @@ def main(argv=None):
     p_ont.add_argument("--entity", help="实体名")
     p_ont.add_argument("--id", dest="id_col", help="主键列")
     p_ont.add_argument("--relations", help="关系声明 JSON 文件")
+    p_ont.add_argument("--industry", help="行业名(联动列名中文映射, 供聚合问答)")
     p_oa = sub.add_parser("onto-answer", help="本体聚合问答(计数/极值/枚举/列表)")
     p_oa.add_argument("csv")
     p_oa.add_argument("question", help="问题(如'有多少台设备'/'功率最大的设备'/'设备类型有哪些')")
     p_oa.add_argument("--entity", help="实体名")
     p_oa.add_argument("--id", dest="id_col", help="主键列")
+    p_oa.add_argument("--industry", help="行业名(联动列名中文映射, 供聚合问答)")
     p_osr = sub.add_parser("onto-search", help="本体三元组检索")
     p_osr.add_argument("csv")
     p_osr.add_argument("term")
     p_osr.add_argument("--entity", help="实体名")
     p_osr.add_argument("--id", dest="id_col", help="主键列")
+    p_osr.add_argument("--industry", help="行业名(联动列名中文映射)")
     p_osr.add_argument("--top-k", type=int, default=5)
 
     # 词典 → 工厂契约 / review 待确认队列（FDE D1 下游，独立 CLI 入口）
@@ -446,13 +449,26 @@ def _industry_current():
 
 
 def _onto_build(args):
-    """从 CSV 建本体（onto-to-nt/answer/search 共用）。返回 (Ontology, 错误dict)。"""
+    """从 CSV 建本体（onto-to-nt/answer/search 共用）。返回 (Ontology, 错误dict)。
+
+    注入行业 col_cn（--industry）使聚合问答能答行业化列名（与 draft_questions 措辞一致）；
+    未显式给 --entity 时，缺省取行业实体中文名（如 阀门），保证计数题 "有多少个阀门" 可答。
+    """
     from solo.factory.ontology import Ontology
+    col_cn = {}
+    entity = getattr(args, "entity", None)
+    ind = getattr(args, "industry", None)
+    if ind:
+        from solo.factory import industry as ind_mod
+        cfg = ind_mod.load_industry(ind)
+        col_cn = dict(cfg.get("col_cn") or {})
+        if not entity and cfg.get("entity_cn"):
+            entity = cfg["entity_cn"]
     rows = _load_rows_csv(args.csv)
     if not rows:
         return None, {"error": "数据源无效或为空"}
-    o = Ontology()
-    o.from_rows(rows, entity_name=args.entity, id_col=args.id_col)
+    o = Ontology(col_cn=col_cn)
+    o.from_rows(rows, entity_name=entity, id_col=args.id_col)
     o.build()
     return o, None
 

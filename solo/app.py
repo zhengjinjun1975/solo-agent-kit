@@ -253,11 +253,20 @@ def _resolve_relations(relations, entity=None):
 
 
 def build_ontology(rows: list, entity: str = None, id_col: str = None,
-                   relations=None) -> dict:
-    """本体建模。relations 可为 dict 或 JSON 文件路径。"""
+                   relations=None, industry: str = None) -> dict:
+    """本体建模。relations 可为 dict 或 JSON 文件路径。
+
+    industry: 行业名 → 注入行业 col_cn 列名中文映射，使聚合问答能答行业化列名
+              （与 draft_questions 行业措辞一致，改行业即联动）。
+    """
     if not rows:
         return {"error": "数据源无效或为空（CSV路径或数据库表）"}
-    o = ontology_mod.Ontology()
+    col_cn = {}
+    if industry:
+        from solo.factory import industry as ind_mod
+        cfg = ind_mod.load_industry(industry)
+        col_cn = dict(cfg.get("col_cn") or {})
+    o = ontology_mod.Ontology(col_cn=col_cn)
     rel = _resolve_relations(relations, entity)
     o.from_rows(rows, entity_name=entity, id_col=id_col, relations=rel)
     o.build()

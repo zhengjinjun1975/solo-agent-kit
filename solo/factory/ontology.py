@@ -58,10 +58,13 @@ class Ontology:
         relations: {实体名: {列: {target_class, label}}} # 关系索引（导航用）
     """
 
-    def __init__(self):
+    def __init__(self, col_cn: dict = None):
         self.entities = {}    # name -> {"cols":[], "types":{}, "obj_props":{}, "instances":[]}
         self.triples = []     # (subj, pred, obj)
         self.relations = {}   # entity -> {col -> {"target_class","label"}}（跨实体导航）
+        # 行业列名中文映射（可选）：供聚合问答 _cn2col 用，与 draft_questions 行业措辞一致。
+        # 从 industry 配置联动（改行业即联动问答能答的列名），全局 COL_CN_MAP 为兜底。
+        self.col_cn = dict(col_cn or {})
 
     # ---- 建模 ----
     def from_csv(self, path: str, entity_name: str = None, id_col: str = None,
@@ -225,10 +228,14 @@ class Ontology:
         return any(k in low for k in ("名称", "名字", "name"))
 
     def _cn2col(self, headers) -> dict:
-        """列名 → 中文 反查表（复用 assist 词典映射，与 draft_questions 措辞一致）。"""
+        """列名 → 中文 反查表（复用 assist 词典映射，与 draft_questions 措辞一致）。
+
+        先查行业 col_cn（Ontology 构造时注入的行业配置，改行业即联动），
+        再回退 assist 全局 COL_CN_MAP 兜底，保证行业化列名（如 阀门类型→valve_type）可答。
+        """
         try:
             from .assist import _col_cn_for  # noqa: PLC0415  # 惰性导入避免循环依赖
-            return {_col_cn_for(c, {}): c for c in headers}
+            return {_col_cn_for(c, self.col_cn): c for c in headers}
         except Exception:  # noqa: BLE001
             return {}
 
