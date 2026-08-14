@@ -257,3 +257,91 @@ class TestIndustryLinkage:
         # 通用(无行业): 20 > 14 → 不缺货
         rg = run_decisions(data, rules_path=_DEFAULT_RULES, industry=None)
         assert not any(d["name"] == "缺货" for d in rg["decisions"])
+
+
+# ══════════════════════════════════════════════════════════════════════
+# 改行业→自动重建产物 事件驱动无死角（2026-08 补齐）
+#   - "当前行业"持久化状态：改行业后任何省略 industry 的下游起草/决策自动跟随新行业
+#   - rebuild_industry_artifacts：一步重建 D0问题集/D1词典(工厂lexicon)/D4报告/决策阈值
+#   - 产物按"行业+kb"隔离持久化，跨行业不覆盖/串台
+# ══════════════════════════════════════════════════════════════════════
+class TestIndustryEventDrivenRebuild:
+    """改行业→自动重建产物 无死角（事件驱动）。"""
+
+    @pytest.fixture(autouse=True)
+    def _isolate_state(self, tmp_path, monkeypatch):
+        """把"当前行业"状态隔离到临时文件，避免污染真实 ~/.solo 与其他测试。"""
+        from solo.factory import industry as ind_mod
+        monkeypatch.setattr(ind_mod, "_STATE_FILE", str(tmp_path / "current_industry.json"))
+        yield
+        ind_mod.set_current_industry(None)  # 复位，避免影响 load_industry(None)=默认 的断言
+
+    def test_set_and_get_current(self):
+        from solo.factory.industry import set_current_industry, get_current_industry
+        set_current_industry("阀门制造")
+        assert get_current_industry() == "阀门制造"
+        set_current_industry(None)
+        assert get_current_industry() is None
+
+    def test_load_industry_follows_current(self):
+        from solo.factory.industry import set_current_industry, load_industry
+        set_current_industry("阀门制造")
+        cfg = load_industry(None)          # 省略行业 → 跟随当前
+        assert cfg["kb"] == "valve" and cfg["entity_cn"] == "阀门"
+        set_current_industry("化工")       # 改行业 → 自动联动
+        assert load_industry(None)["kb"] == "chemical"
+
+    def test_apply_industry_follows_current(self):
+        from solo.factory.industry import set_current_industry, apply_industry
+        set_current_industry("食品制造")
+        a = apply_industry()               # 无显式 → 当前行业
+        assert a["industry"] == "食品制造" and a["kb"] == "food" and a["known"] is True
+
+    def test_draft_questions_follows_current_no_explicit(self):
+        from solo.factory.industry import set_current_industry
+        set_current_industry("阀门制造")
+        qs = draft_questions(VALVE_ROWS)   # 不传 industry → 跟随当前，不再回退默认"设备"
+        assert qs[0] == "有多少个阀门"
+
+    def test_report_draft_dict_follows_current(self):
+        from solo.factory.industry import set_current_industry
+        set_current_industry("阀门制造")
+        r = report_draft_dict(hit=0.5, questions_n=10, hits=5)   # 不传 industry
+        assert r["kb"] == "valve" and r["industry"] == "阀门制造"
+
+    def test_run_decisions_follows_current(self):
+        from solo.factory.industry import set_current_industry
+        from solo.factory.decisions import run_decisions, _DEFAULT_RULES
+        set_current_industry("阀门制造")
+        data = {"inventory": [{"product_id": "P1", "stock": "20"}]}
+        # 阀门阈值 safety_stock=30 → 20<30 缺货（无需显式传 industry）
+        r = run_decisions(data, rules_path=_DEFAULT_RULES)
+        assert any(d["name"] == "缺货" for d in r["decisions"])
+
+    def test_rebuild_rebuilds_all_artifacts(self):
+        from solo.factory.industry import rebuild_industry_artifacts, get_current_industry
+        bundle = rebuild_industry_artifacts("阀门制造", rows=VALVE_ROWS, out_dir=None,
+                                            questions_n=12, hit=0.8, hits=8)
+        assert get_current_industry() == "阀门制造"          # 事件副作用：已设置当前行业
+        a = bundle["artifacts"]
+        assert a["questions"][0] == "有多少个阀门"            # D0 新行业实体/量词
+        assert a["lexicon"]["valve_type"]["cn"] == "阀门类型"  # D1 行业列名中文
+        assert a["factory_lexicon"]["entity_cn2en"]["阀门"] == "valve"  # D1 工厂契约
+        assert a["report"]["kb"] == "valve"                   # D4 行业→kb 自动解析
+        assert a["thresholds"]["inventory"]["safety_stock"] == 30  # 决策阈值覆盖
+        assert bundle["kb"] == "valve" and bundle["entity_cn"] == "阀门"
+
+    def test_rebuild_persists_isolated_by_industry(self, tmp_path):
+        import json
+        from solo.factory.industry import rebuild_industry_artifacts
+        b1 = rebuild_industry_artifacts("阀门制造", rows=VALVE_ROWS, out_dir=str(tmp_path))
+        b2 = rebuild_industry_artifacts("化工", rows=ROWS, out_dir=str(tmp_path))
+        # 按行业隔离落盘：阀门与化工产物文件不同名（不互相覆盖/串台）
+        valve_files = {os.path.basename(p) for p in b1["persisted"].values()}
+        chem_files = {os.path.basename(p) for p in b2["persisted"].values()}
+        assert valve_files.isdisjoint(chem_files)
+        # 阀门产物内容确为新行业产物
+        with open(b1["persisted"]["questions"], encoding="utf-8") as f:
+            assert json.load(f)[0] == "有多少个阀门"
+        with open(b2["persisted"]["questions"], encoding="utf-8") as f:
+            assert json.load(f)[0] == "有多少台设备"

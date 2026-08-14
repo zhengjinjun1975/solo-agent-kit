@@ -16,7 +16,7 @@ import os
 import re
 
 from .ontology import guess_type, local_name
-from .industry import load_industry
+from .industry import load_industry, apply_industry
 
 # 常见量词
 _MEASURE = {"设备": "台", "机器": "台", "产品": "个", "项目": "个", "订单": "个",
@@ -268,7 +268,8 @@ def report_draft(*, kb: str = None, industry: str = None, hit: float, questions_
     """
     ctx = _industry_ctx(industry)
     kb = kb or ctx["kb"]
-    industry = industry or ctx["entity_cn"]
+    # 行业显示名：显式 industry 优先；否则用生效行业名（跟随"当前行业"状态）
+    industry = industry or apply_industry()["industry"]
     health = health or {}
     hyp = health.get("hypotheses", 0)
     acc = health.get("accepted", 0)
@@ -316,7 +317,8 @@ def report_draft_dict(*, kb: str = None, industry: str = None, hit: float, quest
     import datetime
     ctx = _industry_ctx(industry)
     kb = kb or ctx["kb"]
-    industry = industry or ctx["entity_cn"]
+    # 行业显示名：显式 industry 优先；否则用生效行业名（跟随"当前行业"状态）
+    industry = industry or apply_industry()["industry"]
     health = health or {}
     return {
         "kb": kb,

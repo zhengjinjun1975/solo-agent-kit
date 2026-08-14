@@ -658,8 +658,12 @@ class SoloHandler(BaseHTTPRequestHandler):
             if not data:
                 self._json({"error": "无数据源"}, 400)
                 return
-            res = dec_mod.run_decisions(data, model=body.get("model"))
+            res = dec_mod.run_decisions(data, model=body.get("model"),
+                                        industry=body.get("industry"))
             res["tables"] = list(data.keys())
+            # 行业联动：返回生效阈值覆盖（未显式传 industry 时跟随"当前行业"状态）
+            from solo.factory.industry import apply_industry as _apply_ind
+            res["industry"] = _apply_ind(body.get("industry"))
             self._json(res)
         elif path == "/api/memory-add":
             body = self._read_body()

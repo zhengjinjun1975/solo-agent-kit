@@ -2,9 +2,14 @@
 
 所有显著变更记录在此。格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
-# Changelog
+## [Unreleased] - 2026-08-14
 
-所有显著变更记录在此。格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
+### 新增：改行业→自动重建产物（事件驱动无死角）
+
+- `industry-set <行业> [csv]`：改行业事件驱动入口，一步 ①持久化"当前行业" ②自动重建 D0问题集/D1词典(工厂lexicon)/D4报告/决策阈值 ③按"行业+kb"隔离落盘产物包（跨行业不覆盖/串台）
+- `industry-current`：查看当前行业及生效配置
+- "当前行业"持久化状态（`~/.solo/current_industry.json`）：改行业后，任何**省略 `--industry`** 的 draft-questions/lexicon-draft/report-draft/决策**自动跟随当前行业**，杜绝"改行业仍旧行业产物"的串台死角
+- Web `/api/decisions` 透传可选 `industry`（未传时跟随当前行业）
 
 ## [0.5.6] - 2026-08-13
 

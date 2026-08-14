@@ -199,7 +199,11 @@ def run_decisions(data: dict, rules_path: str = None, model: dict = None,
         rules_path = _DEFAULT_RULES  # 回退内置默认规则
     rules = json.load(open(rules_path, encoding="utf-8"))
     thresholds = rules.get("_thresholds", {})
-    # 行业联动：industry 提供的 _thresholds 深合并覆盖全局阈值（改行业即改决策阈值）
+    # 行业联动：industry 提供的 _thresholds 深合并覆盖全局阈值（改行业即改决策阈值）。
+    # industry 为空 → 跟随"当前行业"状态（改行业自动联动，不串台）。
+    if industry is None:
+        from .industry import get_current_industry as _gci
+        industry = _gci()
     if industry:
         try:
             from .industry import load_industry as _li

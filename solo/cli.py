@@ -87,6 +87,13 @@ def main(argv=None):
     p_rd.add_argument("--note", default="", help="补充说明")
     p_rd.add_argument("--json", action="store_true", help="输出结构化 dict(对齐闭源 deliver 报告, 供 FDE D4 消费)")
     sub.add_parser("industry-list", help="列出已登记行业(行业→kb/词典联动注册表)")
+    # 改行业事件驱动：设置当前行业 + 自动重建 FDE 产物（问题集/词典/报告/决策）
+    p_iset = sub.add_parser("industry-set", help="设置当前行业并自动重建 FDE 产物(改行业事件驱动)")
+    p_iset.add_argument("industry", nargs="?", default="", help="行业名(空 → 复位默认工厂)")
+    p_iset.add_argument("csv", nargs="?", default="", help="数据 CSV(给出才重建问题集/词典)")
+    p_iset.add_argument("--out-dir", default="", help="产物包持久化目录(默认不落盘)")
+    p_iset.add_argument("--limit", type=int, default=12, help="问题集上限")
+    sub.add_parser("industry-current", help="查看当前行业及生效配置(改行业自动联动状态)")
 
     # 任务状态控制面
     p_tn = sub.add_parser("task-new", help="新建任务")
@@ -161,6 +168,10 @@ def _dispatch(args):
         return _assist_report_draft(args)
     if cmd == "industry-list":
         return _industry_list()
+    if cmd == "industry-set":
+        return _industry_set(args)
+    if cmd == "industry-current":
+        return _industry_current()
     if cmd == "task-new":
         from solo.task import Task
         t = Task()
@@ -401,6 +412,31 @@ def _industry_list():
     """列出已登记行业(行业→kb/词典联动注册表)。"""
     from solo.factory.industry import industries_list
     return {"industries": industries_list(), "count": len(industries_list())}
+
+
+def _industry_set(args):
+    """改行业事件驱动：设置当前行业 + 自动重建 FDE 产物（问题集/词典/报告/决策）。
+
+    镜像 factory-ontology 的"改行业→自动建模"：industry-set <行业> [csv] 一步完成
+    ①持久化当前行业 ②重建 D0问题集/D1词典(工厂lexicon)/D4报告/决策阈值。
+    给出 csv 才重建问题集/词典（需要数据）；不给则只重建报告/阈值。
+    之后任何省略 --industry 的 draft-questions/lexicon-draft/report-draft/决策都自动跟随新行业。
+    """
+    from solo.factory.industry import rebuild_industry_artifacts
+    rows = None
+    if args.csv:
+        rows = _load_rows_csv(args.csv)
+    return rebuild_industry_artifacts(
+        industry=args.industry or None,
+        rows=rows,
+        out_dir=(args.out_dir or None),
+        questions_n=args.limit)
+
+
+def _industry_current():
+    """查看当前行业及生效配置（改行业自动联动状态）。"""
+    from solo.factory.industry import apply_industry, get_current_industry
+    return {"current": get_current_industry() or "(默认工厂)", "apply": apply_industry()}
 
 
 if __name__ == "__main__":
