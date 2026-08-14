@@ -175,19 +175,19 @@ class SoloHandler(BaseHTTPRequestHandler):
             self._json(app_mod.deploy())
         elif path == "/api/monitor":
             # 环境监控（FDE 现场资源看板）
-            from solo.factory import monitor as mon_mod
-            self._json(mon_mod.system_stats())
+            from solo.factory import ops as ops_mod
+            self._json(ops_mod.system_stats())
         elif path == "/api/monitor/devices":
             # 厂区设备批量巡检（复用 monitor_devices）
             try:
-                from solo.factory import monitor as mon_mod
-                self._json({"devices": mon_mod.monitor_devices()})
+                from solo.factory import ops as ops_mod
+                self._json({"devices": ops_mod.monitor_devices()})
             except Exception as e:
                 self._json({"error": str(e)}, 500)
         elif path == "/api/site/devices":
             # 厂区设备台账
             try:
-                from solo.site import Site
+                from solo.factory.ops import Site
                 s = Site()
                 devs = s.devices() if callable(getattr(s, "devices", None)) else []
                 cur = s.current_site if isinstance(s.current_site, str) else (s.current_site() if callable(s.current_site) else "")
@@ -353,7 +353,7 @@ class SoloHandler(BaseHTTPRequestHandler):
             self._json(res)
         elif path == "/api/remote":
             # 远程运维（FDE 现场 SSH 连接/执行/部署/日志）
-            from solo.factory import remote as remote_mod
+            from solo.factory import ops as ops_mod
             body = self._read_body()
             act = body.get("action", "exec")
             host, user, port = body.get("host", ""), body.get("user"), body.get("port", 22)
@@ -362,13 +362,15 @@ class SoloHandler(BaseHTTPRequestHandler):
                 return
             try:
                 if act == "test":
-                    self._json(remote_mod.test_connection(host, user, port))
+                    self._json(ops_mod.test_connection(host, user, port))
                 elif act == "deploy":
-                    self._json(remote_mod.remoteapi.deploy(host, user, port, body.get("cmd", "")))
+                    # 默认 git pull + 容器重启（对齐 remote_deploy 语义）
+                    cmd = body.get("cmd") or "cd /app && git pull && docker compose up -d"
+                    self._json(ops_mod.run_command(host, cmd, user, port))
                 elif act == "logs":
-                    self._json(remote_mod.remote_logs(host, user, port, body.get("cmd", "")))
+                    self._json(ops_mod.remote_logs(host, user, port, body.get("cmd", "")))
                 else:
-                    self._json(remote_mod.run_command(host, body.get("cmd", ""), user, port))
+                    self._json(ops_mod.run_command(host, body.get("cmd", ""), user, port))
             except Exception as e:
                 self._json({"error": str(e)}, 500)
         elif path == "/api/rdbms-connect":
@@ -648,11 +650,10 @@ class SoloHandler(BaseHTTPRequestHandler):
                 self._json({"styles": writing_mod.list_styles()})
             elif body.get("action") == "rewrite":
                 from solo import provider as provider_mod2
-                from solo import desensitize as ds_mod
                 p = provider_mod2.Provider.from_file()
                 # 脱敏→改写→还原(防敏感信息泄露给LLM)
                 custom = body.get("custom_words") or None
-                self._json(ds_mod.mask_and_rewrite(
+                self._json(provider_mod2.mask_and_rewrite(
                     body.get("text", ""), body.get("style", "tweet"),
                     provider=p, custom_words=custom))
             else:

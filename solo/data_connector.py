@@ -278,7 +278,7 @@ def _read_device(source: dict, limit: int = None, offset: int = 0) -> list:
     if not remote_path:
         raise DataSourceError("device 数据源必须指定 remote_path")
 
-    from solo.factory.remote import resolve_device, run_command
+    from solo.factory.ops import resolve_device, run_command
     r = resolve_device(device)
     if not r["ok"]:
         raise DataSourceError(f"设备解析失败: {r['error']}")

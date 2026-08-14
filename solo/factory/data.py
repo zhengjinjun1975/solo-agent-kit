@@ -5,13 +5,13 @@
 工厂现场数据（MES/SCADA/传感器）脏、缺、噪，审视（清洗→分析→审计）是建模的前提。
 
 同一概念域「对 rows 做审视」的三个切片合并于此，共享同一套数值原语
-（is_num/quantile/guess_type，从 solo._util 一次引入），避免各模块重复拼装：
+（is_num/quantile/guess_type，从 solo.base 一次引入），避免各模块重复拼装：
   - clean   数据清洗（缺失/重复/异常值/类型推断）  → DataCleaner / guess_type
-  - stats   数据分析（描述/趋势/异常/SPC控制图）   → describe / trend / detect_anomaly / control_chart / correlation
+  - stats   数据分析（描述/趋势/异常/SPC控制图）   → describe / trend / detect_anomaly / control_chart
   - audit   数据审计（盘点/字典/质量/一键报告）    → schema / dictionary / quality / report
 
 对齐 FDE：给工厂现场数据做第一道工序，为 stats 分析和 ontology 建模喂干净数据。
-零依赖（仅标准库 + solo._util 数值工具）。
+零依赖（仅标准库 + solo.base 数值工具）。
 """
 from __future__ import annotations
 
@@ -19,11 +19,11 @@ import csv
 import math
 import re
 
-from solo._util import is_num, quantile
+from solo.base import is_num, quantile
 
 
 # ═══════════════════════════ 共享数值原语 ═══════════════════════════
-# is_num / quantile 已从 solo._util 一次引入，供 clean/stats/audit 共用。
+# is_num / quantile 已从 solo.base 一次引入，供 clean/stats/audit 共用。
 # guess_type 在此实现（原 clean 独有，audit 也依赖）。
 
 def guess_type(value: str) -> str:
@@ -199,43 +199,6 @@ def describe(values: list) -> dict:
     }
 
 
-def describe_stream(values) -> dict:
-    """流式描述统计（Welford 在线算法，O(1) 内存，大文件友好）。
-
-    values 可为迭代器/生成器（逐值 yield），不整列入内存。
-    """
-    count = 0
-    mean = 0.0
-    m2 = 0.0
-    minv = None
-    maxv = None
-    for v in values:
-        try:
-            x = float(v)
-        except (ValueError, TypeError):
-            continue
-        count += 1
-        delta = x - mean
-        mean += delta / count
-        m2 += delta * (x - mean)
-        if minv is None or x < minv:
-            minv = x
-        if maxv is None or x > maxv:
-            maxv = x
-    if count == 0:
-        return {"count": 0}
-    variance = m2 / count if count > 1 else 0.0
-    return {
-        "count": count,
-        "min": minv,
-        "max": maxv,
-        "mean": round(mean, 3),
-        "std": round(math.sqrt(variance), 3),
-        # 流式无法算精确中位数/分位数（需排序），标注 O(1) 内存近似
-        "streaming": True,
-    }
-
-
 def trend(values: list) -> dict:
     """趋势分析：线性回归斜率（判断上升/下降/平稳）。"""
     xs = list(range(len(values)))
@@ -300,22 +263,6 @@ def control_chart(values: list) -> dict:
         "ucl": round(ucl, 3), "lcl": round(lcl, 3),
         "out_of_control": out_of_control, "points": points,
     }
-
-
-def correlation(a: list, b: list) -> float:
-    """皮尔逊相关系数（两列相关，如温度↔能耗）。"""
-    x = [float(i) for i in a if is_num(i)]
-    y = [float(i) for i in b if is_num(i)]
-    n = min(len(x), len(y))
-    if n < 2:
-        return 0.0
-    x, y = x[:n], y[:n]
-    mx, my = sum(x) / n, sum(y) / n
-    num = sum((x[i] - mx) * (y[i] - my) for i in range(n))
-    dx = math.sqrt(sum((v - mx) ** 2 for v in x))
-    dy = math.sqrt(sum((v - my) ** 2 for v in y))
-    return round(num / (dx * dy or 1), 3)
-
 
 # ═══════════════════════════ 3. audit：数据审计（盘点/字典/质量/报告）═══════════════════════════
 # 对标 pandas-profiling 的数据审视：盘点(列/类型/样本/唯一值) + 字典(字段/口径/枚举)

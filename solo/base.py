@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-"""base.py — 统一工程基础设施（日志 / 原子写 / 并发锁 / 错误契约）。
+"""base.py — 统一工程基础设施（日志 / 原子写 / 并发锁 / 错误契约 / 数值工具）。
 
 P0 审查修复：日志缺失、原子写、并发锁、错误静默吞。
-所有模块共用，避免重复实现。
+所有模块共用，避免重复实现。is_num/quantile 从 _util 并入（数值工具属基础）。
 """
 from __future__ import annotations
 
@@ -121,3 +121,21 @@ class DataSourceError(ApiError):
 
     def __init__(self, msg: str = "数据源读取失败", internal: str = ""):
         super().__init__(400, msg, internal)
+
+
+# ---- 数值工具（并入自 _util，stats/clean/ontology/web_api 共用）----
+def is_num(v) -> bool:
+    """判断值能否转 float。"""
+    try:
+        float(v)
+        return True
+    except (ValueError, TypeError):
+        return False
+
+
+def quantile(vals: list, q: float) -> float:
+    """线性插值分位数（与原子库 stats._quantile 一致）。"""
+    s = sorted(vals)
+    k = (len(s) - 1) * q
+    lo, hi = int(k), int(k) + 1
+    return s[lo] + (s[hi] - s[lo]) * (k - lo)

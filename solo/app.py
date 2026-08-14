@@ -18,7 +18,7 @@ from solo import provider as provider_mod
 from solo import memory as memory_mod
 from solo.factory import data as data_mod
 from solo.factory import ontology as ontology_mod
-from solo._util import is_num
+from solo.base import is_num
 
 
 # ---- 能力清单（唯一来源，取代 web_server 硬编码 dict + registry） ----
