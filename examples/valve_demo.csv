@@ -1,0 +1,4 @@
+id,valve_type,nominal_dn,pressure_rating,material,status,zone
+1,球阀,50,PN16,不锈钢,在用,一车间
+2,闸阀,80,PN25,碳钢,备用,二车间
+3,球阀,100,PN16,不锈钢,在用,一车间

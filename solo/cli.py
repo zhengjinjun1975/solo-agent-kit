@@ -67,23 +67,26 @@ def main(argv=None):
     p_fo.add_argument("--id", dest="id_col", help="主键列")
     p_fo.add_argument("--relations", help="关系声明 JSON 文件")
 
-    # 交付辅助(FDE D0/D1/D4): 问题集/词典初稿/报告起草
+    # 交付辅助(FDE D0/D1/D4): 问题集/词典初稿/报告起草（行业→kb/词典联动）
     p_dq = sub.add_parser("draft-questions", help="起草问题集(FDE D0)")
     p_dq.add_argument("csv", help="CSV 数据文件")
-    p_dq.add_argument("--entity", default="设备", help="实体名(用于量词)")
+    p_dq.add_argument("--entity", default=None, help="实体名(用于量词, 缺省时用行业默认实体/通用'设备')")
+    p_dq.add_argument("--industry", help="行业名(联动实体/量词/列名中文映射)")
     p_dq.add_argument("--limit", type=int, default=12, help="问题数上限")
     p_ld = sub.add_parser("lexicon-draft", help="起草词典初稿(FDE D1)")
     p_ld.add_argument("csv", help="CSV 数据文件")
+    p_ld.add_argument("--industry", help="行业名(联动列名中文映射/实体)")
     p_ld.add_argument("--json", action="store_true", help="输出 JSON")
     p_rd = sub.add_parser("report-draft", help="起草交付报告(FDE D4)")
-    p_rd.add_argument("--kb", required=True, help="知识库名")
-    p_rd.add_argument("--industry", required=True, help="行业名")
+    p_rd.add_argument("--kb", help="知识库名(缺省时按行业自动解析)")
+    p_rd.add_argument("--industry", help="行业名")
     p_rd.add_argument("--hit", type=float, default=0.0, help="命中率0-1")
     p_rd.add_argument("--questions", type=int, default=0, help="题数")
     p_rd.add_argument("--hits", type=int, default=0, help="命中题数")
     p_rd.add_argument("--asset-versions", type=int, default=0, help="资产版本数")
     p_rd.add_argument("--note", default="", help="补充说明")
     p_rd.add_argument("--json", action="store_true", help="输出结构化 dict(对齐闭源 deliver 报告, 供 FDE D4 消费)")
+    sub.add_parser("industry-list", help="列出已登记行业(行业→kb/词典联动注册表)")
 
     # 任务状态控制面
     p_tn = sub.add_parser("task-new", help="新建任务")
@@ -156,6 +159,8 @@ def _dispatch(args):
         return _assist_lexicon_draft(args)
     if cmd == "report-draft":
         return _assist_report_draft(args)
+    if cmd == "industry-list":
+        return _industry_list()
     if cmd == "task-new":
         from solo.task import Task
         t = Task()
@@ -341,32 +346,47 @@ def _load_rows_csv(csv_path):
 
 
 def _assist_draft_questions(args):
-    """起草问题集(FDE D0)。"""
+    """起草问题集(FDE D0)。行业联动：--industry 决定默认实体/量词/列名中文映射。"""
     from solo.factory.assist import draft_questions
     rows = _load_rows_csv(args.csv)
-    qs = draft_questions(rows, args.entity, limit=args.limit)
-    return {"questions": qs, "count": len(qs)}
+    qs = draft_questions(rows, args.entity, limit=args.limit, industry=getattr(args, "industry", None))
+    ind = getattr(args, "industry", None)
+    out = {"questions": qs, "count": len(qs)}
+    if ind:
+        from solo.factory.industry import apply_industry
+        out["industry"] = apply_industry(ind)
+    return out
 
 
 def _assist_lexicon_draft(args):
-    """起草词典初稿(FDE D1)。"""
+    """起草词典初稿(FDE D1)。行业联动：--industry 决定列名中文映射。"""
     from solo.factory.assist import lexicon_draft
     rows = _load_rows_csv(args.csv)
     headers = list(rows[0].keys()) if rows else []
-    lex = lexicon_draft(headers, rows[:30])
-    return lex if args.json else {"columns": len(lex), "draft": lex}
+    ind = getattr(args, "industry", None)
+    lex = lexicon_draft(headers, rows[:30], industry=ind)
+    if args.json:
+        out = lex
+    else:
+        out = {"columns": len(lex), "draft": lex}
+    if ind:
+        from solo.factory.industry import apply_industry
+        out["industry"] = apply_industry(ind)
+    return out
 
 
 def _assist_report_draft(args):
-    """起草交付报告(FDE D4)。--json 输出结构化 dict(对齐闭源 deliver, 供闭源消费)。"""
+    """起草交付报告(FDE D4)。--json 输出结构化 dict(对齐闭源 deliver, 供闭源消费)。
+    行业联动：--kb 缺省时按 --industry 自动解析；--industry 缺省时用默认实体名。"""
     from solo.factory.assist import report_draft, report_draft_dict
     from solo import writing as _w
+    ind = getattr(args, "industry", None)
     if getattr(args, "json", False):
-        d = report_draft_dict(kb=args.kb, industry=args.industry, hit=args.hit,
+        d = report_draft_dict(kb=args.kb, industry=ind, hit=args.hit,
                               questions_n=args.questions, hits=args.hits,
                               asset_versions=args.asset_versions)
         return d
-    md, ai = report_draft(kb=args.kb, industry=args.industry, hit=args.hit,
+    md, ai = report_draft(kb=args.kb, industry=ind, hit=args.hit,
                           questions_n=args.questions, hits=args.hits,
                           asset_versions=args.asset_versions, note=args.note)
     out = {"report": md}
@@ -375,6 +395,12 @@ def _assist_report_draft(args):
                            "suggestions": ai["suggestions"][:6],
                            "hard_fails": ai["hard_fails"]}
     return out
+
+
+def _industry_list():
+    """列出已登记行业(行业→kb/词典联动注册表)。"""
+    from solo.factory.industry import industries_list
+    return {"industries": industries_list(), "count": len(industries_list())}
 
 
 if __name__ == "__main__":

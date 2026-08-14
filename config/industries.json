@@ -1,0 +1,67 @@
+{
+  "_comment": "行业→kb/词典联动 注册表（数据驱动，新增行业零 Python）。改此文件即可定义新行业的 知识库(kb)/默认实体/量词/词典列名映射/决策阈值覆盖。行业变更 → load_industry/apply_industry 联动联动相关产物（问题集/词典/报告/决策）。",
+  "_defaults": {
+    "kb": "factory",
+    "entity_cn": "设备",
+    "measure": "台",
+    "col_cn": {},
+    "_thresholds": {}
+  },
+  "industries": {
+    "化工": {
+      "kb": "chemical",
+      "entity_cn": "设备",
+      "measure": "台",
+      "col_cn": {
+        "tank_pressure": "罐压",
+        "pressure_mpa": "压力",
+        "reactor_temp": "反应温度",
+        "hazmat_level": "危化等级",
+        "corrosion": "腐蚀度",
+        "flow_rate": "流量",
+        "batch_no": "批次号"
+      },
+      "_thresholds": {
+        "inventory": {"safety_stock": 20, "lead_time_days": 10, "slow_turnover": 0.8},
+        "equipment": {"warranty_warn_days": 90}
+      },
+      "note": "化工行业：罐/反应器/危化物料，更严安全库存与维护阈值。"
+    },
+    "阀门制造": {
+      "kb": "valve",
+      "entity_cn": "阀门",
+      "measure": "个",
+      "col_cn": {
+        "valve_type": "阀门类型",
+        "nominal_dn": "公称通径",
+        "pressure_rating": "公称压力",
+        "material": "材质",
+        "seal_material": "密封材质",
+        "actuator": "执行机构",
+        "media": "介质",
+        "connection_std": "连接标准"
+      },
+      "_thresholds": {
+        "inventory": {"safety_stock": 30, "lead_time_days": 15, "slow_turnover": 0.5}
+      },
+      "note": "阀门制造：阀门为实体，关注公称通径/压力等级/材质/介质。"
+    },
+    "食品制造": {
+      "kb": "food",
+      "entity_cn": "产线",
+      "measure": "条",
+      "col_cn": {
+        "food_batch": "食品批次",
+        "expire_date": "保质期",
+        "hygiene_grade": "卫生等级",
+        "storage_temp": "储存温度",
+        "ingredient": "原料"
+      },
+      "_thresholds": {
+        "inventory": {"safety_stock": 12, "lead_time_days": 5, "slow_turnover": 1.2},
+        "sales": {"aging_warn": 30, "aging_critical": 45}
+      },
+      "note": "食品制造：产线为实体，关注批次/保质期/卫生等级。"
+    }
+  }
+}

@@ -182,11 +182,14 @@ def _supplier_score(data, rule, thr):
     return out
 
 
-def run_decisions(data: dict, rules_path: str = None, model: dict = None) -> dict:
+def run_decisions(data: dict, rules_path: str = None, model: dict = None,
+                  industry: str = None) -> dict:
     """执行声明式决策规则，返回可解释行动清单。
 
     data: {表名: [行...]}
     rules_path: decisions.json（默认 ~/.solo/decisions.json，可复制默认）
+    industry: 行业名（数据驱动联动）。若给出，其 _thresholds 会覆盖全局阈值
+              （来自 config/industries.json），实现"换行业只改阈值、零 Python"。
     model: 可选本体模型（ontology.from_schema 返回），自动提取企业实体表名，
            用于决策与本体打通（哪些实体参与决策）。
     返回: {"decisions": [...], "total": N, "entities": 参与决策的企业实体}
@@ -196,6 +199,16 @@ def run_decisions(data: dict, rules_path: str = None, model: dict = None) -> dic
         rules_path = _DEFAULT_RULES  # 回退内置默认规则
     rules = json.load(open(rules_path, encoding="utf-8"))
     thresholds = rules.get("_thresholds", {})
+    # 行业联动：industry 提供的 _thresholds 深合并覆盖全局阈值（改行业即改决策阈值）
+    if industry:
+        try:
+            from .industry import load_industry as _li
+            ind = _li(industry)
+            ind_thr = ind.get("_thresholds") or {}
+            if ind_thr:
+                thresholds = _deep_merge_thresholds(thresholds, ind_thr)
+        except Exception:  # noqa: BLE001  行业配置异常不阻断决策
+            pass
     decisions = []
     for module, cfg in rules.items():
         if module.startswith("_"):
@@ -219,3 +232,16 @@ def run_decisions(data: dict, rules_path: str = None, model: dict = None) -> dic
 
 # 内置默认规则（复制到 ~/.solo/decisions.json 可自定义）
 _DEFAULT_RULES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "config", "decisions.json")
+
+
+def _deep_merge_thresholds(base: dict, override: dict) -> dict:
+    """阈值深合并：override 覆盖 base，支持多级（模块→键）。"""
+    out = dict(base)
+    for module, thr in (override or {}).items():
+        if isinstance(thr, dict):
+            merged = dict(out.get(module, {}) or {})
+            merged.update(thr)
+            out[module] = merged
+        else:
+            out[module] = thr
+    return out

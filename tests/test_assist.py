@@ -149,3 +149,111 @@ class TestReportDraftDict:
         assert r["命中率"]["提升"] is None
         assert r["资产版本数"] == 0
         assert r["自进化健康度"]["hypotheses"] == 0
+
+
+# ══════════════════════════════════════════════════════════════════════
+# 行业→kb/词典联动（数据驱动改造）：industry 变更联动问题集/词典/报告
+# ══════════════════════════════════════════════════════════════════════
+# 阀门行业样例行：含行业列名映射(valve_type/nominal_dn) 与通用列(status/zone)
+VALVE_ROWS = [
+    {"id": "1", "valve_type": "球阀", "nominal_dn": "50", "status": "在用", "zone": "一车间"},
+    {"id": "2", "valve_type": "闸阀", "nominal_dn": "80", "status": "备用", "zone": "二车间"},
+    {"id": "3", "valve_type": "球阀", "nominal_dn": "100", "status": "在用", "zone": "一车间"},
+]
+VALVE_HEADERS = ["id", "valve_type", "nominal_dn", "status", "zone"]
+
+
+class TestIndustryLinkage:
+    # ---- 行业注册表 ----
+    def test_load_industry_and_apply(self):
+        from solo.factory.industry import load_industry, apply_industry
+        cfg = load_industry("阀门制造")
+        assert cfg["kb"] == "valve"
+        assert cfg["entity_cn"] == "阀门"
+        assert cfg["measure"] == "个"
+        assert cfg["col_cn"]["valve_type"] == "阀门类型"
+        a = apply_industry("阀门制造")
+        assert a["kb"] == "valve" and a["entity_cn"] == "阀门" and a["known"] is True
+
+    def test_unknown_industry_falls_back_to_default(self):
+        from solo.factory.industry import load_industry, apply_industry
+        cfg = load_industry("不存在行业")
+        assert cfg["kb"] == "factory" and cfg["entity_cn"] == "设备"
+        a = apply_industry("不存在行业")
+        assert a["known"] is False and a["kb"] == "factory"
+
+    def test_no_industry_defaults(self):
+        from solo.factory.industry import load_industry
+        cfg = load_industry(None)
+        assert cfg["kb"] == "factory" and cfg["entity_cn"] == "设备" and cfg["measure"] == "台"
+
+    def test_industries_list(self):
+        from solo.factory.industry import industries_list
+        lst = industries_list()
+        names = [i["industry"] for i in lst]
+        assert "阀门制造" in names and "化工" in names
+
+    # ---- 问题集联动（D0）：行业决定实体/量词 ----
+    def test_draft_questions_industry_entity_and_measure(self):
+        qs = draft_questions(VALVE_ROWS, industry="阀门制造")
+        assert qs[0] == "有多少个阀门"          # 行业实体=阀门, 量词=个
+        assert "公称通径最大的阀门" in qs       # nominal_dn → 行业列名中文
+        assert "阀门类型有哪些" in qs           # valve_type → 行业列名中文
+
+    def test_draft_questions_explicit_entity_overrides_industry(self):
+        qs = draft_questions(VALVE_ROWS, entity_name="设备", industry="阀门制造")
+        assert qs[0] == "有多少台设备"          # 显式实体优先于行业
+
+    # ---- 词典联动（D1）：行业决定列名中文映射/实体 ----
+    def test_lexicon_draft_industry_col_cn(self):
+        d = lexicon_draft(VALVE_HEADERS, VALVE_ROWS, industry="阀门制造")
+        assert d["valve_type"]["cn"] == "阀门类型"
+        assert d["nominal_dn"]["cn"] == "公称通径"
+        # 通用列仍走全局映射
+        assert d["status"]["cn"] == "状态"
+
+    def test_lexicon_no_industry_global_map(self):
+        d = lexicon_draft(VALVE_HEADERS, VALVE_ROWS)
+        # 未登记列名保留原名（行业映射未生效）
+        assert d["valve_type"]["cn"] == "valve_type"
+
+    def test_to_factory_lexicon_industry_entity(self):
+        d = lexicon_draft(VALVE_HEADERS, VALVE_ROWS, industry="阀门制造")
+        fx = to_factory_lexicon(d, table_name="valve", industry="阀门制造")
+        assert fx["entity_cn2en"]["阀门"] == "valve"       # 行业实体=阀门
+        assert "阀门" in fx["description"]
+        assert fx["attr_cn2en"]["公称通径"] == "nominal_dn"  # 行业列名进映射
+
+    # ---- 报告联动（D4）：行业决定默认 kb ----
+    def test_report_draft_dict_kb_auto_resolve(self):
+        r = report_draft_dict(industry="阀门制造", hit=0.8, questions_n=10, hits=8)
+        assert r["kb"] == "valve"               # industry→kb 自动解析
+        assert r["industry"] == "阀门制造"
+
+    def test_report_draft_dict_explicit_kb_wins(self):
+        r = report_draft_dict(kb="custom", industry="阀门制造", hit=0.8,
+                              questions_n=10, hits=8)
+        assert r["kb"] == "custom"              # 显式 kb 优先
+
+    # ---- 决策联动：行业阈值覆盖全局 ----
+    def test_run_decisions_industry_threshold(self):
+        from solo.factory.decisions import run_decisions, _DEFAULT_RULES
+        # 库存 stock=10：全局 safety_stock=14 → 触发缺货; 阀门 safety_stock=30 → 也触发
+        data = {"inventory": [{"product_id": "P1", "stock": "10"}]}
+        r = run_decisions(data, rules_path=_DEFAULT_RULES, industry="阀门制造")
+        assert r["total"] >= 1
+        assert any(d["name"] == "缺货" for d in r["decisions"])
+
+    def test_run_decisions_industry_merges_thresholds(self):
+        from solo.factory.decisions import run_decisions, _DEFAULT_RULES
+        from solo.factory.industry import load_industry
+        ind = load_industry("阀门制造")
+        # 确认行业阈值已登记(与 decisions.json 全局不一致)
+        assert ind["_thresholds"]["inventory"]["safety_stock"] == 30
+        data = {"inventory": [{"product_id": "P1", "stock": "20"}]}
+        # 阀门行业: 20 < 30 → 缺货
+        rv = run_decisions(data, rules_path=_DEFAULT_RULES, industry="阀门制造")
+        assert any(d["name"] == "缺货" for d in rv["decisions"])
+        # 通用(无行业): 20 > 14 → 不缺货
+        rg = run_decisions(data, rules_path=_DEFAULT_RULES, industry=None)
+        assert not any(d["name"] == "缺货" for d in rg["decisions"])

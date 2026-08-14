@@ -16,6 +16,7 @@ import os
 import re
 
 from .ontology import guess_type, local_name
+from .industry import load_industry
 
 # 常见量词
 _MEASURE = {"设备": "台", "机器": "台", "产品": "个", "项目": "个", "订单": "个",
@@ -60,7 +61,32 @@ def _entity_name(entity_name: str) -> str:
     return entity_name or "记录"
 
 
-def draft_questions(rows, entity_name: str = "设备", limit: int = 12):
+def _industry_ctx(industry: str = None) -> dict:
+    """解析行业配置上下文（数据驱动联动入口）。
+
+    返回 {kb, entity_cn, measure, col_cn}。行业未登记 → 默认值兜底（不报错）。
+    供 draft_questions / lexicon_draft / to_factory_lexicon / report_draft 联动。
+    """
+    cfg = load_industry(industry)
+    return {
+        "kb": cfg.get("kb", "factory"),
+        "entity_cn": cfg.get("entity_cn", "设备"),
+        "measure": cfg.get("measure", "台"),
+        "col_cn": dict(cfg.get("col_cn", {})),
+    }
+
+
+def _col_cn_for(col: str, col_cn: dict) -> str:
+    """列名 → 中文：先查行业列名映射，再回退全局 COL_CN_MAP。"""
+    if col in col_cn:
+        return col_cn[col]
+    c = re.sub(r"[_\-]", "", col).strip().lower()
+    if c in col_cn:
+        return col_cn[c]
+    return _col_cn(col)
+
+
+def draft_questions(rows, entity_name: str = None, limit: int = 12, industry: str = None):
     """从数据生成 benchmark 候选问题集（FDE 起草初稿，非最终）。
 
     策略:
@@ -74,8 +100,12 @@ def draft_questions(rows, entity_name: str = "设备", limit: int = 12):
     if not rows:
         return []
     questions = []
+    # 行业联动：未显式指定实体/量词时，从行业配置解析（改行业即联动问题集）
+    ctx = _industry_ctx(industry)
+    if not entity_name:
+        entity_name = ctx["entity_cn"]
     en = _entity_name(entity_name)
-    measure = _MEASURE.get(en, "个")
+    measure = _MEASURE.get(en, ctx["measure"])
     questions.append(f"有多少{measure}{en}")
 
     if not isinstance(rows[0], dict):
@@ -89,7 +119,7 @@ def draft_questions(rows, entity_name: str = "设备", limit: int = 12):
         if not vals:
             continue
         t = guess_type(vals[0])
-        col_cn = _col_cn(h)
+        col_cn = _col_cn_for(h, ctx["col_cn"])
         if t in ("integer", "decimal"):
             # 措辞对齐引擎极值模板 "最X的Y"(如"功率最大的设备"), 保证规则引擎能答出
             questions.append(f"{col_cn}最大的{en}")
@@ -107,13 +137,15 @@ def draft_questions(rows, entity_name: str = "设备", limit: int = 12):
     return questions[:limit]
 
 
-def lexicon_draft(headers, sample_rows=None):
+def lexicon_draft(headers, sample_rows=None, industry: str = None):
     """从 CSV 列生成词典初稿（FDE 起草，供闭源 lexicon_agent 参考/人在环确认）。
 
     返回 { 列名: { "cn": 中文建议, "type": 类型, "enum": 枚举值(若有限), "suggest": 建议 } }
+    行业联动：列→中文 优先查行业列名映射（col_cn），再回退全局 COL_CN_MAP。
     """
     if sample_rows is None:
         sample_rows = []
+    ctx = _industry_ctx(industry)
     draft = {}
     for h in headers:
         vals = [str(r.get(h, "")) for r in sample_rows if r.get(h) is not None]
@@ -122,7 +154,7 @@ def lexicon_draft(headers, sample_rows=None):
         uniq = sorted(set(vals)) if vals else []
         enum = uniq if (typ == "string" and 1 < len(uniq) <= 8) else None
         entry = {
-            "cn": _col_cn(h),
+            "cn": _col_cn_for(h, ctx["col_cn"]),
             "type": typ,
             "enum": enum,
             "suggest": "",
@@ -130,14 +162,14 @@ def lexicon_draft(headers, sample_rows=None):
         if enum:
             entry["suggest"] = f"状态/类型枚举值: {'、'.join(enum[:6])} — 建议补 type_cn2en/status_cn2en"
         elif typ in ("integer", "decimal"):
-            entry["suggest"] = f"数值列 — 建议补 attr_cn2en({_col_cn(h)}→{local_name(h)})"
+            entry["suggest"] = f"数值列 — 建议补 attr_cn2en({_col_cn_for(h, ctx['col_cn'])}→{local_name(h)})"
         else:
             entry["suggest"] = f"文本列 — 建议确认是否需 field_alias 或 entity 映射"
         draft[h] = entry
     return draft
 
 
-def to_factory_lexicon(draft, table_name="数据", entity_cn=None):
+def to_factory_lexicon(draft, table_name="数据", entity_cn=None, industry: str = None):
     """把 lexicon_draft 初稿转换为【工厂本体 lexicon 契约】格式。
 
     对齐 factory-ontology-kit 的 lexicon.json 结构，使 solo 起草的词典初稿
@@ -181,10 +213,12 @@ def to_factory_lexicon(draft, table_name="数据", entity_cn=None):
             attr_cn2en[cn] = ename
             attr_en2cn[ename] = cn
     # 实体映射
-    ent_cn = entity_cn or "设备"
+    # 行业联动：未显式指定实体中文名时，从行业配置解析（如阀门制造→阀门）
+    ctx = _industry_ctx(industry)
+    ent_cn = entity_cn or ctx["entity_cn"]
     entity_cn2en = {ent_cn: table_name}
     return {
-        "description": f"由 solo lexicon_draft 起草 ({table_name}, 对齐工厂本体契约)",
+        "description": f"由 solo lexicon_draft 起草 ({table_name}, 实体={ent_cn}, 对齐工厂本体契约, 行业kb={ctx['kb']})",
         "attr_cn2en": attr_cn2en,
         "attr_en2cn": attr_en2cn,
         "type_cn2en": type_cn2en,
@@ -225,12 +259,16 @@ def to_review_items(draft):
     return items
 
 
-def report_draft(*, kb: str, industry: str, hit: float, questions_n: int, hits: int,
+def report_draft(*, kb: str = None, industry: str = None, hit: float, questions_n: int, hits: int,
                  asset_versions: int = 0, health: dict = None, note: str = ""):
     """起草交付报告（markdown 初稿，FDE 补全后进闭源 deliver）。
 
     hit: 命中率 0.0-1.0; health: {hypotheses, accepted, rolled_back}
+    行业联动：未显式指定 kb 时，从行业配置自动解析（industry→kb）。
     """
+    ctx = _industry_ctx(industry)
+    kb = kb or ctx["kb"]
+    industry = industry or ctx["entity_cn"]
     health = health or {}
     hyp = health.get("hypotheses", 0)
     acc = health.get("accepted", 0)
@@ -265,7 +303,7 @@ def report_draft(*, kb: str, industry: str, hit: float, questions_n: int, hits: 
     return md, ai
 
 
-def report_draft_dict(*, kb: str, industry: str, hit: float, questions_n: int, hits: int,
+def report_draft_dict(*, kb: str = None, industry: str = None, hit: float, questions_n: int, hits: int,
                       asset_versions: int = 0, health: dict = None, baseline: float = None,
                       note: str = "") -> dict:
     """起草交付报告(结构化 dict, 对齐闭源 deliver.report 字段)。
@@ -273,8 +311,12 @@ def report_draft_dict(*, kb: str, industry: str, hit: float, questions_n: int, h
     闭源 deliver.report() 返回 {kb, industry, 命中率:{baseline,current,提升},
     资产版本链, 资产版本数, 自进化健康度, 人在环审查, 遗留问题}。
     solo 草稿给出其中的 命中率/资产版本数/自进化健康度 初稿，FDE 补全后进闭源 deliver 渲染。
+    行业联动：未显式指定 kb 时从行业配置解析；industry 缺省时用行业默认实体名。
     """
     import datetime
+    ctx = _industry_ctx(industry)
+    kb = kb or ctx["kb"]
+    industry = industry or ctx["entity_cn"]
     health = health or {}
     return {
         "kb": kb,
