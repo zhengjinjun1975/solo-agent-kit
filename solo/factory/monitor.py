@@ -593,6 +593,163 @@ class MonitorAsk:
 
 
 # ═══════════════════════════════════════════════════════════════════════
+# 5. 规则链 RuleChain（P1：JSON 配置告警规则链，借鉴 ThingsBoard filter→enrich→action）
+# ═══════════════════════════════════════════════════════════════════════
+# 规则 = {id, name, when:{device, metric, cond}, combos:[{op, metric, op2, threshold}],
+#         action:alert|ticket|notify, level, label, enabled}
+# 三段式（JSON 驱动，纯规则确定性，零依赖）：
+#   filter  : 命中设备/指标 + 主条件阈值
+#   enrich  : 组合条件 AND/OR 追加约束（如 温度>80 AND 功率>20）
+#   action  : 触发 告警/工单/通知(事件记录)
+class RuleChain:
+    """JSON 配置告警规则链（P1，借鉴 ThingsBoard 规则引擎 filter→enrich→action）。
+
+    与 AlertEngine 的单点阈值不同：支持
+      - 组合条件（AND/OR 多指标）
+      - 动作分发（alert 告警 / ticket 自动工单 / notify 通知事件）
+      - 幂等去重（同规则同设备 firing 不重复触发）
+    rules 存 store._chain（JSON 持久化 rules_chain.json），web 可增删查。
+    """
+
+    def __init__(self, store: "MetricStore" = None):
+        self.store = store or MetricStore()
+        self.store.chain_file = os.path.join(self.store.dir, "rules_chain.json")
+        self._chain = self.store._load(self.store.chain_file, [])
+
+    # ---- 配置 ----
+    def list(self) -> list:
+        return self._chain
+
+    def add(self, rule: dict) -> dict:
+        """新增/更新一条 JSON 规则链。规则需含 id；同 id 覆盖。"""
+        if not isinstance(rule, dict) or not rule.get("id"):
+            raise ValueError("规则链需含 id")
+        self._chain = [r for r in self._chain if r.get("id") != rule["id"]]
+        rule.setdefault("enabled", True)
+        self._chain.append(rule)
+        self.store._save("_chain", "chain_file", self._chain)
+        return rule
+
+    def remove(self, rule_id: str) -> bool:
+        n = len(self._chain)
+        self._chain = [r for r in self._chain if r.get("id") != rule_id]
+        self.store._save("_chain", "chain_file", self._chain)
+        return len(self._chain) != n
+
+    def clear(self) -> None:
+        self.store._save("_chain", "chain_file", [])
+
+    # ---- 单点评估 ----
+    def evaluate_point(self, device_id: str, metric: str, value: float,
+                       ts: str = None) -> list:
+        """对一条指标评估规则链，返回本次触发的动作记录列表。"""
+        ts = ts or _now_ts()
+        fired = []
+        for rule in self._chain:
+            if not rule.get("enabled", True):
+                continue
+            w = rule.get("when") or {}
+            if w.get("device") and w["device"] != device_id:
+                continue
+            if w.get("metric") and w["metric"] != metric:
+                continue
+            if not self._match_cond(w.get("cond"), metric, value,
+                                    w.get("op2"), w.get("threshold")):
+                continue
+            # 组合条件（enrich 段）：AND/OR 多指标
+            combos = rule.get("combos") or []
+            if combos and not self._match_combos(combos, device_id):
+                continue
+            act = self._dispatch(rule, device_id, metric, value, ts)
+            if act:
+                fired.append(act)
+        return fired
+
+    def _match_cond(self, op, metric, value, op2=None, threshold=None):
+        """主条件：'name op threshold'。threshold 可为固定值或另一指标名。"""
+        op = op or ">"
+        if threshold is None:
+            return False
+        # 阈值是数字 → 直接比较；是字符串 → 视为指标名（当前指标对自身无意义，跳过）
+        try:
+            thr = float(threshold)
+        except (TypeError, ValueError):
+            thr = None
+        if thr is None:
+            return False
+        if op in (">", ">="):
+            return value > thr if op == ">" else value >= thr
+        if op in ("<", "<="):
+            return value < thr if op == "<" else value <= thr
+        if op == "==":
+            return value == thr
+        return False
+
+    def _match_combos(self, combos: list, device_id: str) -> bool:
+        """组合条件：list of {metric, op, threshold}，从左到右布尔求值。
+
+        默认用 AND 连接；某条件 `op:'OR'` 表示它与其前一条件取并集。
+        如 [{power>40}, {op:'OR', temperature>90}] = (power>40) OR (temperature>90)。
+        """
+        result = None
+        for c in combos:
+            lat = self.store.latest(device_id, c.get("metric"))
+            match = bool(lat) and self._match_cond(
+                c.get("op2", ">"), c.get("metric"), float(lat["value"]),
+                None, c.get("threshold"))
+            if result is None:
+                result = match
+            elif c.get("op") == "OR":
+                result = result or match
+            else:
+                result = result and match
+            if result is False and c.get("op") != "OR":
+                # AND 短路（OR 不能短路）
+                pass
+        return bool(result)
+
+    def _dispatch(self, rule, device_id, metric, value, ts):
+        """动作分发 + 幂等去重。返回动作记录或 None（已存在同规则 firing）。"""
+        level = rule.get("level", "medium")
+        label = rule.get("label") or rule.get("name") or rule["id"]
+        rid = rule["id"]
+        # 幂等：同规则同设备同指标 firing 中不再触发
+        for a in self.store._alerts:
+            if (a.get("rule_id") == rid and a["device_id"] == device_id
+                    and a.get("chain", False) and a["state"] == "firing"):
+                a["value"] = value
+                a["events"].append({"ts": ts, "event": "持续触发(规则链)", "value": value})
+                self.store._save("_alerts", "alerts_file", self.store._alerts)
+                return None
+        action = rule.get("action", "alert")
+        aid = f"RL-{rid}-{device_id}-{int(time.time() * 1000)}"
+        alert = {"id": aid, "rule_id": rid, "chain": True,
+                 "device_id": device_id, "metric": metric, "type": "rule_chain",
+                 "value": value, "op": "chain", "threshold": None,
+                 "level": level, "state": "firing", "raised_at": ts,
+                 "recovered_at": None, "label": label,
+                 "events": [{"ts": ts, "event": f"触发规则链[{rid}]", "value": value}]}
+        # action: alert 落告警库；ticket 直接建工单；notify 只记事件不入告警库
+        if action == "ticket":
+            self.store._tickets.append({
+                "id": f"TK-{rid}-{device_id}-{int(time.time()*1000)}",
+                "device_id": device_id, "metric": metric,
+                "problem": f"规则链[{rid}] {label} 触发(值={value})",
+                "severity": level, "state": "open", "triage": "规则链",
+                "diagnosis": "", "resolution": "", "alert_id": aid,
+                "ts": ts, "done_at": None, "chain": True,
+                "events": [{"ts": ts, "event": f"open(规则链[{rid}]触发)"}]})
+            self.store._save("_tickets", "tickets_file", self.store._tickets)
+            return {**alert, "action": "ticket"}
+        if action == "notify":
+            return {**alert, "action": "notify", "state": "fired_once"}
+        # 默认 alert
+        self.store._alerts.append(alert)
+        self.store._save("_alerts", "alerts_file", self.store._alerts)
+        return {**alert, "action": "alert"}
+
+
+# ═══════════════════════════════════════════════════════════════════════
 # 5. 一站式：演示/接入工厂本体决策
 # ═══════════════════════════════════════════════════════════════════════
 def monitor_snapshot(dir: str = None) -> dict:

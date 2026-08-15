@@ -1,8 +1,8 @@
 # FDE 套件运行手册（solo-agent-kit）
 
 > 用途：FDE 个人交付辅助工具。干"起草/记忆/方法论"的辅助活，不碰算法和交付系统核心。
-> 角色：solo 辅助人（FDE）、开源管算法、闭源管交付。
-> 版本：v0.5.0
+> 角色：solo 作为 fde 域开源原子（`solo-fde`/`solo-memory`/`solo-monitor`/`zh-write`）——辅助人（FDE）、开源管算法、闭源管编排交付。
+> 版本：v0.5.6
 
 ## 一、能力边界（solo 只做辅助）
 

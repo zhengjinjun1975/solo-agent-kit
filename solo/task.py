@@ -74,6 +74,8 @@ class Task:
             t["triage"] = "故障类"
         else:
             t["triage"] = "待分类"
+        t["audit"] = [{"ts": _now(), "actor": "system", "from": None,
+                       "to": "open", "note": f"创建工单({t['triage']})"}]
         t["events"].append({"ts": _now(), "event": f"open({t['triage']})"})
         self._save(t)
         return t
@@ -83,8 +85,12 @@ class Task:
         t = self._load(tid)
         if not t or "problem" not in t:
             return {"error": "issue not found"}
+        cur = t.get("state", "open")
         t["diagnosis"] = diagnosis
         t["state"] = "diagnosed"
+        t["audit"] = t.get("audit", [])
+        t["audit"].append({"ts": _now(), "actor": "user", "from": cur,
+                           "to": "diagnosed", "note": "记录诊断"})
         t["events"].append({"ts": _now(), "event": "diagnosed"})
         self._save(t)
         return t
@@ -94,8 +100,12 @@ class Task:
         t = self._load(tid)
         if not t or "problem" not in t:
             return {"error": "issue not found"}
+        cur = t.get("state", "open")
         t["resolution"] = resolution
         t["state"] = "resolved"
+        t["audit"] = t.get("audit", [])
+        t["audit"].append({"ts": _now(), "actor": "user", "from": cur,
+                           "to": "resolved", "note": "记录解决"})
         t["events"].append({"ts": _now(), "event": "resolved"})
         self._save(t)
         return t
@@ -113,6 +123,56 @@ class Task:
                                "severity": t.get("severity"), "triage": t.get("triage"),
                                "state": t.get("state"), "ts": t.get("ts")})
         return issues
+
+    # ---- 工单状态机 + 审计（P0：借鉴 LangGraph 确定性状态机，工单全生命周期可审计）----
+    # 合法状态转移表（确定性，杜绝任意状态乱跳）
+    ISSUE_TRANSITIONS = {
+        "open": {"in_progress", "diagnosed", "closed", "cancelled"},
+        "in_progress": {"diagnosed", "resolved", "closed", "cancelled"},
+        "diagnosed": {"in_progress", "resolved", "closed", "cancelled"},
+        "resolved": {"closed"},
+        "closed": set(),
+        "cancelled": set(),
+    }
+
+    def issue_audit(self, tid: str) -> dict:
+        """工单操作审计：全生命周期操作记录（谁/何时/做了什么/从哪到哪）。"""
+        t = self._load(tid)
+        if not t or "problem" not in t:
+            return {"error": "issue not found", "id": tid}
+        return {"id": tid, "problem": t.get("problem"), "state": t.get("state"),
+                "audit": t.get("audit", []), "events": t.get("events", [])}
+
+    def transition(self, tid: str, target: str, actor: str = "user",
+                   note: str = "") -> dict:
+        """工单确定性状态机：合法流转 + 每一步写操作审计。
+
+        actor: 操作者（user / monitor / rule-chain / system）。
+        审计记录 = {ts, actor, from, to, note}，append 不可变，构成全生命周期操作轨迹。
+        """
+        t = self._load(tid)
+        if not t or "problem" not in t:
+            return {"error": "issue not found", "id": tid}
+        cur = t.get("state", "open")
+        if target not in self.ISSUE_TRANSITIONS.get(cur, set()):
+            return {"error": f"非法流转: {cur} → {target}",
+                    "id": tid, "state": cur,
+                    "legal": sorted(self.ISSUE_TRANSITIONS.get(cur, set()))}
+        t["state"] = target
+        t["audit"] = t.get("audit", [])
+        t["audit"].append({"ts": _now(), "actor": actor, "from": cur,
+                           "to": target, "note": note})
+        t["events"].append({"ts": _now(), "event": f"{target}({actor})",
+                            "note": note})
+        if target == "closed":
+            t["closed_at"] = _now()
+        self._save(t)
+        return {"id": tid, "state": target, "from": cur, "to": target,
+                "audit_count": len(t["audit"]), "audit": t["audit"]}
+
+    def reopen(self, tid: str, actor: str = "user", note: str = "") -> dict:
+        """重开工单（closed → open，合法单向往返，审计记录）。"""
+        return self.transition(tid, "open", actor=actor, note=note)
 
     def status(self, tid: str) -> dict:
         t = self._load(tid)

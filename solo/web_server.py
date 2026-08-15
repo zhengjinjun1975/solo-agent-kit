@@ -74,6 +74,11 @@ class SoloHandler(_GetRoutesMixin, _PostRoutesMixin, BaseHTTPRequestHandler):
         "/api/db-preview": "_get_db_preview",
         "/api/industry": "_get_industry",
         "/api/memory/optmem-search": "_get_optmem_search",
+        "/api/monitor/protocols": "_get_monitor_protocols",
+        "/api/monitor/chain": "_get_monitor_chain",
+        "/api/writing/evidence": "_get_writing_evidence",
+        "/api/task/audit": "_get_task_audit",
+        "/api/ontology/semantic": "_get_ontology_semantic",
     }
     _POST_ROUTES = {
         "/api/config": "_post_config",
@@ -109,6 +114,13 @@ class SoloHandler(_GetRoutesMixin, _PostRoutesMixin, BaseHTTPRequestHandler):
         "/api/monitor/rule": "_post_monitor_rule",
         "/api/monitor/ticket-state": "_post_monitor_ticket_state",
         "/api/monitor/demo": "_post_monitor_demo",
+        "/api/monitor/protocol/http": "_post_monitor_protocol_http",
+        "/api/monitor/protocol/probe": "_post_monitor_protocol_probe",
+        "/api/monitor/chain": "_post_monitor_chain",
+        "/api/memory/write": "_post_memory_write",
+        "/api/memory/update": "_post_memory_update",
+        "/api/memory/delete": "_post_memory_delete",
+        "/api/ontology/semantic": "_post_onto_semantic",
     }
 
     def _json(self, data, code=200):

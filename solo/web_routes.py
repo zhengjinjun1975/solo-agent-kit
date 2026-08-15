@@ -115,6 +115,53 @@ class _GetRoutesMixin:
         self._json({"tickets": store.tickets(state),
                     "count": len(store.tickets(state))})
 
+    def _get_monitor_protocols(self, qs):
+        # 协议直采：可用协议清单（内置 TCP/HTTP，可选 MQTT/Modbus/OPC-UA）
+        from solo.factory import protocols as proto
+        self._json({"protocols": proto.protocols()})
+
+    def _get_monitor_chain(self, qs):
+        # 规则链：JSON 配置告警规则链清单（P1）
+        from solo.factory import monitor as mon
+        rc = mon.RuleChain()
+        self._json({"rules": rc.list(), "count": len(rc.list())})
+
+    def _get_writing_evidence(self, qs):
+        # 写作证据账本+事实核查（P0）：需文本+数据源，POST 用；GET 返回能力说明
+        from solo.factory import evidence as ev
+        self._json({"capability": "POST /api/writing/evidence {text, source:{csv|db}, col_map}",
+                    "report_format": {"ledger": [], "summary": {}}})
+
+    def _get_task_audit(self, qs):
+        # 任务：工单全生命周期操作审计（?id=xxx）
+        from solo.task import Task
+        tid = qs().get("id", [""])[0]
+        if not tid:
+            self._json({"error": "需 id 参数（工单号）"}, 400)
+            return
+        r = Task().issue_audit(tid)
+        if "error" in r:
+            self._json(r, 400)
+            return
+        self._json(r)
+
+    def _get_ontology_semantic(self, qs):
+        # 本体语义贯通：字段语义角色分类（?fields=温度,cpu_percent 或 ?block=monitor）
+        from solo.factory.ontology import semantic as sem
+        fields = [f.strip() for f in qs().get("fields", [""])[0].split(",") if f.strip()]
+        block = qs().get("block", [None])[0]
+        if block:
+            blocks = {"monitor": ["device_id", "temperature", "power", "cpu_percent", "mem_percent"],
+                      "task": ["device_id", "severity", "triage", "problem", "state"],
+                      "memory": ["text", "tags", "ts", "updated"]}
+            self._json(sem.semantic_bridge({block: blocks.get(block, [])}))
+            return
+        if not fields:
+            self._json({"error": "需 fields 参数（逗号分隔字段名）"}, 400)
+            return
+        self._json({"fields": sem.cross_field_semantics(fields),
+                    "consistency": sem.semantic_consistency(fields)})
+
     def _get_site_devices(self, qs):
         # 厂区设备台账
         try:
@@ -313,6 +360,51 @@ class _PostRoutesMixin:
                     "alerts": r["alerts"], "tickets": r["tickets"],
                     "latest": s.store.latest(device_id, metric)})
 
+    def _post_monitor_protocol_http(self, body):
+        # 协议直采（P0）：HTTP webhook 直采网关——真实设备/边缘网关 POST 指标，全链路落地
+        # body: {device_id, metric, value} 或 {设备:{指标:值}}；自动_ticket 可选
+        from solo.factory import protocols as proto
+        g = proto.HttpIngestGateway(auto_ticket=bool(body.get("auto_ticket", True)))
+        r = g.ingest(body)
+        self._json(r)
+
+    def _post_monitor_protocol_probe(self, body):
+        # 协议直采（P0）：连接自检（TCP/HTTP/MQTT 等源连通状态）
+        from solo.factory import protocols as proto
+        try:
+            src = proto.create_source(body.get("config") or {"protocol": "tcp"},
+                                      auto_ticket=False)
+            self._json(src.probe())
+        except proto.ProtocolError as e:
+            self._json({"ok": False, "error": str(e)}, 400)
+
+    def _post_monitor_chain(self, body):
+        # 规则链（P1）：新增/更新一条 JSON 告警规则链
+        from solo.factory import monitor as mon
+        action = body.get("action", "add")
+        rc = mon.RuleChain()
+        if action == "add":
+            # 规则需包在 rule 字段内（避免规则的 action 与分发 action 冲突）
+            rule = body.get("rule")
+            if not isinstance(rule, dict):
+                self._json({"error": "需 rule 字段（JSON 规则链对象）"}, 400)
+                return
+            try:
+                saved = rc.add(rule)
+            except ValueError as e:
+                self._json({"error": str(e)}, 400)
+                return
+            self._json({"ok": True, "rule": saved, "count": len(rc.list())})
+        elif action == "remove":
+            self._json({"ok": rc.remove(body.get("id", "")), "count": len(rc.list())})
+        elif action == "evaluate":
+            # 手动评估一条指标：{device_id, metric, value}
+            fired = rc.evaluate_point(body.get("device_id"), body.get("metric"),
+                                      float(body.get("value", 0)))
+            self._json({"ok": True, "fired": fired, "count": len(fired)})
+        else:
+            self._json({"error": f"unknown chain action: {action}"}, 400)
+
     def _post_monitor_ask(self, body):
         # 设备监测：AI 问数（自然语言查设备/告警/工单，先查库再回答）
         from solo.factory import monitor as mon
@@ -454,6 +546,12 @@ class _PostRoutesMixin:
             self._json(t.resolve(body.get("id", "")))
         elif cmd == "list_tasks":  # 目标式任务列表（task-status）
             self._json({"tasks": t.list(body.get("state"))})
+        elif cmd == "transition":  # 工单状态机（P0）：确定性流转 + 操作审计
+            self._json(t.transition(body.get("id", ""), body.get("target", ""),
+                                    actor=body.get("actor", "user"),
+                                    note=body.get("note", "")))
+        elif cmd == "audit":  # 工单全生命周期审计（P0）
+            self._json(t.issue_audit(body.get("id", "")))
         else:
             self._json({"issues": t.list_issues()})
 
@@ -608,6 +706,30 @@ class _PostRoutesMixin:
         added = m.add_fact(body.get("text", ""), tags=["fact"])
         self._json({"added": added})
 
+    def _post_memory_write(self, body):
+        # 记忆写入决策层（P0）：对齐 Mem0 决策循环，写入前召回相似 → ADD/UPDATE/SKIP
+        m = memory_mod.Memory()
+        text = body.get("text", "")
+        if not text:
+            self._json({"error": "需 text"}, 400)
+            return
+        r = m.write(text, tags=body.get("tags"),
+                    threshold=float(body.get("threshold", 0.6)))
+        self._json(r)
+
+    def _post_memory_update(self, body):
+        # 记忆显式 UPDATE（P0）
+        m = memory_mod.Memory()
+        r = m.update_fact(body.get("target", ""), body.get("new_text", ""),
+                          tags=body.get("tags"))
+        self._json(r)
+
+    def _post_memory_delete(self, body):
+        # 记忆 DELETE（P0）
+        m = memory_mod.Memory()
+        r = m.delete_fact(text=body.get("text"), h=body.get("h"))
+        self._json(r)
+
     def _post_survey(self, body):
         # 需求→验收生命周期（survey 打通入口，POST action 分发）
         act = body.get("action", "outline")
@@ -654,6 +776,21 @@ class _PostRoutesMixin:
             p = provider_mod.Provider.from_file()
             self._json(writing_mod.write_natural(body.get("text", ""),
                                                  style=body.get("style", "tweet"), provider=p))
+        elif body.get("action") == "evidence":
+            # 写作证据账本 + 事实核查（P0）：防幻觉、可溯源
+            from solo.factory import evidence as ev
+            text = body.get("text", "")
+            if not text:
+                self._json({"error": "需 text（写作产出）"}, 400)
+                return
+            rows = api.load_rows(body)
+            if not rows:
+                # 无数据源：只出证据账本（全 unsupported），不造假
+                result = ev.FactChecker([]).check(text)
+            else:
+                result = ev.fact_check(text, rows, col_map=body.get("col_map"))
+            result["report"] = ev.render_report(result)
+            self._json(result)
         else:
             self._json(writing_mod.scan(body.get("text", "")))
 
@@ -730,6 +867,28 @@ class _PostRoutesMixin:
         term = body.get("term", "")
         o = self._build_onto(rows, body.get("entity"), body.get("id"), body.get("industry"))
         self._json({"term": term, "hits": o.search(term, top_k=body.get("top_k", 5))})
+
+    def _post_onto_semantic(self, body):
+        # 本体语义贯通（P0）：多表关联 + 字段语义角色 + 语义一致性 + 统一实例图
+        from solo.factory.ontology import semantic as sem
+        if body.get("fields"):
+            # 仅字段语义角色分类/一致性
+            fields = body.get("fields")
+            if isinstance(fields, str):
+                fields = [f.strip() for f in fields.split(",") if f.strip()]
+            self._json({"fields": sem.cross_field_semantics(fields),
+                        "consistency": sem.semantic_consistency(fields)})
+            return
+        if body.get("blocks"):
+            # 多板块语义贯通（monitor/task/memory 字段统一到本体语义层）
+            self._json(sem.semantic_bridge(body.get("blocks")))
+            return
+        # 多表关联：data 或 csvs → 实体图 + 语义角色
+        data = self._load_multi_tables(body)
+        if not data:
+            self._json({"error": "需 fields / blocks / 多表数据源(csvs 或 data)"}, 400)
+            return
+        self._json(sem.link_entities(data))
 
     # ---- CLI→web 回归：交付辅助 FDE D0/D1/D4（draft-questions/lexicon-draft/report-draft/to-factory-lexicon/to-review-items）----
     def _post_delivery(self, body):

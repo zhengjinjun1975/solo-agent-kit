@@ -3,6 +3,27 @@
 > 针对 FDE（工厂部署工程师）/一人公司的轻量全栈 AI 工具。零第三方依赖（纯标准库）。
 > 本文档面向工程师：模块分层、契约、数据流、扩展方式。
 
+## 0. 原子化定位（fde 域开源原子底座）
+
+本仓库在生态「插件式原子智能体组装」架构中，作为 **FDE 域的开源原子底座**存在
+（架构定稿见 `_os/plugin-agent-architecture.md`、边界见 `_os/oss-close-boundary-license.md`）。
+
+**四条定位，贯穿本文档与 README：**
+
+1. **fde 域原子**：solo 本身是一个开源超集原子（`agent.type=fde`，`open_source=true`），内部按子能力域再拆原子——
+   `fde`（现场流程 D0-D4 工具箱）、`memory`（三层两域记忆）、`monitor`（设备监测）、`write`（中文写作）
+   四原子可独立运行、可被上层组装。每个原子 = 现有核心模块（零改动）+ `manifest.json` + `main.py` 薄壳。
+2. **甲方乙方工程师共用工具**：solo 不是只给乙方（FDE 交付）用，也不只给甲方自持用——同一套开源底座，
+   乙方工程师用于交付辅助（起草/记忆/方法论），甲方工程师用于自持自运行（本体/监测/决策），两方共用同一算法内核。
+3. **开源算法 + 闭源编排边界**：算法/流程内核全部开源（Apache-2.0，可免费使用、被闭源编排层调用）；
+   唯一不进开源的是「编排/组装/交付增值」（assembler/orchestrator/deliver）——闭源侧只经公开能力接口调用本仓库原子，
+   **禁 import 内部、禁依赖反向**。删掉闭源编排器后，本仓库全开源子图仍自洽可独立运行。
+4. **FDE 先开源**：solo 的算法与流程内核优先开源，甲方可自持；其「对外服务/交付」增值若需闭源，由闭源 `deliver`
+   原子承接，不把 FDE 本身闭源化。
+
+> 边界铁律（开源侧强制执行）：开源原子**不得** `depends_on` 任何闭源原子；所有外部依赖同为开源侧且可离线获得。
+> 本仓库核心模块零依赖（纯标准库），天然满足「开源可独立运行」。
+
 ## 1. 分层架构
 
 ```
@@ -88,6 +109,25 @@
 2. 在 agent.py 的 INTENTS 加意图关键词（+LLM 意图识别）
 3. 实现 handler（Domain 层模块）
 4. 前端工作区 + API 端点（如需 Web 暴露）
+
+## 5.1 原子化封装（fde 域 → 原子壳）
+
+同一套核心模块可再加一层薄壳，暴露为可独立运行、可被组装的开源原子
+（对齐生态原子化规范 `_os/plugin-agent-architecture.md`）。**不改核心，只加壳**：
+
+| 域（原子 agent.type） | 原子名 | 现有核心模块（零改动） | 暴露能力 |
+|---|---|---|---|
+| `fde` | `solo-fde` | `agent.py` / `cli.py` / `cli_handlers.py` / `factory/*`（D0-D4 流程工具箱） | `fde.flow` `fde.ontology` `fde.data` |
+| `memory` | `solo-memory` | `memory.py`（+ OptMem） | `memory.save` `memory.recall` |
+| `monitor` | `solo-monitor` | `factory/monitor.py`（指标存储/告警引擎/工单状态机/MQTT/AI问数） | `monitor.metric` `monitor.alert` `monitor.ask` |
+| `write` | `zh-write` | `writing.py`（与 zh-writing-checker 收敛为单一来源） | `write.check` `write.rewrite` |
+| `codereview` | `code-review` | `code_review.py` / `code.py`（与 codeagent-minimal 收敛） | `codereview.review` `codereview.test` |
+
+封装要点：
+- 每原子 = 一个目录 + `manifest.json`（声明 `agent/name/version/open_source/provides/depends_on`）+ `main.py`（`AtomicAgent` 子类，`import` 并调用既有模块，包 `{ok, data/error}` 信封）。
+- **开源原子只依赖同为开源的原子**，不反向依赖闭源（边界铁律，manifest 加载即强校验）。
+- `main.py` 提供 `if __name__ == '__main__'` 独立自测入口，保证「可独立运行（A3）」。
+- 原子可作为一个节点进入任意组装图（如「FDE + monitor + decision」构成现场运营链），也可按需拆成子原子复用。
 
 ## 6. 数据持久化
 

@@ -1,7 +1,7 @@
 /* SoloAgentKit 样式 (从 index.html 拆分, P2-7) */
 
 /* ============================================================
-   solo-agent-kit — AI 原生设计（类似 OpenClaw 聊天对话框为中心）
+   solo-agent-kit — AI 原生设计（聊天对话框为中心）
    融合 WorkBuddy 多面板结构 · 方案A配色(青绿主色#0D9488 + 紫罗兰强调#7C3AED + 暖灰白浅底#F8FAFC)
    对话是主入口：自然语言 → AI 路由到全部套件能力
    ============================================================ */
@@ -63,7 +63,7 @@ body{font-family:-apple-system,"Segoe UI","Microsoft YaHei",system-ui,sans-serif
 .btn:active{transform:translateY(0)}
 .btn.pri{background:linear-gradient(135deg,var(--blue),var(--blue-soft));border:none;color:#fff;box-shadow:0 2px 10px rgba(13,148,136,.25)}
 
-/* 聊天中心（OpenClaw 式）*/
+/* 聊天中心 */
 .chat{flex:1;display:flex;flex-direction:column;overflow:hidden}
 .chat-scroll{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:14px;align-items:center;justify-content:center}
 .chat-welcome{text-align:center;max-width:560px;padding:20px;display:flex;flex-direction:column;align-items:center}

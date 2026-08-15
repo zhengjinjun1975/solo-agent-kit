@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "solo-agent-kit"
 version = "0.5.6"
-description = "本体优先、方法论驱动、轻量独立的一人公司 Agent —— 记忆/写作/代码/开源，一个人干完整活。"
+description = "本体优先、方法论驱动、轻量独立的一人公司/FDE Agent —— 也是 fde 域开源原子底座（fde/memory/monitor/write），甲方乙方工程师共用、可被闭源编排层调用。"
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "Apache-2.0" }

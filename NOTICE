@@ -11,6 +11,21 @@ Derived work notice:
   methodology (syntax / cyclomatic complexity / security / 0-100 score) is
   aligned with codeagent-minimal.
 
+Atomic / Open-Core boundary notice:
+- solo-agent-kit is published as the **fde-domain open-source atomic base**
+  (atoms `solo-fde` / `solo-memory` / `solo-monitor` / `zh-write`, plus
+  `code-review`). All algorithm/flow internals are Apache-2.0 and free to use,
+  modify, redistribute, and be called by a closed-source orchestration layer
+  through public capability interfaces.
+- The closed side (assembler / orchestrator / deliver packaging) is NOT part of
+  this open repository. Open-source atoms never depend on closed-source atoms;
+  removing the closed orchestration leaves the fully-open subset self-consistent
+  and independently runnable. See `docs/ARCHITECTURE.md` for the boundary rules.
+- Design-only credit: the device-monitoring P0 (metric→storage→alert→AI-ask)
+  follows the *design approach* of DataBuff (AGPL). Only the approach is reused;
+  no code is copied, to avoid AGPL copyleft propagation. The implementation here
+  is original.
+
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at

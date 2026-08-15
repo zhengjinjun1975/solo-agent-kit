@@ -57,8 +57,6 @@ def generate_doc(topic: str, kind: str = "readme", tier: str = "local") -> str:
 # 候选路径：环境变量 → 常见源码根。任一命中即可，找不到不报错。
 _CANDIDATES = [
     os.environ.get("ZH_WRITING_CHECKER", ""),
-    r"E:/open-source/zh-writing-checker/zh_writing_checker.py",
-    r"C:/Users/ASUS Air/open-source/zh-writing-checker/zh_writing_checker.py",
 ]
 # 相对回退：从本文件往上找 open-source 根（保证闭源工具在 E: 根即可命中）
 _here = os.path.dirname(os.path.abspath(__file__))

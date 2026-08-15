@@ -52,7 +52,7 @@ class Memory:
         p = self._load(self._profile_path, {})
         return "\n".join(f"{k}: {v}" for k, v in p.items())
 
-    # ---- 温域·事实层 ----
+    # ---- 温域·事实层 ----  
     def add_fact(self, text: str, tags: list = None) -> bool:
         """事实层：有价值的都写。返回是否新增（去重）。"""
         facts = self._load(self._facts_path, [])
@@ -62,6 +62,78 @@ class Memory:
         facts.append({"text": text, "tags": tags or [], "h": h, "ts": _now()})
         self._save(self._facts_path, facts)
         return True
+
+    # ---- 写入决策层（P0：对齐 Mem0 决策循环 ADD/UPDATE/DELETE，需自实现）----
+    def write(self, text: str, tags: list = None, threshold: float = 0.6) -> dict:
+        """记忆写入决策层：写入前召回相似旧记忆，规则判定 ADD/UPDATE/SKIP。
+
+        借鉴 Mem0 论文「写入前召回相似 + 决策层」：避免日期戳/标题变体重复堆积。
+        零依赖自实现（不引第三方 SDK）：
+          1. 召回 top-k 相似旧事实（复用 search 语义/词重叠）
+          2. 相似度 ≥ 0.9 → SKIP（等价，跳过）
+          3. 相似度 ≥ threshold → UPDATE（同主题，覆盖旧值，保留时序）
+          4. 否则 → ADD（新事实）
+        返回 {action, reason, fact, similar}，落库带 updated 时间戳。
+        """
+        facts = self._load(self._facts_path, [])
+        # 1) 召回相似旧记忆（词重叠打分，零依赖）
+        scored = []
+        for f in facts:
+            sim = _overlap(text, f["text"])
+            if sim >= 0.3:
+                scored.append((sim, f))
+        scored.sort(key=lambda x: x[0], reverse=True)
+        similar = [f for s, f in scored[:5]]
+
+        # 2) 决策
+        if similar and scored[0][0] >= 0.9:
+            return {"action": "SKIP", "reason": "与现有记忆等价(相似度≥0.9)，跳过防重复",
+                    "text": text, "similar": similar, "updated": False}
+        if similar and scored[0][0] >= threshold:
+            top = similar[0]
+            # UPDATE：保留原 text 主体，追加新视角（避免信息丢失），更新 tags/updated
+            top["tags"] = sorted(set((top.get("tags") or []) + (tags or [])))
+            top["updated"] = _now()
+            top["updates"] = top.get("updates", 0) + 1
+            if top["text"] != text and len(top.get("history", [])) < 20:
+                top.setdefault("history", []).append({"text": top["text"], "ts": top["ts"]})
+            top["ts"] = _now()
+            self._save(self._facts_path, facts)
+            return {"action": "UPDATE", "reason": f"同主题记忆存在(相似度{scored[0][0]:.2f})，更新而非重复新增",
+                    "text": text, "fact": top, "similar": similar, "updated": True}
+        # 3) ADD
+        added = self.add_fact(text, tags)
+        return {"action": "ADD" if added else "SKIP",
+                "reason": "新增事实" if added else "完全重复，跳过",
+                "text": text, "updated": added}
+
+    def update_fact(self, target_text: str, new_text: str, tags: list = None) -> dict:
+        """显式 UPDATE 一条记忆（对齐 Mem0 update 语义）。"""
+        facts = self._load(self._facts_path, [])
+        for f in facts:
+            if f["text"] == target_text:
+                if f.get("history", []).__len__() < 20:
+                    f.setdefault("history", []).append({"text": f["text"], "ts": f["ts"]})
+                f["text"] = new_text
+                f["h"] = self._hash(new_text)
+                if tags:
+                    f["tags"] = sorted(set((f.get("tags") or []) + tags))
+                f["updated"] = _now()
+                self._save(self._facts_path, facts)
+                return {"ok": True, "action": "UPDATE", "fact": f}
+        return {"ok": False, "action": "UPDATE", "reason": "目标记忆不存在"}
+
+    def delete_fact(self, text: str = None, h: str = None) -> dict:
+        """DELETE 一条记忆（按文本或哈希）。返回是否删除。"""
+        facts = self._load(self._facts_path, [])
+        before = len(facts)
+        if text is not None:
+            facts = [f for f in facts if f["text"] != text]
+        elif h is not None:
+            facts = [f for f in facts if f.get("h") != h]
+        self._save(self._facts_path, facts)
+        return {"ok": len(facts) != before, "action": "DELETE",
+                "deleted": before - len(facts)}
 
     def search(self, query: str, top_k: int = 5, semantic: bool = True):
         """事实层检索。优先 embed 向量（P1-5），无 embed 回退词重叠。"""
@@ -206,11 +278,11 @@ def _cosine(a: list, b: list) -> float:
 
 
 # ------------------------------------------------------------------ OptMem 互通（可选增强，零依赖）
-# 把 FDE 工具箱经验/方法论沉淀进 OptMem 全局记忆（E:\optmem），跨项目、跨会话复用。
+# 把 FDE 工具箱经验/方法论沉淀进 OptMem 全局记忆（可选增强，由环境变量指定），跨项目、跨会话复用。
 # 失败静默返回，绝不打断主流程；可用环境变量 OPTMEM_NOTE=0 关闭。
-_MEMO = os.environ.get("OPTMEM_MEMO", r"E:\optmem\memo")
-_MEMO_SEARCH = os.environ.get("OPTMEM_MEMO_SEARCH", r"E:\optmem\memo_search.py")
-_MEMORY_DIR = os.environ.get("OPTMEM_MEMORY_DIR", r"E:\optmem\memory")
+_MEMO = os.environ.get("OPTMEM_MEMO", os.path.join(os.path.expanduser("~"), "optmem", "memo"))
+_MEMO_SEARCH = os.environ.get("OPTMEM_MEMO_SEARCH", os.path.join(os.path.expanduser("~"), "optmem", "memo_search.py"))
+_MEMORY_DIR = os.environ.get("OPTMEM_MEMORY_DIR", os.path.join(os.path.expanduser("~"), "optmem", "memory"))
 _OPTMEM_ENABLED = os.environ.get("OPTMEM_NOTE", "1").lower() not in ("0", "false", "no", "off")
 
 
