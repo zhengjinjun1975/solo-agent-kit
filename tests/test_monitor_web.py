@@ -42,6 +42,16 @@ def _free_port():
     return p
 
 
+def _opener():
+    """返回绕过系统代理的 opener。
+
+    Windows 会把系统/注册表代理(如 127.0.0.1:xxxx)注入 urllib，
+    导致本机测试 web 服务的 localhost 请求被代理劫持而 ConnectionRefused。
+    测试只访问 127.0.0.1，禁用代理保证与开发者本机代理设置解耦。
+    """
+    return urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+
 @pytest.fixture(scope="module")
 def server():
     """启动隔离数据目录的测试 web 服务（SOLO_MONITOR_DIR → 临时目录）。"""
@@ -54,7 +64,7 @@ def server():
     base = f"http://127.0.0.1:{port}"
     for _ in range(20):
         try:
-            urllib.request.urlopen(base + "/", timeout=2)
+            _opener().open(base + "/", timeout=2)
             break
         except Exception:
             time.sleep(0.5)
@@ -73,7 +83,7 @@ def api(server, path, method="GET", body=None, t=20):
                                          headers={"Content-Type": "application/json"})
         else:
             req = urllib.request.Request(server + path)
-        with urllib.request.urlopen(req, timeout=t) as r:
+        with _opener().open(req, timeout=t) as r:
             return r.status, json.load(r)
     except urllib.error.HTTPError as e:
         try:
