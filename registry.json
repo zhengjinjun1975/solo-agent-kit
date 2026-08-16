@@ -2,6 +2,34 @@
   "schema": "fde.registry/1.0",
   "agents": [
     {
+      "name": "factory-cognition",
+      "agent": "cognition",
+      "version": "0.1.0",
+      "open_source": true,
+      "license": "Apache-2.0",
+      "path": "atoms/cognition/factory-cognition",
+      "entry": "main.py",
+      "capabilities": [
+        "factory.cognition"
+      ],
+      "depends_on": [],
+      "conflicts": []
+    },
+    {
+      "name": "sme-decision",
+      "agent": "decision",
+      "version": "0.1.0",
+      "open_source": true,
+      "license": "Apache-2.0",
+      "path": "atoms/decision/sme-decision",
+      "entry": "main.py",
+      "capabilities": [
+        "sme.decision"
+      ],
+      "depends_on": [],
+      "conflicts": []
+    },
+    {
       "name": "delivery-package",
       "agent": "deliver",
       "version": "0.1.0",
@@ -11,6 +39,20 @@
       "entry": "main.py",
       "capabilities": [
         "delivery.package"
+      ],
+      "depends_on": [],
+      "conflicts": []
+    },
+    {
+      "name": "diagnose-kb",
+      "agent": "fde",
+      "version": "0.1.0",
+      "open_source": true,
+      "license": "Apache-2.0",
+      "path": "atoms/fde/diagnose-kb",
+      "entry": "main.py",
+      "capabilities": [
+        "diagnose.kb"
       ],
       "depends_on": [],
       "conflicts": []
@@ -67,6 +109,20 @@
       "entry": "main.py",
       "capabilities": [
         "monitor.alert"
+      ],
+      "depends_on": [],
+      "conflicts": []
+    },
+    {
+      "name": "monitor-anomaly",
+      "agent": "monitor",
+      "version": "0.1.0",
+      "open_source": true,
+      "license": "Apache-2.0",
+      "path": "atoms/monitor/monitor-anomaly",
+      "entry": "main.py",
+      "capabilities": [
+        "monitor.anomaly"
       ],
       "depends_on": [],
       "conflicts": []

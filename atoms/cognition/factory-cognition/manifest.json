@@ -1,0 +1,18 @@
+{
+  "schema_version": "agent.manifest/1.0",
+  "name": "factory-cognition",
+  "agent": "cognition",
+  "version": "0.1.0",
+  "entry": "main.py",
+  "license": "Apache-2.0",
+  "open_source": true,
+  "description": "复用 factory-ontology-kit 认知/本体/RAG 能力：确定性本体问答 + 离线RAG知识检索（算法开源，数据不出厂）",
+  "provides": ["factory.cognition"],
+  "capabilities": ["factory.cognition"],
+  "depends_on": [],
+  "conflicts": [],
+  "resources": [],
+  "run_config": {
+    "ops": ["linkage", "ontology_qa", "add_doc", "retrieve", "ask"]
+  }
+}

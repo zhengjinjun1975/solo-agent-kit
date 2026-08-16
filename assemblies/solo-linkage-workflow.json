@@ -1,0 +1,155 @@
+{
+  "name": "solo-linkage-workflow",
+  "schema": "fde.assembly/1.0",
+  "version": "0.1.0",
+  "description": "三大开源联动组装链：monitor(指标+异常检测+动态阈值告警) → factory(本体感知认知) → sme(告警→决策→行动) → fde(工单+故障诊断根因) → delivery(交付包)。算法开源、数据不出厂，跨开源原子经统一能力路由协同。",
+  "dir": null,
+  "steps": [
+    {
+      "id": "ingest",
+      "capability": "monitor.metric",
+      "op": "ingest",
+      "inputs": {
+        "dir": "$dir",
+        "points": [
+          {"device_id": "pump_01", "metric": "vibration", "value": 4.9, "ts": "2026-08-16T10:00:00"},
+          {"device_id": "pump_01", "metric": "vibration", "value": 5.0, "ts": "2026-08-16T10:01:00"},
+          {"device_id": "pump_01", "metric": "vibration", "value": 5.1, "ts": "2026-08-16T10:02:00"},
+          {"device_id": "pump_01", "metric": "vibration", "value": 5.2, "ts": "2026-08-16T10:03:00"},
+          {"device_id": "pump_01", "metric": "vibration", "value": 5.3, "ts": "2026-08-16T10:04:00"},
+          {"device_id": "pump_01", "metric": "vibration", "value": 5.4, "ts": "2026-08-16T10:05:00"},
+          {"device_id": "pump_01", "metric": "vibration", "value": 5.6, "ts": "2026-08-16T10:06:00"},
+          {"device_id": "pump_01", "metric": "vibration", "value": 5.7, "ts": "2026-08-16T10:07:00"},
+          {"device_id": "pump_01", "metric": "vibration", "value": 8.6, "ts": "2026-08-16T10:08:00"}
+        ]
+      }
+    },
+    {
+      "id": "anomaly",
+      "capability": "monitor.anomaly",
+      "op": "detect",
+      "inputs": {
+        "mode": "sudden",
+        "values": {"$ref": "ingest.ingested.value"},
+        "k": 3.0
+      }
+    },
+    {
+      "id": "predict",
+      "capability": "monitor.anomaly",
+      "op": "predict",
+      "inputs": {
+        "values": {"$ref": "ingest.ingested.value"},
+        "failure_threshold": 20.0
+      }
+    },
+    {
+      "id": "adaptive",
+      "capability": "monitor.alert",
+      "op": "adaptive",
+      "inputs": {
+        "dir": "$dir",
+        "values": {"$ref": "ingest.ingested.value"},
+        "k": 3.0
+      }
+    },
+    {
+      "id": "set_rule",
+      "capability": "monitor.alert",
+      "op": "set_rule",
+      "inputs": {
+        "dir": "$dir",
+        "device_id": "pump_01",
+        "metric": "vibration",
+        "cmp_op": ">",
+        "threshold": {"$ref": "adaptive.threshold.upper"}
+      }
+    },
+    {
+      "id": "evaluate",
+      "capability": "monitor.alert",
+      "op": "evaluate",
+      "inputs": {
+        "dir": "$dir",
+        "device_id": "pump_01",
+        "metric": "vibration",
+        "value": 8.6
+      }
+    },
+    {
+      "id": "cognition",
+      "capability": "factory.cognition",
+      "op": "ask",
+      "inputs": {
+        "dir": "$dir",
+        "question": "水泵 pump_01 振动超限 8.6，根因可能是什么"
+      }
+    },
+    {
+      "id": "decision",
+      "capability": "sme.decision",
+      "op": "decide_alert",
+      "inputs": {
+        "device_id": "pump_01",
+        "metric": "vibration",
+        "value": 8.6,
+        "action": "维护告急",
+        "level": "预警"
+      }
+    },
+    {
+      "id": "ticket",
+      "capability": "fde.task",
+      "op": "issue",
+      "inputs": {
+        "dir": "$dir",
+        "problem": "水泵 pump_01 振动 8.6 超动态阈值 ${adaptive.threshold.upper}（预测剩余寿命 ${predict.rul}），待诊断",
+        "severity": "high"
+      }
+    },
+    {
+      "id": "learn",
+      "capability": "diagnose.kb",
+      "op": "learn",
+      "inputs": {
+        "dir": "$dir",
+        "kb": "faults",
+        "symptom": "水泵振动超限",
+        "cause": "轴承磨损/泵轴对中不良",
+        "solution": "更换轴承并做动平衡，振动恢复5.0以内",
+        "device": "pump_01",
+        "signals": {"vibration": 8.6}
+      }
+    },
+    {
+      "id": "diagnose",
+      "capability": "diagnose.kb",
+      "op": "diagnose",
+      "inputs": {
+        "dir": "$dir",
+        "symptom": "水泵振动超限",
+        "signals": {"vibration": 8.6},
+        "device": "pump_01"
+      }
+    },
+    {
+      "id": "package",
+      "capability": "delivery.package",
+      "op": "package",
+      "inputs": {
+        "monitor_snapshot": {"$ref": "ingest.ingested"},
+        "tickets": [
+          {"id": {"$ref": "ticket.ticket.id"},
+           "state": {"$ref": "ticket.ticket.state"},
+           "problem": {"$ref": "ticket.ticket.problem"},
+           "diagnosis": {"$ref": "diagnose.diagnosis.cause"}}
+        ],
+        "kb": "factory",
+        "industry": "factory",
+        "hit": 0.9,
+        "questions_n": 10,
+        "hits": 9
+      }
+    }
+  ]
+}

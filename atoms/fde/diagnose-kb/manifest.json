@@ -1,0 +1,18 @@
+{
+  "schema_version": "agent.manifest/1.0",
+  "name": "diagnose-kb",
+  "agent": "fde",
+  "version": "0.1.0",
+  "entry": "main.py",
+  "license": "Apache-2.0",
+  "open_source": true,
+  "description": "FDE 诊断深度：故障知识库「积累→诊断→根因分析」闭环。learn 沉淀问题→根因→方案，diagnose 大词共现检索命中最相关案例输出根因+方案+置信度，未知症状诚实 miss(防幻觉)。纯标准库，故障数据本地自持(data/diagnose/)不出厂",
+  "provides": ["diagnose.kb"],
+  "capabilities": ["diagnose.kb"],
+  "depends_on": [],
+  "conflicts": [],
+  "resources": [],
+  "run_config": {
+    "ops": ["learn", "diagnose", "list", "linkage"]
+  }
+}

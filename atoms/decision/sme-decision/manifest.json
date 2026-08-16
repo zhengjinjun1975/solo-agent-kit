@@ -1,0 +1,18 @@
+{
+  "schema_version": "agent.manifest/1.0",
+  "name": "sme-decision",
+  "agent": "decision",
+  "version": "0.1.0",
+  "entry": "main.py",
+  "license": "Apache-2.0",
+  "open_source": true,
+  "description": "复用 sme-decision-ontology 决策能力：确定性决策 + 行动清单 + 阈值回灌（算法开源，数据不出厂）",
+  "provides": ["sme.decision"],
+  "capabilities": ["sme.decision"],
+  "depends_on": [],
+  "conflicts": [],
+  "resources": [],
+  "run_config": {
+    "ops": ["linkage", "decide", "action", "feedback", "decide_alert"]
+  }
+}
