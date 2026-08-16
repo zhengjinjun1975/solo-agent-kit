@@ -45,7 +45,7 @@ def build_ledger(text: str, source_rows: list = None) -> list:
     # 1) 百分比声明（"下降了 30%" "占用 90%"）
     for m in re.finditer(
             r"(?P<word>下降|上升|降低|升高|提升|减少|增加|占比|达到|占用|超|低于|高于|为|是)"
-            r"[^。，；]{0,6}\s*" + _PCT, text):
+            r"[^。，；\d%]{0,6}?\s*" + _PCT, text):
         val = _to_float(m.group("pct"))
         word = m.group("word")
         sense = "decrease" if word in ("下降", "降低", "减少", "低于") else \
