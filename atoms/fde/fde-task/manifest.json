@@ -1,0 +1,16 @@
+{
+  "schema_version": "agent.manifest/1.0",
+  "name": "fde-task",
+  "agent": "fde",
+  "version": "0.1.0",
+  "entry": "main.py",
+  "license": "Apache-2.0",
+  "open_source": true,
+  "provides": ["fde.task"],
+  "depends_on": [],
+  "conflicts": [],
+  "resources": [],
+  "run_config": {
+    "description": "FDE 工单状态机/诊断/验收（复用 solo/task.py，核心零改动）"
+  }
+}

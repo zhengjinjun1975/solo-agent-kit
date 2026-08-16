@@ -1,0 +1,18 @@
+{
+  "schema_version": "agent.manifest/1.0",
+  "name": "monitor-alert",
+  "agent": "monitor",
+  "version": "0.1.0",
+  "entry": "main.py",
+  "license": "Apache-2.0",
+  "open_source": true,
+  "provides": [
+    "monitor.alert"
+  ],
+  "depends_on": [],
+  "conflicts": [],
+  "resources": [],
+  "run_config": {
+    "description": "告警引擎(AlertEngine)+动态阈值自适应"
+  }
+}

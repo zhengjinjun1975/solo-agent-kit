@@ -247,4 +247,5 @@ class TestKnowledgeBase:
         kb = support.KnowledgeBase(str(tmp_path))
         kb.add("A", "B")
         m = mem_mod.Memory(str(tmp_path))
-        assert len(m._load(m._facts_path, [])) == 1
+        # P1 增量写：add_fact 写入追加日志(facts.jsonl)，读经合并视图可见
+        assert len(m._load_facts()) == 1

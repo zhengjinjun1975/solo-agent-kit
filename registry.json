@@ -1,0 +1,159 @@
+{
+  "schema": "fde.registry/1.0",
+  "agents": [
+    {
+      "name": "delivery-package",
+      "agent": "deliver",
+      "version": "0.1.0",
+      "open_source": true,
+      "license": "Apache-2.0",
+      "path": "atoms/delivery/delivery-package",
+      "entry": "main.py",
+      "capabilities": [
+        "delivery.package"
+      ],
+      "depends_on": [],
+      "conflicts": []
+    },
+    {
+      "name": "fde-task",
+      "agent": "fde",
+      "version": "0.1.0",
+      "open_source": true,
+      "license": "Apache-2.0",
+      "path": "atoms/fde/fde-task",
+      "entry": "main.py",
+      "capabilities": [
+        "fde.task"
+      ],
+      "depends_on": [],
+      "conflicts": []
+    },
+    {
+      "name": "memory-fact",
+      "agent": "memory",
+      "version": "0.1.0",
+      "open_source": true,
+      "license": "Apache-2.0",
+      "path": "atoms/memory/memory-fact",
+      "entry": "main.py",
+      "capabilities": [
+        "memory.fact"
+      ],
+      "depends_on": [],
+      "conflicts": []
+    },
+    {
+      "name": "memory-optmem",
+      "agent": "memory",
+      "version": "0.1.0",
+      "open_source": true,
+      "license": "Apache-2.0",
+      "path": "atoms/memory/memory-optmem",
+      "entry": "main.py",
+      "capabilities": [
+        "memory.optmem"
+      ],
+      "depends_on": [],
+      "conflicts": []
+    },
+    {
+      "name": "monitor-alert",
+      "agent": "monitor",
+      "version": "0.1.0",
+      "open_source": true,
+      "license": "Apache-2.0",
+      "path": "atoms/monitor/monitor-alert",
+      "entry": "main.py",
+      "capabilities": [
+        "monitor.alert"
+      ],
+      "depends_on": [],
+      "conflicts": []
+    },
+    {
+      "name": "monitor-ask",
+      "agent": "monitor",
+      "version": "0.1.0",
+      "open_source": true,
+      "license": "Apache-2.0",
+      "path": "atoms/monitor/monitor-ask",
+      "entry": "main.py",
+      "capabilities": [
+        "monitor.ask"
+      ],
+      "depends_on": [],
+      "conflicts": []
+    },
+    {
+      "name": "monitor-metric",
+      "agent": "monitor",
+      "version": "0.1.0",
+      "open_source": true,
+      "license": "Apache-2.0",
+      "path": "atoms/monitor/monitor-metric",
+      "entry": "main.py",
+      "capabilities": [
+        "monitor.metric"
+      ],
+      "depends_on": [],
+      "conflicts": []
+    },
+    {
+      "name": "monitor-protocol",
+      "agent": "monitor",
+      "version": "0.1.0",
+      "open_source": true,
+      "license": "Apache-2.0",
+      "path": "atoms/monitor/monitor-protocol",
+      "entry": "main.py",
+      "capabilities": [
+        "monitor.protocol"
+      ],
+      "depends_on": [],
+      "conflicts": []
+    },
+    {
+      "name": "ontology-qa",
+      "agent": "ontology",
+      "version": "0.1.0",
+      "open_source": true,
+      "license": "Apache-2.0",
+      "path": "atoms/ontology/ontology-qa",
+      "entry": "main.py",
+      "capabilities": [
+        "ontology.qa"
+      ],
+      "depends_on": [],
+      "conflicts": []
+    },
+    {
+      "name": "write-evidence",
+      "agent": "write",
+      "version": "0.1.0",
+      "open_source": true,
+      "license": "Apache-2.0",
+      "path": "atoms/write/write-evidence",
+      "entry": "main.py",
+      "capabilities": [
+        "write.evidence"
+      ],
+      "depends_on": [],
+      "conflicts": []
+    },
+    {
+      "name": "write-qa",
+      "agent": "write",
+      "version": "0.1.0",
+      "open_source": true,
+      "license": "Apache-2.0",
+      "path": "atoms/write/write-qa",
+      "entry": "main.py",
+      "capabilities": [
+        "write.qa"
+      ],
+      "depends_on": [],
+      "conflicts": []
+    }
+  ]
+}

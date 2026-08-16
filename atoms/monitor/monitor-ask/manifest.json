@@ -1,0 +1,18 @@
+{
+  "schema_version": "agent.manifest/1.0",
+  "name": "monitor-ask",
+  "agent": "monitor",
+  "version": "0.1.0",
+  "entry": "main.py",
+  "license": "Apache-2.0",
+  "open_source": true,
+  "provides": [
+    "monitor.ask"
+  ],
+  "depends_on": [],
+  "conflicts": [],
+  "resources": [],
+  "run_config": {
+    "description": "AI 问数(MonitorAsk) 关键词路由查库"
+  }
+}

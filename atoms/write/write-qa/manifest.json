@@ -1,0 +1,18 @@
+{
+  "schema_version": "agent.manifest/1.0",
+  "name": "write-qa",
+  "agent": "write",
+  "version": "0.1.0",
+  "entry": "main.py",
+  "license": "Apache-2.0",
+  "open_source": true,
+  "provides": [
+    "write.qa"
+  ],
+  "depends_on": [],
+  "conflicts": [],
+  "resources": [],
+  "run_config": {
+    "description": "六维中文写作检查(scan/ai_taste)"
+  }
+}

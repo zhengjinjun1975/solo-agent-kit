@@ -29,6 +29,8 @@ def connect(source: dict) -> list:
     失败抛 DataSourceError（区分原因，不再静默返回 []）。
     limit/offset 支持分页（大表友好）。
     """
+    if not isinstance(source, dict):
+        raise DataSourceError(f"数据源必须为 dict，收到 {type(source).__name__}")
     stype = source.get("type", "csv")
     limit = source.get("limit")
     offset = source.get("offset", 0)
@@ -176,13 +178,22 @@ def _read_sqlite(path: str, table: str, limit: int = None, offset: int = 0) -> l
 
 
 # 只读 SQL 白名单（P0-4）：仅允许 SELECT 查询
-_SQL_SELECT_RE = re.compile(r"^\s*(SELECT|WITH)\b", re.IGNORECASE)
+_SQL_SELECT_RE = re.compile(r"^[ \t]*SELECT\b", re.IGNORECASE)
 _SQL_DANGEROUS_RE = re.compile(
-    r"\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|ATTACH|PRAGMA)\b", re.IGNORECASE)
+    r"\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|ATTACH|PRAGMA|REPLACE|TRUNCATE|GRANT|VACUUM|INTO\s+OUTFILE|LOAD_FILE)\b",
+    re.IGNORECASE)
+# P0 加固：多语句/注释/控制符一律拒绝（黑名单正则可被绕过，纵深防御）
+_SQL_BLOCKED_CHARS_RE = re.compile(r"[;'\"]|--|/\*|\*/|\x00")
+# 仅允许 SELECT（不允许 WITH 起头的任意复合查询）
+_SQL_AFTER_SELECT_RE = re.compile(r"^[ \t]*SELECT\b", re.IGNORECASE)
 
 
 def _read_sql(source: dict) -> list:
-    """只读 SQL 查询（仅允许 SELECT，拒绝写/危险操作）。"""
+    """只读 SQL 查询（仅允许 SELECT，拒绝写/危险操作/多语句）。
+
+    P0 加固：除 SELECT 白名单外，额外拒绝多语句(;)、注释(-- /*)、引号与
+    控制符，并用只读打开模式，纵深防御黑名单正则被绕过的注入。
+    """
     db_path = source.get("path", "")
     query = source.get("query", "")
     if not db_path or not os.path.exists(db_path):
@@ -191,16 +202,23 @@ def _read_sql(source: dict) -> list:
         raise DataSourceError("未指定 SQL 查询")
     if not _SQL_SELECT_RE.match(query):
         raise DataSourceError("仅允许 SELECT 只读查询")
+    if _SQL_AFTER_SELECT_RE.match(query) is None or not _SQL_SELECT_RE.match(query):
+        raise DataSourceError("仅允许 SELECT 只读查询")
     if _SQL_DANGEROUS_RE.search(query):
         raise DataSourceError("检测到危险 SQL 操作，已拒绝")
+    if _SQL_BLOCKED_CHARS_RE.search(query):
+        # 含分号(多语句)/注释/引号/控制符 → 拒绝，防黑名单绕过
+        raise DataSourceError("检测到多语句/注释/非法字符，已拒绝")
     try:
-        conn = sqlite3.connect(db_path)
+        conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)  # 只读连接
         conn.row_factory = sqlite3.Row
         cur = conn.cursor()
         cur.execute(query)
         rows = [dict(r) for r in cur.fetchall()[:5000]]
         conn.close()
         return rows
+    except DataSourceError:
+        raise
     except Exception as e:
         log.warning("SQL 查询失败 %s: %s", db_path, e)
         raise DataSourceError("SQL 查询失败", str(e))

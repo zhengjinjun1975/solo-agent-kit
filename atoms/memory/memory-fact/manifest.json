@@ -1,0 +1,18 @@
+{
+  "schema_version": "agent.manifest/1.0",
+  "name": "memory-fact",
+  "agent": "memory",
+  "version": "0.1.0",
+  "entry": "main.py",
+  "license": "Apache-2.0",
+  "open_source": true,
+  "provides": [
+    "memory.fact"
+  ],
+  "depends_on": [],
+  "conflicts": [],
+  "resources": [],
+  "run_config": {
+    "description": "三层两域记忆(Memory) add_fact/write/search"
+  }
+}

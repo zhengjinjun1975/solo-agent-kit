@@ -1,0 +1,111 @@
+{
+  "name": "fde-workflow",
+  "schema": "fde.assembly/1.0",
+  "version": "0.1.0",
+  "description": "FDE 组装链：监测(指标采集) → 诊断(动态阈值+告警+工单) → 交付(交付包) → 验收(验收清单)。真实数据协同，前一环输出注入后一环输入。",
+  "dir": null,
+  "steps": [
+    {
+      "id": "ingest",
+      "capability": "monitor.metric",
+      "op": "ingest",
+      "inputs": {
+        "dir": "$dir",
+        "points": [
+          {"device_id": "pump_01", "metric": "vibration", "value": 4.9, "ts": "2026-08-16T10:00:00"},
+          {"device_id": "pump_01", "metric": "vibration", "value": 5.1, "ts": "2026-08-16T10:01:00"},
+          {"device_id": "pump_01", "metric": "vibration", "value": 4.8, "ts": "2026-08-16T10:02:00"},
+          {"device_id": "pump_01", "metric": "vibration", "value": 5.2, "ts": "2026-08-16T10:03:00"},
+          {"device_id": "pump_01", "metric": "vibration", "value": 5.0, "ts": "2026-08-16T10:04:00"},
+          {"device_id": "pump_01", "metric": "vibration", "value": 5.3, "ts": "2026-08-16T10:05:00"},
+          {"device_id": "pump_01", "metric": "vibration", "value": 5.4, "ts": "2026-08-16T10:06:00"},
+          {"device_id": "pump_01", "metric": "vibration", "value": 5.6, "ts": "2026-08-16T10:07:00"},
+          {"device_id": "pump_01", "metric": "vibration", "value": 5.7, "ts": "2026-08-16T10:08:00"},
+          {"device_id": "pump_01", "metric": "vibration", "value": 8.6, "ts": "2026-08-16T10:09:00"}
+        ]
+      }
+    },
+    {
+      "id": "adaptive",
+      "capability": "monitor.alert",
+      "op": "adaptive",
+      "inputs": {
+        "dir": "$dir",
+        "values": {"$ref": "ingest.ingested.value"},
+        "k": 3.0
+      }
+    },
+    {
+      "id": "set_rule",
+      "capability": "monitor.alert",
+      "op": "set_rule",
+      "inputs": {
+        "dir": "$dir",
+        "device_id": "pump_01",
+        "metric": "vibration",
+        "cmp_op": ">",
+        "threshold": {"$ref": "adaptive.threshold.upper"}
+      }
+    },
+    {
+      "id": "evaluate",
+      "capability": "monitor.alert",
+      "op": "evaluate",
+      "inputs": {
+        "dir": "$dir",
+        "device_id": "pump_01",
+        "metric": "vibration",
+        "value": 8.6
+      }
+    },
+    {
+      "id": "ticket",
+      "capability": "fde.task",
+      "op": "issue",
+      "inputs": {
+        "dir": "$dir",
+        "problem": "水泵 pump_01 振动值 8.6 超过动态阈值 ${adaptive.threshold.upper}，需诊断",
+        "severity": "high"
+      }
+    },
+    {
+      "id": "diagnose",
+      "capability": "fde.task",
+      "op": "diagnose",
+      "inputs": {
+        "dir": "$dir",
+        "tid": {"$ref": "ticket.ticket.id"},
+        "diagnosis": "振动越限疑似轴承磨损，建议检查泵轴对中与轴承间隙"
+      }
+    },
+    {
+      "id": "resolve",
+      "capability": "fde.task",
+      "op": "resolve",
+      "inputs": {
+        "dir": "$dir",
+        "tid": {"$ref": "ticket.ticket.id"},
+        "resolution": "更换轴承并做动平衡，振动恢复至 5.0 以内，工单闭环"
+      }
+    },
+    {
+      "id": "package",
+      "capability": "delivery.package",
+      "op": "package",
+      "inputs": {
+        "monitor_snapshot": {"$ref": "ingest.ingested"},
+        "tickets": [
+          {"id": {"$ref": "ticket.ticket.id"},
+           "state": {"$ref": "resolve.ticket.state"},
+           "diagnosis": {"$ref": "diagnose.ticket.diagnosis"},
+           "resolution": {"$ref": "resolve.ticket.resolution"}}
+        ],
+        "kb": "factory",
+        "industry": "factory",
+        "hit": 0.9,
+        "questions_n": 10,
+        "hits": 9
+      }
+    }
+  ]
+}

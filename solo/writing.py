@@ -364,23 +364,8 @@ def _split_sentences(text: str) -> list:
     return [s.strip() for s in re.split(r"[。！？!?；]", text) if s.strip()]
 
 
-def scan(text: str, filepath: str = None) -> dict:
-    """六维扫描，返回结构化报告。text 为要检查的中文文本（兼容 v1 接口）。
-
-    filepath: 可选，填则报告里带文件名（兼容 zh-writing-checker 文件输入）。
-    """
-    raw = text if filepath is None else open(filepath, encoding="utf-8").read()
-    text = _strip_code_blocks(raw)
-    issues = []
-    stats = {"total_chars": len(raw), "total_sentences": len(_split_sentences(text))}
-    dim_counts = {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}
-
-    def _add(layer, type_, count, severity, suggestion, details=()):
-        issues.append({"layer": layer, "type": type_, "count": count,
-                       "severity": severity, "suggestion": suggestion, "details": list(details)})
-        dim_counts[layer] += count
-
-    # ── D1 错字/错词（warn）──
+def _scan_d1(text, _add):
+    """D1 错字/错词（warn）。"""
     for wrong, right in VARIANT_WORDS:
         if wrong != right and wrong in text:
             _add("D1", f"异形词: {wrong}（规范:{right}）", text.count(wrong), "warn",
@@ -393,7 +378,9 @@ def scan(text: str, filepath: str = None) -> dict:
     if en_mix:
         _add("D1", "中英混写", len(en_mix), "info", "中文句夹英文，注意空格与术语统一", en_mix[:3])
 
-    # ── D2 标点（fail）──
+
+def _scan_d2(text, _add):
+    """D2 标点（fail）。"""
     for m in HALF_PUNCT.finditer(text):
         c = text[m.start() + 1]
         _add("D2", f"半角标点{c}(应全角)", 1, "fail",
@@ -406,12 +393,16 @@ def scan(text: str, filepath: str = None) -> dict:
     for m in re.finditer(r'[\u4e00-\u9fff]"[^"]{1,20}"', text):
         _add("D2", "英文引号", 1, "fail", "中文引号用“”", [m.group(0)[:40]])
 
-    # ── D3 语病（fail）──
+
+def _scan_d3(text, _add):
+    """D3 语病（fail）。"""
     for name, pat, sug in FAULTY_PATTERNS:
         for m in re.finditer(pat, text):
             _add("D3", name, 1, "fail", sug, [m.group(0)[:40]])
 
-    # ── D4 数字（warn）──
+
+def _scan_d4(text, _add):
+    """D4 数字（warn）。"""
     for m in DATE_FMT.finditer(text):
         _add("D4", f"日期格式:{m.group(0)}", 1, "warn", "日期建议用 YYYY-MM-DD 或中文年月日", [m.group(0)])
     for m in RANGE_TILDE.finditer(text):
@@ -419,7 +410,9 @@ def scan(text: str, filepath: str = None) -> dict:
     for m in CN_CN_NUM.finditer(text):
         _add("D4", f"中英数字混排:{m.group(0)}", 1, "warn", "数字书写统一", [m.group(0)])
 
-    # ── D5 去AI味（warn + fail 破折号/禁用词）──
+
+def _scan_d5(text, _add):
+    """D5 去AI味（warn + fail 破折号/禁用词）。"""
     for w in DISABLED_WORDS:
         if w in text:
             _add("D5", f"禁用词:{w}", text.count(w), "fail", "换成具体描述", _contexts(text, w, 18, 2))
@@ -438,7 +431,9 @@ def scan(text: str, filepath: str = None) -> dict:
     for m in DASH_PATTERN.finditer(text):
         _add("D5", "破折号", 1, "fail", "破折号是AI头号标志，改逗号或重写", [text[max(0, m.start()-10):m.start()+12]])
 
-    # ── D6 活人感（warn + info）──
+
+def _scan_d6(text, _add, stats):
+    """D6 活人感（warn + info）。"""
     for i, para in enumerate(text.split("\n")):
         if len(para) > LONG_PARAGRAPH:
             _add("D6", f"超长段落({len(para)}字)", 1, "warn", "拆段，留呼吸感", [para[:40]])
@@ -455,7 +450,9 @@ def scan(text: str, filepath: str = None) -> dict:
     if stats["total_chars"] > 150 and not re.search(r"\d|结果|结论|是|%|倍|万|亿", head):
         _add("D6", "开篇未给结论", 1, "info", "前100字甩出数字/结论", [head[:60]])
 
-    # ── 汇总 ──
+
+def _build_report(filepath, issues, dim_counts, stats):
+    """汇总六维结果 → 结构化报告。"""
     layers = {}
     for dim in ("D1", "D2", "D3", "D4", "D5", "D6"):
         di = [i for i in issues if i["layer"] == dim]
@@ -473,3 +470,28 @@ def scan(text: str, filepath: str = None) -> dict:
         "dimension_counts": dim_counts, "layers": layers,
         "issues": issues, "stats": stats,
     }
+
+
+def scan(text: str, filepath: str = None) -> dict:
+    """六维扫描，返回结构化报告。text 为要检查的中文文本（兼容 v1 接口）。
+
+    filepath: 可选，填则报告里带文件名（兼容 zh-writing-checker 文件输入）。
+    """
+    raw = text if filepath is None else open(filepath, encoding="utf-8").read()
+    text = _strip_code_blocks(raw)
+    issues = []
+    stats = {"total_chars": len(raw), "total_sentences": len(_split_sentences(text))}
+    dim_counts = {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}
+
+    def _add(layer, type_, count, severity, suggestion, details=()):
+        issues.append({"layer": layer, "type": type_, "count": count,
+                       "severity": severity, "suggestion": suggestion, "details": list(details)})
+        dim_counts[layer] += count
+
+    _scan_d1(text, _add)
+    _scan_d2(text, _add)
+    _scan_d3(text, _add)
+    _scan_d4(text, _add)
+    _scan_d5(text, _add)
+    _scan_d6(text, _add, stats)
+    return _build_report(filepath, issues, dim_counts, stats)

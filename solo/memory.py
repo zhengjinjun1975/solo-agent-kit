@@ -14,6 +14,9 @@ from __future__ import annotations
 import json
 import os
 import hashlib
+import re
+
+from solo.base import lock_for
 
 DEFAULT_DIR = os.path.join(os.path.expanduser("~"), ".solo", "memory")
 
@@ -35,6 +38,11 @@ class Memory:
         os.makedirs(os.path.join(mem_dir, "sessions"), exist_ok=True)
         self._facts_path = os.path.join(mem_dir, "facts.json")
         self._profile_path = os.path.join(mem_dir, "profile.json")
+        # P1 性能优化：事实层改为「追加日志 + 内存缓存」增量写，避免每次全量 load+save(O(n²))
+        self._journal_path = os.path.join(mem_dir, "facts.jsonl")
+        self._facts_cache = None   # 懒加载：facts.json(快照) + facts.jsonl(增量) 合并后的完整列表
+        self._hash_cache = None    # 去重哈希集合
+        self._emb_cache = {}       # search embed 向量缓存 h→vec，避免重复 embed 调用
 
     # ---- 热域·画像层 ----
     def set_profile(self, key: str, value: str) -> None:
@@ -53,14 +61,72 @@ class Memory:
         return "\n".join(f"{k}: {v}" for k, v in p.items())
 
     # ---- 温域·事实层 ----  
-    def add_fact(self, text: str, tags: list = None) -> bool:
-        """事实层：有价值的都写。返回是否新增（去重）。"""
+    def _load_facts(self) -> list:
+        """懒加载事实层：facts.json(快照) + facts.jsonl(追加日志) 合并为完整列表。
+
+        首次调用后缓存在 _facts_cache，之后 O(1) 返回，避免每次全量读文件。
+        """
+        if self._facts_cache is not None:
+            return self._facts_cache
         facts = self._load(self._facts_path, [])
-        h = self._hash(text)
-        if any(f.get("h") == h for f in facts):
-            return False
-        facts.append({"text": text, "tags": tags or [], "h": h, "ts": _now()})
+        if os.path.exists(self._journal_path):
+            with lock_for(self._journal_path):
+                with open(self._journal_path, encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        try:
+                            facts.append(json.loads(line))
+                        except Exception:
+                            continue
+        self._facts_cache = facts
+        self._hash_cache = {f.get("h") for f in facts}
+        return facts
+
+    def _consolidate(self, facts: list = None) -> list:
+        """把内存缓存合并写回 facts.json 快照，并清空追加日志。
+
+        仅在增删改 / 读后落盘时调用（O(n) 一次），add_fact 热路径不触发，避免 O(n²)。
+        """
+        facts = self._facts_cache if facts is None else facts
         self._save(self._facts_path, facts)
+        self._facts_cache = facts
+        self._hash_cache = {f.get("h") for f in facts}
+        if os.path.exists(self._journal_path):
+            with lock_for(self._journal_path):
+                with open(self._journal_path, "w", encoding="utf-8") as f:
+                    f.truncate()
+        return facts
+
+    def _maybe_consolidate(self):
+        """日志非空时才合并落盘（读操作后保持 facts.json 新鲜，成本摊薄）。"""
+        if self._facts_cache is not None and os.path.exists(self._journal_path):
+            try:
+                if os.path.getsize(self._journal_path) > 0:
+                    self._consolidate()
+            except OSError:
+                pass
+
+    def add_fact(self, text: str, tags: list = None) -> bool:
+        """事实层：有价值的都写。返回是否新增（去重）。
+
+        P1 性能优化：增量追加写入 facts.jsonl（O(1)），不每次全量 load+save 整个列表，
+        使 3000 条批量写入从 O(n²) 降到近线性。
+        """
+        if not isinstance(text, str) or not text.strip():
+            return False
+        facts = self._load_facts()
+        h = self._hash(text)
+        if self._hash_cache is not None and h in self._hash_cache:
+            return False
+        rec = {"text": text, "tags": tags or [], "h": h, "ts": _now()}
+        facts.append(rec)
+        if self._hash_cache is not None:
+            self._hash_cache.add(h)
+        with lock_for(self._journal_path):
+            with open(self._journal_path, "a", encoding="utf-8") as f:
+                f.write(json.dumps(rec, ensure_ascii=False) + "\n")
         return True
 
     # ---- 写入决策层（P0：对齐 Mem0 决策循环 ADD/UPDATE/DELETE，需自实现）----
@@ -75,7 +141,7 @@ class Memory:
           4. 否则 → ADD（新事实）
         返回 {action, reason, fact, similar}，落库带 updated 时间戳。
         """
-        facts = self._load(self._facts_path, [])
+        facts = self._load_facts()
         # 1) 召回相似旧记忆（词重叠打分，零依赖）
         scored = []
         for f in facts:
@@ -98,18 +164,19 @@ class Memory:
             if top["text"] != text and len(top.get("history", [])) < 20:
                 top.setdefault("history", []).append({"text": top["text"], "ts": top["ts"]})
             top["ts"] = _now()
-            self._save(self._facts_path, facts)
+            self._consolidate()
             return {"action": "UPDATE", "reason": f"同主题记忆存在(相似度{scored[0][0]:.2f})，更新而非重复新增",
                     "text": text, "fact": top, "similar": similar, "updated": True}
         # 3) ADD
         added = self.add_fact(text, tags)
+        self._consolidate()
         return {"action": "ADD" if added else "SKIP",
                 "reason": "新增事实" if added else "完全重复，跳过",
                 "text": text, "updated": added}
 
     def update_fact(self, target_text: str, new_text: str, tags: list = None) -> dict:
         """显式 UPDATE 一条记忆（对齐 Mem0 update 语义）。"""
-        facts = self._load(self._facts_path, [])
+        facts = self._load_facts()
         for f in facts:
             if f["text"] == target_text:
                 if f.get("history", []).__len__() < 20:
@@ -119,34 +186,40 @@ class Memory:
                 if tags:
                     f["tags"] = sorted(set((f.get("tags") or []) + tags))
                 f["updated"] = _now()
-                self._save(self._facts_path, facts)
+                self._consolidate()
                 return {"ok": True, "action": "UPDATE", "fact": f}
         return {"ok": False, "action": "UPDATE", "reason": "目标记忆不存在"}
 
     def delete_fact(self, text: str = None, h: str = None) -> dict:
         """DELETE 一条记忆（按文本或哈希）。返回是否删除。"""
-        facts = self._load(self._facts_path, [])
+        facts = self._load_facts()
         before = len(facts)
         if text is not None:
             facts = [f for f in facts if f["text"] != text]
         elif h is not None:
             facts = [f for f in facts if f.get("h") != h]
-        self._save(self._facts_path, facts)
+        self._consolidate(facts)
         return {"ok": len(facts) != before, "action": "DELETE",
                 "deleted": before - len(facts)}
 
     def search(self, query: str, top_k: int = 5, semantic: bool = True):
-        """事实层检索。优先 embed 向量（P1-5），无 embed 回退词重叠。"""
-        facts = self._load(self._facts_path, [])
+        """事实层检索。优先 embed 向量（P1-5），无 embed 回退词重叠。
+
+        P1 性能优化：embed 向量按事实哈希缓存(_emb_cache)，仅首次计算，
+        重复 search 不再逐条重复调用 embed（批量/缓存），大幅降低检索开销。
+        """
+        facts = self._load_facts()
         if semantic:
             q_emb = self._try_embed(query)
             if q_emb is not None:
-                # 批量向量化一次，避免重复 embed 调用
-                vecs = {}
+                vecs = self._emb_cache
+                # 只对尚未缓存的条目标量化一次（缓存命中直接复用）
                 for f in facts:
-                    v = self._try_embed(f["text"])
-                    if v:
-                        vecs[f.get("h", id(f))] = v
+                    h = f.get("h", id(f))
+                    if h not in vecs:
+                        v = self._try_embed(f["text"])
+                        if v:
+                            vecs[h] = v
                 scored = sorted(
                     facts,
                     key=lambda f: _cosine(q_emb, vecs.get(f.get("h", id(f)), [])),
@@ -155,25 +228,54 @@ class Memory:
                 scored = sorted(facts, key=lambda f: _overlap(f["text"], query), reverse=True)
         else:
             scored = facts
+        self._maybe_consolidate()
         return scored[:top_k]
 
     def _try_embed(self, text: str):
-        """尝试用配置的 embed 模型向量化。失败返回 None（回退词重叠）。"""
+        """尝试用配置的 embed 模型向量化。失败返回 None（回退词重叠）。
+
+        健壮性：一旦探测到 embed 不可用(无 ollama / 连接失败)即标记 unavailable，
+        后续不再重复等待，避免 search 在 embed 端点宕机时反复阻塞。
+        """
+        if getattr(self, "_embed_unavailable", False):
+            return None
         try:
-            from solo import provider as provider_mod
-            p = provider_mod.Provider.from_file()
-            return p.embed(text)
+            import socket
+            old_to = socket.getdefaulttimeout()
+            socket.setdefaulttimeout(3)  # 连接探测上限，防无限阻塞
+            try:
+                from solo import provider as provider_mod
+                p = provider_mod.Provider.from_file()
+                return p.embed(text)
+            finally:
+                socket.setdefaulttimeout(old_to)
         except Exception:
+            self._embed_unavailable = True
             return None
 
     # ---- 温域·场景层 ----
+    @staticmethod
+    def _safe_name(name: str) -> str:
+        """防路径穿越：场景/会话名仅允许 字母数字_-.，杜绝 ../ 绝对路径 控制符。"""
+        n = str(name)
+        if not n or n in (".", ".."):
+            raise ValueError(f"非法名称: {name!r}")
+        if os.path.sep in n or (os.path.altsep and os.path.altsep in n) \
+                or "/" in n or "\\" in n or "\x00" in n or n.startswith("."):
+            raise ValueError(f"非法名称(含路径分隔/穿越): {name!r}")
+        if not re.fullmatch(r"[A-Za-z0-9_\-.]+", n):
+            raise ValueError(f"非法名称(仅允许字母数字_-.): {name!r}")
+        return n
+
     def set_scenario(self, name: str, content: str) -> None:
         """场景层：项目完整上下文（整包恢复）。"""
-        self._save(os.path.join(self.dir, "scenarios", f"{name}.json"),
-                   {"name": name, "content": content, "ts": _now()})
+        safe = self._safe_name(name)
+        self._save(os.path.join(self.dir, "scenarios", f"{safe}.json"),
+                   {"name": safe, "content": content, "ts": _now()})
 
     def get_scenario(self, name: str) -> str:
-        d = self._load(os.path.join(self.dir, "scenarios", f"{name}.json"), None)
+        safe = self._safe_name(name)
+        d = self._load(os.path.join(self.dir, "scenarios", f"{safe}.json"), None)
         return d.get("content", "") if d else ""
 
     def list_scenarios(self) -> list:
@@ -186,8 +288,9 @@ class Memory:
 
     # ---- 冷域·会话层 ----
     def log_session(self, name: str, content: str) -> None:
-        self._save(os.path.join(self.dir, "sessions", f"{name}.json"),
-                   {"name": name, "content": content, "ts": _now()})
+        safe = self._safe_name(name)
+        self._save(os.path.join(self.dir, "sessions", f"{safe}.json"),
+                   {"name": safe, "content": content, "ts": _now()})
 
     # ---- Obsidian 互通 ----
     def import_markdown(self, path: str) -> int:
@@ -207,12 +310,13 @@ class Memory:
                                         added += 1
                     except Exception:
                         continue
+        self._consolidate()
         return added
 
     def export_markdown(self, out_dir: str) -> None:
         """导出事实层为 Markdown（可回写 Obsidian）。"""
         os.makedirs(out_dir, exist_ok=True)
-        facts = self._load(self._facts_path, [])
+        facts = self._load_facts()
         with open(os.path.join(out_dir, "solo-memory.md"), "w", encoding="utf-8") as fh:
             for f in facts:
                 fh.write("- " + f["text"] + "\n")

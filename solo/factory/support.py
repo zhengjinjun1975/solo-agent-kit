@@ -164,5 +164,9 @@ class KnowledgeBase:
         return self.mem.search(problem, top_k=top_k)
 
     def all(self) -> list:
-        """列出全部沉淀经验。"""
-        return self.mem._load(self.mem._facts_path, [])
+        """列出全部沉淀经验。
+
+        经 memory 的合并视图（facts.json 快照 + facts.jsonl 追加日志）读取，
+        兼容 P1 增量写优化（add_fact 写入追加日志，读时合并）。
+        """
+        return self.mem._load_facts()

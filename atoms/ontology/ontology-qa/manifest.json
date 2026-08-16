@@ -1,0 +1,18 @@
+{
+  "schema_version": "agent.manifest/1.0",
+  "name": "ontology-qa",
+  "agent": "ontology",
+  "version": "0.1.0",
+  "entry": "main.py",
+  "license": "Apache-2.0",
+  "open_source": true,
+  "provides": [
+    "ontology.qa"
+  ],
+  "depends_on": [],
+  "conflicts": [],
+  "resources": [],
+  "run_config": {
+    "description": "本体建模/问答(Ontology)"
+  }
+}
