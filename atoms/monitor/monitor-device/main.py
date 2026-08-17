@@ -38,7 +38,7 @@ class MonitorDeviceAtom(AtomicAgent):
 
     def inputs(self):
         return {"op": ["ingest", "set_rule", "evaluate", "adaptive", "anomaly",
-                       "protocols", "snapshot", "ask"]}
+                       "protocols", "protocol_read", "snapshot", "ask"]}
 
     def _run(self, op="snapshot", dir=None, points=None, device_id=None, metric=None,
              value=None, rule=None, values=None, config=None, k=3.0, ts="", **params):
@@ -82,12 +82,30 @@ class MonitorDeviceAtom(AtomicAgent):
                         protos.append({"kind": kind, "available": True})
                     else:
                         skipped.append(kind)
-                        protos.append({"kind": kind, "available": False})
+                        protos.append({"kind": kind, "available": False,
+                                       "error": f"{kind} 缺库不可用"})
                 degraded = bool(skipped)
-                env = {"protocols": protos, "skipped": skipped}
+                env = {"protocols": protos, "skipped": skipped,
+                       "detail": "modbus/opcua 纯标准库真实直采可用(可连真设备或本地模拟器)"}
                 if degraded:
                     return fail("部分协议缺库降级", degraded=True, **env)
                 return ok(env)
+            if op == "protocol_read":
+                # 真实连接直采：config 指定 {protocol, ...}，连本地模拟器或真设备读数据
+                config = config or params.get("config") or {}
+                kind = config.get("protocol")
+                if kind not in ("modbus", "opcua"):
+                    return fail(f"protocol_read 仅支持 modbus/opcua 真实直采，收到: {kind}")
+                adapter = device_impl.ProtocolAdapter(kind, config)
+                if not adapter.available():
+                    return fail(f"{kind} 不可用")
+                try:
+                    res = adapter.read()
+                except Exception as e:  # noqa: BLE001
+                    return fail(f"{kind} 直采失败(明确报错不静默): {e}", degraded=True)
+                # 直采点入存储
+                store.ingest(res.get("points") or [])
+                return ok({"protocol": kind, "read": res, "count": len(res.get("points") or [])})
             if op == "snapshot":
                 devices = sorted({s.get("device_id") for s in store.series()})
                 series = {d: {m: store.values(d, m) for m in

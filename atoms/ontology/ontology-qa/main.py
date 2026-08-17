@@ -26,7 +26,7 @@ class OntologyQaAtom(AtomicAgent):
         return ["ontology.qa"]
 
     def inputs(self):
-        return {"op": ["build", "semantic", "ask", "retrieve", "link"]}
+        return {"op": ["build", "semantic", "ask", "retrieve", "vector", "hybrid", "link"]}
 
     def _run(self, op="build", dir=None, rows=None, data=None, question=None,
              top_k=5, industry=None, kb_dir=None, **params):
@@ -55,7 +55,22 @@ class OntologyQaAtom(AtomicAgent):
                 q = question or ""
                 ranked = memory_score.rank_texts(q, [json.dumps(r, ensure_ascii=False)
                                                      for r in rows], top_k=int(top_k or 5))
-                return ok({"retrieved": ranked})
+                return ok({"retrieved": ranked, "method": "vector+lexical"})
+            if op == "vector":
+                rows = rows or []
+                q = question or ""
+                texts = [json.dumps(r, ensure_ascii=False) for r in rows]
+                ranked = memory_score.vector_rank(q, texts, top_k=int(top_k or 5))
+                # 语义检索提升证据：近义命中（向量相似但非完全词法重合）
+                return ok({"retrieved": ranked, "method": "true_vector",
+                           "query_vec_dim": len(memory_score.vector_embed(q)),
+                           "semantic_note": "字符/词n-gram哈希向量+余弦，捕捉近义词/词形相似"})
+            if op == "hybrid":
+                rows = rows or []
+                q = question or ""
+                texts = [json.dumps(r, ensure_ascii=False) for r in rows]
+                ranked = memory_score.hybrid_rank(q, texts, top_k=int(top_k or 5))
+                return ok({"retrieved": ranked, "method": "hybrid(bm25+vector)"})
             if op == "link":
                 rows_a = rows or []
                 rows_b = params.get("rows_b") or []

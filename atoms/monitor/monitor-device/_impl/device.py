@@ -141,33 +141,66 @@ class RuleChain:
         return self._load()
 
 
-# ---- 协议适配器（缺库降级）----
+# ---- 协议适配器（P1：真实直采，缺库明确报错不静默）----
+from importlib import util as _piu
+import os as _os
+_PIMPL = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "protocols_impl.py")
+_pispec = _piu.spec_from_file_location("monitor_device_protocols_impl", _PIMPL)
+_pimod = _piu.module_from_spec(_pispec)
+_pispec.loader.exec_module(_pimod)
+
+
 class ProtocolAdapter:
+    """协议直采适配器：modbus/opcua 为纯标准库真实实现，可连真实设备或本地模拟器。
+
+    available()：
+      - tcp/http/csv 内置可用；
+      - mqtt 需 paho-mqtt（缺库明确报 False，不静默）；
+      - modbus 纯标准库真实 Modbus/TCP，**恒为 True**（不依赖第三方库）；
+      - opcua 可选 asyncua 或纯标准库子集，恒为 True（stdlib 兜底）。
+    read(kind, config) 真正建立连接读数据（模拟器或真设备），失败抛明确异常。
+    """
+
     def __init__(self, kind, config=None):
         self.kind = kind
         self.config = config or {}
 
     def available(self):
-        if self.kind == "tcp":
+        if self.kind in ("tcp", "http", "csv", "modbus", "opcua"):
             return True
-        if self.kind in ("mqtt",):
+        if self.kind == "mqtt":
             try:
                 import paho.mqtt  # noqa: F401
                 return True
             except ImportError:
                 return False
-        if self.kind in ("modbus",):
-            try:
-                import pymodbus  # noqa: F401
-                return True
-            except ImportError:
-                return False
-        if self.kind in ("opcua",):
-            try:
-                import opcua  # noqa: F401
-                return True
-            except ImportError:
-                return False
-        if self.kind in ("http", "csv"):
-            return True
         return False
+
+    def read(self):
+        """建立真实连接读取统一指标点列表；失败抛明确异常（不静默降级）。"""
+        if self.kind == "modbus":
+            client = _pimod.ModbusTcpClient(self.config)
+            try:
+                client.connect()
+                pts = client.read_points()
+            finally:
+                client.close()
+            return {"protocol": "modbus", "points": pts}
+        if self.kind == "opcua":
+            client = _pimod.OpcUaClient(self.config)
+            try:
+                client.connect()
+                pts = client.read_points()
+            finally:
+                client.close()
+            return {"protocol": "opcua", "points": pts}
+        if self.kind == "tcp":
+            src = _pimod.__dict__.get("_TcpLineMini")
+            # 统一走 tcp 行协议（复用 protocols_impl 的 socket 直采思路）
+            raise NotImplementedError("tcp 直采请用 solo/factory/protocols.py 的 TcpLineSource")
+        raise ProtocolError(f"协议 {self.kind} 暂不支持 read()")
+
+
+class ProtocolError(Exception):
+    """协议直采错误（缺库/连接失败），明确报错不静默。"""
+

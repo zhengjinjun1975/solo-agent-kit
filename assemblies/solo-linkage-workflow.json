@@ -145,12 +145,24 @@
         "hits": 9
       },
       "optional": true
+    },
+    {
+      "id": "evolve",
+      "capability": "evolve.self",
+      "op": "evolve",
+      "inputs": {
+        "dir": "$dir",
+        "observation": "水泵 pump_01 振动越限告警后，运维沉淀为知识库并完成交付验收",
+        "target": "knowledge",
+        "feedback": 1
+      }
     }
   ],
   "final": {
     "worst_level": {"$ref": "evaluate.worst_level"},
     "accept": {"$ref": "package.accept.accept"},
     "tickets_n": {"$ref": "ticket.tickets|len"},
-    "writing_evidence_pass": {"$ref": "write_evidence.pass"}
+    "writing_evidence_pass": {"$ref": "write_evidence.pass"},
+    "evolve_loop_closed": {"$ref": "evolve.loop_closed"}
   }
 }

@@ -3,7 +3,7 @@
   "order": ["data.cap", "memory.core", "diagnose.kb", "fde.task",
             "monitor.device", "ontology.qa", "sme.decision",
             "predict.maintain", "deliver.accept", "deliver.train",
-            "write.qa", "write.evidence"],
+            "write.qa", "write.evidence", "evolve.self"],
   "agents": [
     {
       "name": "data-cap",
@@ -147,6 +147,18 @@
       "path": "atoms/writing/write-evidence",
       "entry": "main.py",
       "capabilities": ["write.evidence"],
+      "depends_on": [],
+      "conflicts": []
+    },
+    {
+      "name": "evolve",
+      "agent": "learning",
+      "version": "0.1.0",
+      "open_source": true,
+      "license": "Apache-2.0",
+      "path": "atoms/fde/evolve",
+      "entry": "main.py",
+      "capabilities": ["evolve.self"],
       "depends_on": [],
       "conflicts": []
     }

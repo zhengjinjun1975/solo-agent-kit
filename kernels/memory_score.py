@@ -72,8 +72,15 @@ def _token_jaccard(a: str, b: str) -> float:
 
 
 def rank_texts(query: str, texts: list, top_k: int = 5) -> list:
-    """给候选文本打分并返回 top_k：[{text, score, index}, ...]（按 score 降序）。"""
-    scored = [{"text": t, "score": semantic_score(query, t),
+    """给候选文本打分并返回 top_k：[{text, score, index}, ...]（按 score 降序）。
+
+    升级（P1）：从纯词法升级为「真向量」语义检索——
+      - vector_embed 字符/词 n-gram 哈希向量 + 余弦相似度；
+      - 可选 bge 嵌入（embed_fn 注入），无嵌入模型时降级 n-gram 向量。
+    """
+    embed = _embed_fn() or _vector_embed
+    qv = embed(query)
+    scored = [{"text": t, "score": round(_cos_vec(qv, embed(t)), 4),
                "index": i} for i, t in enumerate(texts)]
     scored.sort(key=lambda x: x["score"], reverse=True)
     return scored[:top_k]
@@ -89,3 +96,105 @@ def decide_write_action(similar: list, threshold: float = 0.6) -> dict:
     if top_sim >= threshold:
         return {"action": "UPDATE", "reason": f"同主题记忆存在(相似度{top_sim:.2f})，更新而非重复新增"}
     return {"action": "ADD", "reason": "与现有记忆差异较大，新增事实"}
+
+
+# ═══════════════════════════════════════════════════════════════════
+# P1：离线 RAG 真向量 —— 字符/词 n-gram 哈希向量 + 余弦（零依赖）
+# ═══════════════════════════════════════════════════════════════════
+_VEC_DIM = 512          # 固定哈希向量维度（轻量，无第三方库）
+_EMBED_FN = {"fn": None}
+
+
+def set_embed_fn(fn):
+    """注入可选嵌入函数（如 bge 模型）；fn(text)->list[float]。None 恢复 n-gram。"""
+    _EMBED_FN["fn"] = fn
+
+
+def _embed_fn():
+    """返回当前嵌入函数（注入的 bge 或 None→n-gram 兜底）。"""
+    return _EMBED_FN["fn"]
+
+
+def _hash_idx(term: str, salt: int = 0) -> int:
+    """把 term 哈希到 [0, _VEC_DIM) 索引，支持正/负符号（signed 哈希）。"""
+    h = int.from_bytes(
+        hashlib.sha256(f"{salt}:{term}".encode("utf-8")).digest()[:8], "big")
+    return h % _VEC_DIM
+
+
+def _ngrams(text: str, n: int = 3) -> list:
+    """字符 n-gram（含边界）——捕捉近义子串/词形相似。"""
+    t = re.sub(r"\s+", "", (text or "").lower())
+    grams = [t[i:i + n] for i in range(max(len(t) - n + 1, 1))]
+    return grams or []
+
+
+def _vector_embed(text: str) -> list:
+    """轻量哈希向量：字符 n-gram(1~3) + 词 token 混合，带符号哈希 + 词频加权。
+
+    零依赖、确定性、可比较（同文本同向量）。维度固定 _VEC_DIM。
+    """
+    vec = [0.0] * _VEC_DIM
+    for gram in set(_ngrams(text, 1)) | set(_ngrams(text, 2)) | set(_ngrams(text, 3)):
+        idx = _hash_idx(gram)
+        sign = 1.0 if _hash_idx(gram, 7) % 2 == 0 else -1.0
+        vec[idx] += sign
+    for tok in set(tokenize(text)):
+        idx = _hash_idx("w:" + tok)
+        sign = 1.0 if _hash_idx("w:" + tok, 7) % 2 == 0 else -1.0
+        vec[idx] += 1.5 * sign
+    # L2 归一化（余弦可比）
+    norm = sum(x * x for x in vec) ** 0.5
+    if norm:
+        vec = [x / norm for x in vec]
+    return vec
+
+
+def _cos_vec(a: list, b: list) -> float:
+    return cosine(a, b)
+
+
+def vector_embed(text: str) -> list:
+    """对外向量接口：优先注入的 bge 嵌入，否则 n-gram 哈希向量兜底。"""
+    fn = _embed_fn()
+    if fn is not None:
+        try:
+            v = fn(text)
+            if isinstance(v, (list, tuple)) and v:
+                return list(v)
+        except Exception:  # noqa: BLE001
+            pass
+    return _vector_embed(text)
+
+
+def vector_rank(query: str, texts: list, top_k: int = 5) -> list:
+    """真向量语义排序：向量余弦相似度（近义词/词形相似命中）。"""
+    embed = vector_embed
+    qv = embed(query)
+    scored = [{"text": t, "score": round(_cos_vec(qv, embed(t)), 4),
+               "index": i} for i, t in enumerate(texts)]
+    scored.sort(key=lambda x: x["score"], reverse=True)
+    return scored[:top_k]
+
+
+def hybrid_rank(query: str, texts: list, top_k: int = 5,
+                vec_w: float = 0.7, lex_w: float = 0.3) -> list:
+    """混合检索：真向量 + 词法（BM25/重叠）加权。对齐业界 BM25+向量 标准。"""
+    vec_scores = {i: s for i, s in
+                  [(r["index"], r["score"]) for r in vector_rank(query, texts, len(texts))]}
+    lex_scores = {r["index"]: r["score"]
+                  for r in rank_texts_lexical(query, texts)}
+    scored = []
+    for i, t in enumerate(texts):
+        score = vec_w * vec_scores.get(i, 0.0) + lex_w * lex_scores.get(i, 0.0)
+        scored.append({"text": t, "score": round(score, 4), "index": i})
+    scored.sort(key=lambda x: x["score"], reverse=True)
+    return scored[:top_k]
+
+
+def rank_texts_lexical(query: str, texts: list) -> list:
+    """纯词法排序（保留 BM25 语义，供混合检索 / 旧接口兼容）。"""
+    scored = [{"text": t, "score": semantic_score(query, t), "index": i}
+              for i, t in enumerate(texts)]
+    scored.sort(key=lambda x: x["score"], reverse=True)
+    return scored

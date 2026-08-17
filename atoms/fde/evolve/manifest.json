@@ -1,0 +1,25 @@
+{
+  "schema_version": "agent.manifest/1.0",
+  "name": "evolve",
+  "agent": "learning",
+  "version": "0.1.0",
+  "open_source": true,
+  "license": "Apache-2.0",
+  "entry": "main.py",
+  "provides": ["evolve.self"],
+  "depends_on": [],
+  "conflicts": [],
+  "inputs": {
+    "op": {"enum": ["evolve", "recent", "closed_count", "status"]},
+    "observation": {"type": "str", "required": false, "default": null},
+    "target": {"type": "str", "required": false, "default": null},
+    "feedback": {"type": "any", "required": false, "default": null},
+    "dir": {"type": "str", "required": false, "default": null}
+  },
+  "outputs": {
+    "entry": {"type": "dict", "desc": "进化记录(反馈/归因/改进/校验/沉淀)"},
+    "loop_closed": {"type": "bool", "desc": "闭环标志"},
+    "closed_count": {"type": "int", "desc": "累计闭环数"}
+  },
+  "run_config": {"local_only": true}
+}

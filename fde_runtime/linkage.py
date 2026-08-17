@@ -150,11 +150,89 @@ def status() -> dict:
             "present": f is not None,
             "dir": f,
             "role": "认知原子：本体问答 / 离线RAG知识检索",
+            **(_repo_deps(f) or {}),
         },
         "sme_decision_ontology": {
             "present": s is not None,
             "dir": s,
             "role": "决策原子：决策 / 阈值回灌 / 行动清单",
+            **(_repo_deps(s) or {}),
         },
         "boundary": "算法开源联动，数据不出厂（各库数据本地自持，仅传算法入参）",
     }
+
+
+# ═══════════════════════════════════════════════════════════════════
+# P1：跨开源强联动健壮 —— 依赖库版本检测 / 缺失清晰报错 / 回退
+# ═══════════════════════════════════════════════════════════════════
+_REQUIRED_LIBS = {
+    "factory-ontology-kit": {
+        "codes/ontology_qa_v3.py": "本体问答核心(算法开源)",
+        "codes/bm25_retrieval.py": "离线检索(BM25,纯标准库)",
+    },
+    "sme-decision-ontology": {
+        "codes/rules_engine.py": "决策规则引擎(纯标准库)",
+        "codes/feedback_engine.py": "反馈回灌引擎",
+    },
+}
+
+
+def _repo_deps(repo_root: str | None) -> dict:
+    """返回某兄弟仓库的关键依赖文件在位情况：{deps:{file:bool}, deps_ok:bool}。"""
+    if not repo_root:
+        return {"deps": {}, "deps_ok": False}
+    name = os.path.basename(repo_root.rstrip("/\\"))
+    need = _REQUIRED_LIBS.get(name, {})
+    deps = {}
+    for rel in need:
+        deps[rel] = os.path.exists(os.path.join(repo_root, rel))
+    return {"deps": deps, "deps_ok": all(deps.values()) if deps else True}
+
+
+def check_required(repo_root: str | None, clear: bool = True) -> dict:
+    """校验兄弟仓库关键依赖文件是否在位；缺失给出清晰报错列表。
+
+    返回 {present, missing:[{file, role, fix}], ok}。缺失不抛出、调用方回退，
+    但绝不静默——missing 非空即代表该仓库能力不可用，需明确处理。
+    """
+    if not repo_root:
+        return {"present": False, "missing": [],
+                "ok": False, "error": "未发现兄弟仓库（可经环境变量 FACTORY_ONTOLOGY_KIT_DIR / SME_DECISION_ONTOLOGY_DIR 指定）"}
+    name = os.path.basename(repo_root.rstrip("/\\"))
+    need = _REQUIRED_LIBS.get(name, {})
+    missing = []
+    for rel, role in need.items():
+        if not os.path.exists(os.path.join(repo_root, rel)):
+            missing.append({"file": rel, "role": role,
+                            "fix": f"仓库 {name} 缺少 {rel}，请拉取完整仓库或补建该文件"})
+    return {"present": True, "missing": missing, "ok": not missing,
+            "repo": name}
+
+
+def verify_linkage() -> dict:
+    """跨开源联动健壮性总检：定位 + 依赖检测 + 缺失清晰报错 + 可用能力。
+
+    供 linkage op 与跨开源组装链在启动时调用：任兄弟仓库缺关键依赖文件，
+    会清晰列出 missing，链路回退为「单库/零库」可用，不崩溃。
+    """
+    f = find_factory()
+    s = find_sme()
+    f_ck = check_required(f)
+    s_ck = check_required(s)
+    return {
+        "factory_ontology_kit": {
+            **({"dir": f} if f else {}),
+            "present": f is not None,
+            "deps_ok": f_ck["ok"],
+            "missing": f_ck["missing"],
+        },
+        "sme_decision_ontology": {
+            **({"dir": s} if s else {}),
+            "present": s is not None,
+            "deps_ok": s_ck["ok"],
+            "missing": s_ck["missing"],
+        },
+        "available": (f is not None and f_ck["ok"]) or (s is not None and s_ck["ok"]),
+        "fallback": "任库缺依赖/缺失 → 该库能力回退为不可用，不阻断 solo 主链",
+    }
+
