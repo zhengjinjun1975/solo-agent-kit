@@ -117,9 +117,12 @@ class SoloHandler(_GetRoutesMixin, _PostRoutesMixin, BaseHTTPRequestHandler):
         "/api/monitor/protocol/http": "_post_monitor_protocol_http",
         "/api/monitor/protocol/probe": "_post_monitor_protocol_probe",
         "/api/monitor/chain": "_post_monitor_chain",
+        "/api/site/devices": "_post_site_device",
         "/api/memory/write": "_post_memory_write",
         "/api/memory/update": "_post_memory_update",
         "/api/memory/delete": "_post_memory_delete",
+        "/api/memory/auto-sediment": "_post_memory_auto_sediment",
+        "/api/skill/auto-generate": "_post_skill_auto_generate",
         "/api/ontology/semantic": "_post_onto_semantic",
     }
 

@@ -38,3 +38,5 @@ tmp/
 
 # 内部审查文档, 不发布
 docs/OPENCLAW_*.md
+dev/
+_os/_smoke_*.py

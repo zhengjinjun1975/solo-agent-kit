@@ -69,6 +69,56 @@ class Site:
                 return {"ok": True, "device": d, "site": site}
         return {"ok": False, "error": f"当前厂区无设备: {name}", "site": site}
 
+    # ---- 写入 ----
+    def _save(self) -> None:
+        """原子写回 site.json（临时文件 + os.replace，崩溃不损坏原配置）。"""
+        import tempfile
+        fd, tmp = tempfile.mkstemp(dir=os.path.dirname(self.file), suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                import json
+                json.dump(self._cfg, f, ensure_ascii=False, indent=2)
+            os.replace(tmp, self.file)
+        except Exception:
+            if os.path.exists(tmp):
+                os.remove(tmp)
+            raise
+
+    def add_device(self, name: str, site: str = None, host: str = None,
+                   port: int = 22, user: str = None,
+                   device_type: str = None, status: str = None,
+                   power: str = None) -> dict:
+        """往指定（或当前）厂区设备台账新增一台设备，写入 site.json。
+
+        返回 {"ok": True, "device": ..., "site": ...} 或 {"ok": False, "error": ...}。
+        厂区不存在时自动创建（以指定名或默认厂区）。
+        """
+        name = (name or "").strip()
+        if not name:
+            return {"ok": False, "error": "设备名必填"}
+        site = (site or "").strip() or self.current_site or "默认厂区"
+        sites = self._cfg.setdefault("sites", {})
+        info = sites.setdefault(site, {"devices": []})
+        devs = info.setdefault("devices", [])
+        # 同厂区内设备名唯一
+        for d in devs:
+            if d.get("name") == name:
+                return {"ok": False, "error": f"厂区「{site}」已存在设备 {name}"}
+        device = {
+            "name": name,
+            "host": (host or "").strip() or "127.0.0.1",
+            "port": int(port or 22),
+            "user": (user or "").strip() or "root",
+            "device_type": (device_type or "").strip(),
+            "status": (status or "待机").strip() or "待机",
+            "power": (power or "").strip(),
+        }
+        devs.append(device)
+        if not self._cfg.get("current_site"):
+            self._cfg["current_site"] = site
+        self._save()
+        return {"ok": True, "device": device, "site": site}
+
 
 # ═══════════════════════════ 2. SSH 远程运维 ═══════════════════════════
 def _ssh_base(host: str, user: str = None, port: int = 22) -> list:

@@ -62,6 +62,18 @@ def route_llm(task: str) -> str:
     return route(task)
 
 
+def _sediment(m, sk, text: str, source: str):
+    """自动沉淀统一入口：写记忆 + 触发技能自动生成。失败静默不打断主流程。"""
+    try:
+        m.auto_sediment(text, source=source)
+    except Exception:
+        pass
+    try:
+        sk.auto_generate(m)
+    except Exception:
+        pass
+
+
 def run(task: str, mem_dir: str = None, skill_dir: str = None, tier: str = "auto",
         csv_path: str = None, col: str = None, conversation_id: str = None,
         history: list = None) -> dict:
@@ -71,6 +83,7 @@ def run(task: str, mem_dir: str = None, skill_dir: str = None, tier: str = "auto
     conversation_id/history 支持多轮对话（P0-6）：传入会话历史注入上下文。
     """
     m = memory_mod.Memory(mem_dir or memory_mod.DEFAULT_DIR)
+    sk = skill_mod.Skill(skill_dir or skill_mod.DEFAULT_DIR)
     # P1-6: 关键词优先，无法判定时用 LLM 增强（仍回退关键词）
     intent = route(task)
     if intent == "chat" and not any(k in task for k in ("你好", "hi", "hello")):
@@ -84,6 +97,8 @@ def run(task: str, mem_dir: str = None, skill_dir: str = None, tier: str = "auto
         cl = data_mod.DataCleaner()
         rows = cl.load_csv(path)
         res = app_mod.data_clean(rows, method="drop", outlier="iqr")
+        _sediment(m, sk, f"数据清洗完成 {res['input']}→{res['output']} 行，方法=drop/iqr",
+                  source="clean")
         return {"intent": "clean", "summary": f"清洗完成 {res['input']}→{res['output']} 行",
                 "report": res["report"], "memory_dir": m.dir}
     if intent == "stats":
@@ -93,6 +108,8 @@ def run(task: str, mem_dir: str = None, skill_dir: str = None, tier: str = "auto
         res = app_mod.data_stats(rows, col)
         if "error" in res:
             return {"intent": "stats", "error": res["error"], "memory_dir": m.dir}
+        _sediment(m, sk, f"数据分析完成 列={res['column']} 异常点={len(res['anomalies'])}",
+                  source="stats")
         return {"intent": "stats", "column": res["column"],
                 "describe": res["describe"],
                 "anomalies": res["anomalies"],
@@ -102,6 +119,8 @@ def run(task: str, mem_dir: str = None, skill_dir: str = None, tier: str = "auto
         cl = data_mod.DataCleaner()
         rows = cl.load_csv(path)
         res = app_mod.build_ontology(rows, entity="equip", id_col="id")
+        _sediment(m, sk, f"本体建模完成 实体={len(res.get('entities', []))} 三元组={res.get('triples', 0)}",
+                  source="ontology")
         return {"intent": "ontology", "entities": res.get("entities", []),
                 "triples": res.get("triples", 0), "memory_dir": m.dir}
     if intent == "memory_search":
@@ -190,5 +209,14 @@ def run(task: str, mem_dir: str = None, skill_dir: str = None, tier: str = "auto
     # 明确引导：模型不得编造配置/环境信息，只答能力范围内
     guard = "\n\n重要约束：若用户询问配置、API key、环境变量、模型设置等，不要猜测或编造，统一指引运行 `solo setup` 和 `solo config` 查看。只回答你实际知道的、能力范围内的事。"
     text = p.complete(context + guard + "\n\n请给出简洁回复(中文):", tier=tier)
-    m.add_fact(task, tags=["task"])
+    # 记忆自动沉淀（用后自动存，非手动点）：把用户问题沉淀为一条事实，供下次检索
+    try:
+        m.auto_sediment(task, tags=[intent, "问答"], source="chat")
+    except Exception:
+        pass
+    # 技能自动生成（从经验自动总结，非手动加）：每次问答后尝试从自动沉淀经验提炼高频技能
+    try:
+        sk.auto_generate(m)
+    except Exception:
+        pass
     return {"intent": "chat", "suggestion": text, "tier": tier, "memory_dir": m.dir}

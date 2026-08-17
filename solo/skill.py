@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 
 DEFAULT_DIR = os.path.join(os.path.expanduser("~"), ".solo", "skills")
 
@@ -51,6 +52,82 @@ class Skill:
         # 过滤乱码技能(含 U+FFFD 替换字符 = 写入时编码损坏, 无法恢复)
         return [idx[name] for name in sorted(idx.keys())
                 if "\ufffd" not in name and "\ufffd" not in str(idx[name])]
+
+    # ---- 技能自动生成（从经验自动总结，非手动加）----
+    def auto_generate(self, memory: "Memory" = None, min_cluster: int = 2,
+                      min_len: int = 10) -> dict:
+        """从记忆/经验自动提炼技能：识别高频模式 → 自动生成可复用技能。
+
+        规则（零依赖，避免调用 LLM 不稳定）：
+          1. 取事实层中带「auto/沉淀」标签的经验（用后自动存下的）
+          2. 提取每条经验的主题词（高频实词，取长度≥2 的连续片段）
+          3. 主题词出现 ≥ min_cluster 次 → 作为候选技能触发词
+          4. 把同主题的若干条经验文本归纳为「执行步骤」→ 自动生成技能
+          5. 幂等：同名技能已存在则不覆盖（走 add 版本递增，source=auto）
+        返回 {generated: [...], skipped: n}。
+        """
+        import collections
+        # 1) 取记忆经验（全部事实，或带 auto 标签的）
+        if memory is None:
+            from solo import memory as memory_mod
+            memory = memory_mod.Memory()
+        facts = memory._load_facts()
+        exp = []
+        for f in facts:
+            t = (f.get("text") or "").strip()
+            tags = f.get("tags") or []
+            if len(t) >= min_len and ("auto" in tags or "沉淀" in tags or "经验" in tags):
+                exp.append(t)
+        if not exp:
+            return {"generated": [], "skipped": 0, "reason": "暂无自动沉淀经验，先问答/任务让记忆自动积累"}
+
+        # 2) 主题词提取：按常见连接词/标点切分，取长度≥2 的实词片段
+        stop = set("的了吗呢和与及在是我想我们你们他们如何怎样什么为什么怎么才能让把被对从到对此关于因为所以但是然后最后"
+                   "用于用后自动存自动沉淀经验技能记忆问答审查决策任务完成发现结论做法步骤实践方案问题建议")
+        tokens = collections.Counter()
+        for t in exp:
+            for seg in re.split(r"[,，。；;：:!！?？\s、/()（）\[\]【】]+", t):
+                seg = seg.strip()
+                if 2 <= len(seg) <= 12 and seg not in stop:
+                    tokens[seg] += 1
+        # 3) 高频主题词 → 候选技能
+        hot = [w for w, c in tokens.items() if c >= min_cluster]
+        if not hot:
+            return {"generated": [], "skipped": 0, "reason": "暂无高频主题，经验还需更多积累"}
+
+        # 3b) 共享关键词提取：用于技能触发词，让技能能被「部署/清洗/分析」等真实场景词触发
+        def _bigrams(t: str):
+            return {t[i:i+2] for i in range(len(t) - 1)
+                    if t[i:i+2] not in stop
+                    and not t[i:i+2].isdigit()
+                    and all(c.isalnum() or "\u4e00" <= c <= "\u9fff" for c in t[i:i+2])}
+
+        generated, skipped = [], 0
+        for topic in hot[:8]:
+            # 该主题关联的经验（含主题词的）作为执行步骤
+            steps = [t for t in exp if topic in t][:8]
+            if not steps:
+                continue
+            # 触发词 = 主题词 + 该主题步骤中高频出现的共享关键词
+            local_bigram = collections.Counter()
+            for st in steps:
+                for bg in _bigrams(st):
+                    local_bigram[bg] += 1
+            shared = [w for w, c in local_bigram.items()
+                      if c >= 2 and w not in stop][:4]
+            trigger = [topic] + shared
+            name = f"经验·{topic}"
+            old = self.get(name)
+            # 幂等：同名且同步骤的同源 auto 技能已存在 → 跳过，不重复生成/不盲目升级版本
+            if old and old.get("source") == "auto" and old.get("steps") == steps:
+                skipped += 1
+                continue
+            skill = self.add(name, trigger=trigger, steps=steps, source="auto")
+            generated.append({"name": name, "trigger": skill["trigger"],
+                              "steps_count": len(steps), "version": skill["version"],
+                              "auto": True})
+        return {"generated": generated, "skipped": skipped}
+
 
     def match(self, text: str) -> list:
         """按触发词匹配当前任务的适用 skill（按触发词命中排序）。"""

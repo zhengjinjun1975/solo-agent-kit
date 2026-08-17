@@ -120,6 +120,18 @@
     </div>
   </main>
 
+  <!-- 功能工作区（点左侧功能 → 中央使用方法 + 功能面板） -->
+  <main id="feature-workspace" class="glass" style="display:none">
+    <div class="fw-toolbar">
+      <div class="fw-title" id="fw-title">💡 使用方法</div>
+      <div class="fw-breadcrumb" id="fw-breadcrumb"></div>
+    </div>
+    <div id="usage-panel" class="fw-usage"></div>
+    <div id="feature-panels" class="fw-panels">
+      <!-- 功能面板由 JS 从右侧接入区移入中央 -->
+    </div>
+  </main>
+
   <!-- 写作画布（主区，方向B：写作占主区 Canvas 式） -->
   <main id="writing-canvas">
     <div class="canvas-toolbar">
@@ -157,11 +169,28 @@
 
   <!-- 右侧：工作区容器（点击导航渲染对应工作区面板） -->
   <aside class="ctx glass">
+    <!-- 功能接入（右侧：API 端点 + 集成方式） -->
+    <div id="access-panel" class="access-panel" style="display:none">
+      <div class="access-head">
+        <div class="access-icon" id="access-icon">🔌</div>
+        <div>
+          <div class="access-title" id="access-title">功能接入</div>
+          <div class="access-sub" id="access-sub">API 端点 · 集成方式</div>
+        </div>
+      </div>
+      <div class="lbl">📡 API 端点</div>
+      <div id="access-endpoints"></div>
+      <div class="lbl">🧩 集成方式</div>
+      <div id="access-integration" class="access-text"></div>
+    </div>
+
     <!-- 系统状态（默认视图） -->
     <div id="ws-status">
       <div class="lbl">系统状态</div>
       <div class="stat"><span class="num blue" id="s-facts">0</span> 已沉淀知识</div>
       <div class="stat"><span class="num orange" id="s-skills">0</span> 可复用技能</div>
+      <div class="stat"><span class="num green" id="s-mem-auto">0</span> 自动沉淀</div>
+      <div class="stat"><span class="num purple" id="s-skill-auto">0</span> 自动生成技能</div>
       <div class="stat"><span class="num green" id="s-api">—</span> 后端服务</div>
       <div class="lbl">方法论</div>
       <div class="tag-row">
@@ -348,14 +377,17 @@
       <div id="task-result" style="font-size:12px;margin-top:10px"></div>
     </div>
 
-    <!-- 记忆工作区（温域记忆 note/search + OptMem 全局记忆 note/search） -->
+    <!-- 记忆工作区（自动沉淀 + 手动补充 + OptMem 全局） -->
     <div id="ws-memory" style="display:none">
-      <div class="lbl">记忆 — 温域 + OptMem 全局</div>
-      <textarea id="mem-note" rows="2" placeholder="记一条事实 / 沉淀经验（如：交付前先跑 e2e 联调再打补丁）" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;margin-top:8px;background:#fff;color:var(--text);resize:vertical"></textarea>
+      <div class="lbl">记忆 — 自动沉淀（用后自动存，问答/任务后自动积累经验）</div>
+      <div style="font-size:11px;color:var(--mute);margin:6px 0">🤖 问答、分析、审查、决策、任务完成后会自动沉淀关键结论；重复内容自动去重/更新。手动记录仅作补充。</div>
+      <textarea id="mem-note" rows="2" placeholder="经验 / 结论（完成后可点下方「自动沉淀」写入记忆决策层，自动去重/更新）" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;margin-top:8px;background:#fff;color:var(--text);resize:vertical"></textarea>
       <div style="display:flex;gap:6px;margin-top:8px">
-        <button class="btn pri" onclick="runMemNote('warm')" style="flex:1">💾 记温域</button>
-        <button class="btn pri" onclick="runMemNote('optmem')" style="flex:1">🌍 沉淀 OptMem</button>
+        <button class="btn pri" onclick="memAutoSediment()" style="flex:1.2">⚙️ 自动沉淀（去重/更新）</button>
+        <button class="btn" onclick="runMemNote('warm')" style="flex:1">✍️ 手动补充</button>
+        <button class="btn" onclick="runMemNote('optmem')" style="flex:1">🌍 沉淀 OptMem</button>
       </div>
+      <div id="mem-auto-badge" style="font-size:11px;color:var(--mute);margin-top:6px">⚙️ 自动沉淀状态加载中…</div>
       <input id="mem-q" placeholder="检索关键词（如：交付 / 本体）" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;margin-top:8px;background:#fff;color:var(--text)">
       <div style="display:flex;gap:6px;margin-top:8px">
         <button class="btn" onclick="runMemSearch('warm')" style="flex:1">🔍 温域检索</button>
@@ -419,9 +451,15 @@
 
     <!-- 技能工作区 -->
     <div id="ws-skill" style="display:none">
-      <div class="lbl">技能库 — 可复用经验管理</div>
+      <div class="lbl">技能库 — 经验自动总结（高频/成功经验自动提炼成可复用技能）</div>
+      <div style="font-size:11px;color:var(--mute);margin:6px 0">🤖 记忆自动沉淀后，高频主题会自动生成技能；也可点下方按钮手动触发一次提炼。下方手动添加仅作补充。</div>
+      <div id="skill-auto-badge" style="font-size:11px;color:var(--mute);margin:6px 0">🤖 自动技能状态加载中…</div>
       <div id="skill-list" style="font-size:12px"></div>
-      <div class="lbl" style="margin-top:14px">添加技能</div>
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <button class="btn pri" style="flex:1" onclick="skillAutoGenerate()">🤖 从经验自动生成技能</button>
+        <button class="btn" style="flex:1" onclick="loadSkillPanel()">🔄 刷新</button>
+      </div>
+      <div class="lbl" style="margin-top:14px">手动补充技能</div>
       <input type="text" id="sk-name" placeholder="技能名" style="margin-bottom:4px">
       <input type="text" id="sk-trigger" placeholder="触发词,逗号分隔" style="margin-bottom:4px">
       <textarea id="sk-steps" rows="3" placeholder="执行步骤,换行分隔" style="width:100%;background:#fff;border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12px;padding:8px;outline:none"></textarea>

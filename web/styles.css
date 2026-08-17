@@ -23,7 +23,13 @@ body{font-family:-apple-system,"Segoe UI","Microsoft YaHei",system-ui,sans-serif
     radial-gradient(700px 400px at 95% 110%, rgba(124,58,237,0.06), transparent 55%),
     linear-gradient(160deg,#f0fdfa 0%,#f8fafc 45%,#f5f3ff 100%);
   color:var(--text);height:100vh;overflow:hidden}
-.app{display:grid;grid-template-columns:300px 1fr 250px;gap:14px;padding:14px;height:100vh}
+.app{display:grid;grid-template-columns:300px 1fr 320px;gap:14px;padding:14px;height:100vh}
+/* 三列显式占位：左导航=1，中央(chat/写作/功能工作区共享)=2，右侧接入=3 */
+.sidebar{grid-column:1;grid-row:1}
+.main{grid-column:2;grid-row:1}
+#writing-canvas{grid-column:2;grid-row:1}
+#feature-workspace{grid-column:2;grid-row:1}
+.ctx{grid-column:3;grid-row:1}
 .glass{background:var(--panel);border:1px solid var(--border);border-radius:var(--r);backdrop-filter:var(--glass);-webkit-backdrop-filter:var(--glass);box-shadow:var(--shadow);transition:box-shadow .3s var(--ease),transform .3s var(--ease)}
 
 /* 左导航 */
@@ -98,7 +104,8 @@ body{font-family:-apple-system,"Segoe UI","Microsoft YaHei",system-ui,sans-serif
 .ctx .stat{padding:10px 13px;background:var(--panel);border:1px solid var(--border);border-radius:10px;margin-bottom:6px;font-size:15px;transition:all .2s var(--ease)}
 .ctx .stat:hover{background:#fff;box-shadow:var(--shadow);transform:translateY(-1px)}
 .ctx .stat .num{font-size:16px;font-weight:600}
-.ctx .stat .num.blue{color:var(--blue)}.ctx .stat .num.orange{color:var(--orange)}.ctx .stat .num.green{color:var(--green)}
+.ctx .stat .num.blue{color:var(--blue)}.ctx .stat .num.orange{color:var(--orange)}.ctx .stat .num.purple{color:#7C3AED}
+.num.green{color:var(--green)}
 .tag-row{display:flex;flex-wrap:wrap;gap:5px}
 .ds-card{display:flex;align-items:center;gap:14px;padding:14px 16px;border:1.5px dashed var(--blue-border);border-radius:14px;background:var(--blue-bg);cursor:pointer;transition:all .25s var(--ease)}
 .ds-card:hover{border-color:var(--blue);background:#f0fdfa;transform:translateY(-1px);box-shadow:0 4px 16px rgba(13,148,136,.08)}
@@ -187,3 +194,37 @@ body{font-family:-apple-system,"Segoe UI","Microsoft YaHei",system-ui,sans-serif
 .mc-embed-title{font-size:12px;font-weight:700;color:var(--blue)}
 .mc-actions{display:flex;gap:8px;margin-top:10px}
 .mc-actions .btn{flex:1}
+
+/* ============================================================
+   布局改进：中央使用方法 + 右侧功能接入
+   ============================================================ */
+/* 功能工作区（中央） */
+#feature-workspace{display:flex;flex-direction:column;overflow:hidden;background:
+  radial-gradient(600px 300px at 80% 0%, rgba(13,148,136,0.05), transparent 60%),
+  linear-gradient(180deg,rgba(255,255,255,0.94),rgba(248,250,253,0.9))}
+.fw-toolbar{padding:16px 22px;display:flex;align-items:center;gap:14px;flex-shrink:0;border-bottom:1px solid rgba(13,148,136,0.12);background:linear-gradient(90deg,rgba(204,251,241,0.5),rgba(255,255,255,0))}
+.fw-toolbar .fw-title{font-size:22px;font-weight:800;letter-spacing:-.02em;color:var(--text)}
+.fw-toolbar .fw-breadcrumb{display:flex;align-items:center;gap:8px;margin-left:auto;flex-shrink:0}
+.fw-chip{color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:12px}
+.fw-crumb{font-size:12px;color:var(--mute)}
+/* 使用方法区 */
+.fw-usage{flex-shrink:0;padding:14px 22px;border-bottom:1px solid var(--border);background:rgba(255,255,255,0.6)}
+.usage-grid{display:grid;grid-template-columns:1.6fr 1fr;gap:16px}
+.usage-col{display:flex;flex-direction:column;gap:6px}
+.usage-h{font-size:14px;font-weight:700;color:var(--blue);display:flex;align-items:center;gap:6px}
+.usage-body{font-size:15px;color:var(--dim);line-height:1.8;background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:10px 14px}
+/* 功能面板滚动区 */
+.fw-panels{flex:1;overflow-y:auto;padding:16px 22px}
+/* 右侧功能接入面板 */
+.access-panel{padding:4px 2px}
+.access-head{display:flex;align-items:center;gap:12px;padding:12px;border-radius:12px;background:linear-gradient(135deg,rgba(13,148,136,.08),rgba(124,58,237,.06));border:1px solid var(--border);margin-bottom:8px}
+.access-icon{font-size:30px}
+.access-title{font-size:16px;font-weight:800;color:var(--text)}
+.access-sub{font-size:11px;color:var(--mute);margin-top:2px}
+.ep-row{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--border);border-radius:8px;padding:7px 10px;margin-bottom:6px}
+.ep-method{font-size:10px;font-weight:800;padding:2px 7px;border-radius:5px;flex-shrink:0}
+.ep-method.get{background:rgba(13,148,136,.15);color:var(--blue)}
+.ep-method.post{background:rgba(124,58,237,.15);color:var(--orange)}
+.ep-path{font-family:Consolas,monospace;font-size:11px;color:var(--text);word-break:break-all}
+.access-text{font-size:12px;color:var(--dim);line-height:1.8;background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:10px 12px}
+.access-text p{margin:0}

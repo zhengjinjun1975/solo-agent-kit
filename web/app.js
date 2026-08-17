@@ -184,6 +184,9 @@ async function selectDataSource(cap, ex){
 
 // ===== 工作区切换：导航点击在右侧渲染对应工作区 =====
 function showWorkspace(ws){
+  // 布局改进：功能类(非chat/writing) → 中央使用方法 + 右侧功能接入
+  if(FEATURE_CENTER && FEATURE_CENTER.includes(ws)){ setView('feature', ws); renderUsage(ws); renderAccess(ws); }
+  else if(ws==='writing'){ setView('writing'); }
   ['status','clean','stats','ontology','decisions','writing','code','skill','config','setup','monitor','logs','remote','issue','site-panel','task','memory','delivery'].forEach(id=>{
     const el=document.getElementById('ws-'+id);
     if(el) el.style.display = (id===ws)?'block':'none';
@@ -243,6 +246,7 @@ document.querySelectorAll('.ni').forEach(n=>n.addEventListener('click',()=>{
       return;
     }
     if(cap==='skill')loadSkillPanel();
+    if(cap==='memory')loadMemAutoBadge();
     if(cap==='config')loadConfigPanel();
     if(cap==='setup')loadSetupPanel();
     if(cap==='code')runCodeOverview();
@@ -582,12 +586,75 @@ async function loadSitePanel(){
   if(!box) return;
   box.innerHTML=`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
       <button class="btn pri" onclick="refreshSitePanel()">🔄 刷新</button>
+      <button class="btn" onclick="toggleSiteForm()">➕ 添加设备</button>
       <button class="btn" onclick="siteSPC()">📈 SPC演示</button>
       <span style="font-size:11px;color:var(--mute)" id="site-msg"></span></div>
+    <div id="site-form" style="display:none"></div>
     <div id="site-devices" style="margin-bottom:12px"></div>
     <div id="site-status" style="margin-bottom:12px"></div>
     <div id="site-chart" style="width:100%;height:260px"></div>`;
   await refreshSitePanel();
+}
+
+function toggleSiteForm(){
+  const f=document.getElementById('site-form');
+  if(!f) return;
+  if(f.style.display==='none'){
+    f.innerHTML=`<div style="background:var(--bg,#f8fafc);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:12px">
+      <div style="font-size:13px;font-weight:600;margin-bottom:8px">➕ 添加设备</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:8px">
+        <input id="sd-name" placeholder="设备名 *" style="padding:7px;border:1px solid var(--border);border-radius:8px;font-size:13px">
+        <input id="sd-host" placeholder="IP/主机" value="127.0.0.1" style="padding:7px;border:1px solid var(--border);border-radius:8px;font-size:13px">
+        <input id="sd-port" placeholder="端口" value="22" style="padding:7px;border:1px solid var(--border);border-radius:8px;font-size:13px">
+        <input id="sd-user" placeholder="SSH用户" value="root" style="padding:7px;border:1px solid var(--border);border-radius:8px;font-size:13px">
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:8px">
+        <input id="sd-site" placeholder="厂区" value="${window._siteCur||''}" style="padding:7px;border:1px solid var(--border);border-radius:8px;font-size:13px">
+        <select id="sd-type" style="padding:7px;border:1px solid var(--border);border-radius:8px;font-size:13px">
+          <option value="">类型(可选)</option><option>加工设备</option><option>检测设备</option><option>输送设备</option><option>PLC</option><option>传感器</option><option>其他</option>
+        </select>
+        <select id="sd-status" style="padding:7px;border:1px solid var(--border);border-radius:8px;font-size:13px">
+          <option value="运行中">运行中</option><option value="待机">待机</option><option value="维护">维护</option><option value="停机">停机</option>
+        </select>
+        <input id="sd-power" placeholder="功率(kW)" style="padding:7px;border:1px solid var(--border);border-radius:8px;font-size:13px">
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn pri" onclick="submitSiteDevice()">✔ 保存设备</button>
+        <button class="btn" onclick="toggleSiteForm()">取消</button>
+        <span style="font-size:11px;color:var(--mute)" id="sd-msg"></span>
+      </div>
+    </div>`;
+    f.style.display='block';
+  } else { f.style.display='none'; f.innerHTML=''; }
+}
+
+async function submitSiteDevice(){
+  const msg=document.getElementById('sd-msg');
+  if(!msg) return;
+  const name=document.getElementById('sd-name').value.trim();
+  if(!name){ msg.textContent='⚠ 设备名必填'; msg.style.color='#dc2626'; return; }
+  const payload={
+    name,
+    host:document.getElementById('sd-host').value.trim(),
+    port:document.getElementById('sd-port').value.trim(),
+    user:document.getElementById('sd-user').value.trim(),
+    site:document.getElementById('sd-site').value.trim(),
+    device_type:document.getElementById('sd-type').value,
+    status:document.getElementById('sd-status').value,
+    power:document.getElementById('sd-power').value.trim(),
+  };
+  msg.textContent='⏳ 提交中…'; msg.style.color='var(--mute)';
+  try{
+    const res=await api('/api/site/devices',{method:'POST',body:JSON.stringify(payload)});
+    if(res.ok){
+      const hmsg=document.getElementById('site-msg');
+      if(hmsg){ hmsg.textContent=`✅ 已添加 ${res.device.name} → ${res.site}`; hmsg.style.color='#16a34a'; }
+      toggleSiteForm();          // 收起表单
+      await refreshSitePanel();  // 刷新设备列表
+    } else {
+      msg.textContent='✗ '+(res.error||'添加失败'); msg.style.color='#dc2626';
+    }
+  }catch(e){ msg.textContent='✗ '+e; msg.style.color='#dc2626'; }
 }
 
 async function refreshSitePanel(){
@@ -596,14 +663,15 @@ async function refreshSitePanel(){
   try{
     // 1. 设备台账
     const devs=await api('/api/site/devices');
+    window._siteCur=devs.site||'';
     const dbox=document.getElementById('site-devices');
     if(devs.devices && devs.devices.length){
       dbox.innerHTML=`<div style="font-size:11px;color:var(--mute);margin-bottom:4px">设备台账（${devs.site||''}）</div>
         <table style="width:100%;font-size:11px;border-collapse:collapse">
-        <tr style="color:var(--mute)"><th style="text-align:left;padding:3px">设备</th><th>IP</th><th>端口</th><th>用户</th></tr>
-        ${devs.devices.map(d=>`<tr><td style="padding:3px">${esc(d.name||'')}</td><td style="text-align:center">${esc(d.host||'')}</td><td style="text-align:center">${d.port||''}</td><td style="text-align:center">${esc(d.user||'')}</td></tr>`).join('')}</table>`;
+        <tr style="color:var(--mute)"><th style="text-align:left;padding:3px">设备</th><th>类型</th><th>状态</th><th>功率</th><th>IP</th><th>端口</th><th>用户</th></tr>
+        ${devs.devices.map(d=>`<tr><td style="padding:3px"><b>${esc(d.name||'')}</b></td><td style="text-align:center">${esc(d.device_type||'—')}</td><td style="text-align:center">${esc(d.status||'待机')}</td><td style="text-align:center">${esc(d.power||'—')}</td><td style="text-align:center">${esc(d.host||'')}</td><td style="text-align:center">${d.port||''}</td><td style="text-align:center">${esc(d.user||'')}</td></tr>`).join('')}</table>`;
     } else {
-      dbox.innerHTML=`<div style="font-size:11px;color:var(--mute)">暂无设备台账，请先 <code>solo site add-device</code> 添加</div>`;
+      dbox.innerHTML=`<div style="font-size:11px;color:var(--mute)">暂无设备台账，点击上方「➕ 添加设备」在线录入</div>`;
     }
     // 2. 实时状态
     const st=await api('/api/monitor/devices');
@@ -611,9 +679,9 @@ async function refreshSitePanel(){
     if(st.devices && st.devices.length){
       sbox.innerHTML=st.devices.map(d=>{
         const nm=d.name||d.device||'设备';
-        const cpu=d.cpu!=null?`CPU ${d.cpu}%`:''; const mem=d.mem!=null?`MEM ${d.mem}%`:'';
+        const cpu=d.cpu!=null?`CPU ${d.cpu}%`:''; const mem=d.mem!=null?`MEM ${d.mem}%`:''; const pw=d.power!=null?`功率 ${d.power}kW`:'';
         return `<div style="font-size:11px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:6px 8px;margin-bottom:4px">
-          <b>${esc(nm)}</b> ${cpu} ${mem} ${d.ok?'' : (d.error?'<span style="color:#ef4444"> ⚠ '+esc(d.error)+'</span>':'')}</div>`;
+          <b>${esc(nm)}</b> ${cpu} ${mem} ${pw} ${d.ok?'' : (d.error?'<span style="color:#ef4444"> ⚠ '+esc(d.error)+'</span>':'')}</div>`;
       }).join('');
     } else {
       sbox.innerHTML=`<div style="font-size:11px;color:var(--mute)">无设备状态</div>`;
@@ -642,17 +710,30 @@ async function loadSkillPanel(){
   const res=await api('/api/skills');
   const el=document.getElementById('skill-list');
   const sk=res.skills||[];
-  if(!sk.length){el.innerHTML='<div class="stat" style="color:var(--mute)">暂无技能，添加一个可复用经验</div>';return;}
+  const ab=document.getElementById('skill-auto-badge');
+  if(ab) ab.textContent=`🤖 已自动生成 ${res.auto_skills||0} / ${res.total||sk.length} 个技能（经验自动总结）`;
+  if(!sk.length){el.innerHTML='<div class="stat" style="color:var(--mute)">暂无技能，经验会自动总结生成技能</div>';return;}
   // 列表式展示每个技能
   el.innerHTML=sk.map(s=>`
     <div style="border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:8px;background:#fff">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <b style="font-size:13px;color:var(--blue)">🎯 ${esc(s.name)}</b>
-        <span style="font-size:10px;color:var(--mute)">v${s.version||1} · ${(s.ts||'').slice(0,10)}</span>
+        <span style="font-size:10px;color:var(--mute)">${s.source==='auto'?'🤖 自动生成 · ':''}v${s.version||1} · ${(s.ts||'').slice(0,10)}</span>
       </div>
       ${s.trigger&&s.trigger.length?`<div style="font-size:11px;color:var(--mute);margin-top:5px">触发词：${s.trigger.map(esc).join(' · ')}</div>`:''}
       ${s.steps&&s.steps.length?`<div style="font-size:11px;margin-top:4px"><span style="color:var(--mute)">步骤：</span><br>${s.steps.map((st,i)=>`<span style="color:var(--dim)">${i+1}. ${esc(st)}</span>`).join('<br>')}</div>`:''}
     </div>`).join('');
+}
+async function skillAutoGenerate(){
+  const el=document.getElementById('skill-list');
+  el.innerHTML='<div class="stat" style="color:var(--mute)">⏳ 从自动沉淀经验提炼技能中…</div>';
+  try{
+    const res=await api('/api/skill/auto-generate',{method:'POST',body:JSON.stringify({min_cluster:2})});
+    const n=(res.generated||[]).length;
+    el.innerHTML=`<div class="stat" style="color:var(--green)">🤖 自动生成 ${n} 个技能（本次），累计自动技能 ${res.auto_skills||0} 个。${res.reason?'<br>'+esc(res.reason):''}</div>`;
+    if(n) el.innerHTML+='<div style="font-size:11px;color:var(--mute);margin-top:6px">'+res.generated.map(g=>`· ${esc(g.name)}（${g.steps_count} 步）`).join('<br>')+'</div>';
+  }catch(e){el.innerHTML='❌ '+esc(e.message||e);}
+  loadSkillPanel(); loadOverview();
 }
 async function addSkill(){
   const name=document.getElementById('sk-name').value.trim();
@@ -776,10 +857,22 @@ async function loadSetupPanel(){
     +`· 记忆 ${c.memory?.facts||0} 条事实`;
 }
 
+async function loadMemAutoBadge(){
+  const el=document.getElementById('mem-auto-badge');
+  try{
+    const m=await api('/api/memory');
+    if(el) el.innerHTML=`⚙️ 已自动沉淀 <b>${m.auto_count||0}</b> 条经验（问答/任务后自动积累） · 共 ${m.facts||0} 条记忆 · 最近 ${(m.auto?.updated||'').slice(0,16)||'—'}`;
+  }catch(e){ if(el) el.textContent='⚙️ 自动沉淀状态加载失败'; }
+}
 async function loadOverview(){
   try{const m=await api('/api/memory'),s=await api('/api/skills');
     document.getElementById('s-facts').textContent=m.facts||0;
     document.getElementById('s-skills').textContent=(s.skills||[]).length;
+    // 自动积累状态徽标
+    const ma=document.getElementById('s-mem-auto');
+    if(ma) ma.textContent = `⚙️ 自动沉淀 ${m.auto_count||0} 条`;
+    const sa=document.getElementById('s-skill-auto');
+    if(sa) sa.textContent = `🤖 自动生成 ${s.auto_skills||0} 个`;
     document.getElementById('s-api').textContent='在线';document.getElementById('s-api').style.color='var(--green)';
   }catch(e){document.getElementById('s-api').textContent='离线';document.getElementById('s-api').style.color='var(--red)';}
 }
@@ -1175,6 +1268,19 @@ async function runMemNote(kind){
     : await api('/api/memory-add',{method:'POST',body:JSON.stringify({text})});
   out.innerHTML=res.error?('❌ '+res.error):`✅ 已记录（${kind==='optmem'?'OptMem 全局':res.message||'温域记忆'}）`;
 }
+async function memAutoSediment(){
+  // 记忆自动沉淀（用后自动存，非手动点）：把刚完成的问答/经验写入记忆决策层(去重/更新/新增)
+  const out=document.getElementById('mem-result');
+  const text=document.getElementById('mem-note').value.trim();
+  if(!text){out.innerHTML='⚠️ 请先输入刚完成的经验/结论';return;}
+  out.innerHTML='⏳ 自动沉淀中…';
+  const res=await api('/api/memory/auto-sediment',{method:'POST',body:JSON.stringify({text,source:'auto'})});
+  if(res.error){out.innerHTML='❌ '+res.error;return;}
+  const tag={ADD:'🆕 新增',UPDATE:'🔄 更新(同主题)',SKIP:'⏭ 跳过'}[res.action]||res.action;
+  out.innerHTML=`<b>⚙️ 自动沉淀：${tag}</b>（${res.reason||''}）<br>`
+    +`<span style="font-size:11px;color:var(--mute)">累计自动沉淀 ${res.auto_state?.count||0} 条 · 最近 ${(res.auto_state?.updated||'').slice(0,16)}</span>`;
+  loadOverview();
+}
 async function runMemSearch(kind){
   const out=document.getElementById('mem-result');
   const q=document.getElementById('mem-q').value.trim();
@@ -1285,3 +1391,207 @@ async function wcAiTaste(){
     ${res.issues&&res.issues.length?`<div style="margin-top:8px"><b>命中问题：</b>${res.issues.slice(0,8).map(i=>`<div style="font-size:11px;margin-top:3px;color:${i.severity==='fail'?'var(--red)':'var(--orange)'}">[${i.layer}] ${esc(i.type)}${i.count>1?'×'+i.count:''}</div>`).join('')}</div>`:''}
   </div>`;
 }
+
+/* ============================================================
+   布局改进：点左侧功能 → 中央使用方法 + 右侧功能接入
+   ============================================================ */
+// 功能信息：用法（步骤/输入/产出）+ 接入（API端点/集成）
+const FEATURE_INFO = {
+  monitor: { name:'监控', icon:'📈', tag:'运维',
+    usage:'①点「📈 刷新资源」看 CPU/内存/磁盘/进程实时占用；②点「▶ 一键端到端演示」或用「模拟接入指标」灌入设备数据；③设「告警规则」阈值，超限自动触发告警并建工单；④用「AI 问数」用自然语言查设备/告警/工单。',
+    input:'设备ID、指标(temperature/power/vibration)、阈值、自然语言问题',
+    output:'资源占用率、设备看板、告警列表、工单列表、AI问答',
+    access:'GET /api/monitor · POST /api/monitor/ingest{device_id,metric,value} · POST /api/monitor/rule · GET /api/monitor/metrics|alerts|tickets · POST /api/monitor/ask{question} · GET /api/site/devices · GET /api/monitor/devices',
+    integration:'集成方式：业务系统向 POST /api/monitor/ingest 推送设备实时指标（JSON），后端按规则引擎判告警→自动建工单；前端可经 /api/monitor/ask 做自然语言问数，或直接轮询 /api/monitor/metrics 渲染看板。',
+    color:'teal' },
+  'site-panel': { name:'厂区', icon:'🏭', tag:'运维',
+    usage:'①点「🔄 刷新」加载设备台账与实时状态；②点「📈 SPC演示」用演示数据生成 SPC 控制图；③看各设备 CPU/内存占用与连接状态。',
+    input:'无（自动读设备台账）',
+    output:'设备台账表、实时状态卡片、SPC 控制图',
+    access:'GET /api/site/devices · GET /api/monitor/devices · GET /api/charts/spc?values=...',
+    integration:'集成方式：前端点「➕ 添加设备」表单 POST /api/site/devices 在线录入设备台账（也可 CLI 录入），GET /api/site/devices 渲染台账、/api/monitor/devices 拉实时状态；SPC 演示可传 values 参数直接出图。',
+    color:'violet' },
+  logs: { name:'日志', icon:'📋', tag:'运维',
+    usage:'①点「📋 全部日志」看全量日志；②点「🔴 错误」过滤 ERROR 级；③点「🟠 警告」过滤 WARN 级；④滚动查看 FDE 排障线索。',
+    input:'可选 level 过滤（ERROR/WARN/全部）',
+    output:'日志列表（级别着色）',
+    access:'GET /api/logs?level=ERROR|WARN',
+    integration:'集成方式：前端调 GET /api/logs 拉取日志，传 level 参数过滤级别；用于 FDE 现场排障，可与监控/工单联动定位根因。',
+    color:'teal' },
+  remote: { name:'远程', icon:'↗️', tag:'运维',
+    usage:'①填主机 host；②点「🔌 测试连接」验证 SSH 可达；③填用户（留空=当前用户）与命令；④点「⚡ 执行命令」或「📋 远程日志」。',
+    input:'host、user、cmd（命令）',
+    output:'连接测试结果、命令 stdout/退出码、远程日志',
+    access:'POST /api/remote {action:test|exec|logs, host, user, cmd}',
+    integration:'集成方式：向后端 POST /api/remote 发起 SSH 操作；action=test 验连、exec 执行命令、logs 取远程日志，返回 stdout 与 exit_code。',
+    color:'violet' },
+  issue: { name:'工单', icon:'🎫', tag:'运维',
+    usage:'①填「问题描述」（如 生产环境部署失败）；②选「严重度」（低/中/高/紧急）；③点「📝 新建工单」自动 triage；④点「📋 工单列表」看问题闭环状态。',
+    input:'问题描述、严重度(severity)',
+    output:'工单ID、triage标签、状态(open/diagnosed/resolved)',
+    access:'POST /api/task {cmd:new_issue, problem, severity} · GET /api/task?cmd=list_issues',
+    integration:'集成方式：前端 POST /api/task 提交工单，后端自动 triage；监控超限触发的告警也会自动建工单，实现 指标→告警→工单 全链路闭环。',
+    color:'teal' },
+  task: { name:'任务', icon:'✅', tag:'交付与任务',
+    usage:'①填「任务目标」→点「➕ 新建任务」得到任务 id；②点「📋 任务列表」/「🔍 查状态」；③填 id+问题点「🚪 设决策门」（断点续跑）；④「✅ 解决门」推进状态。',
+    input:'goal（目标）、id、gate问题',
+    output:'任务ID、状态(todo/doing/waiting/done/cancelled)、决策门',
+    access:'POST /api/task {cmd:new|status|gate|resolve_task|list_tasks, goal, id, question}',
+    integration:'集成方式：目标式任务经 POST /api/task 管理，cmd 区分 new/status/gate/resolve_task/list_tasks；支持断点续跑与决策门，长任务状态外置不丢进度。',
+    color:'violet' },
+  memory: { name:'记忆', icon:'🧠', tag:'交付与任务',
+    usage:'①在文本框记一条事实/经验；②点「💾 记温域」或「🌍 沉淀 OptMem」持久化；③填关键词点「🔍 温域检索」/「🌍 OptMem 检索」召回。',
+    input:'text（要记录的内容）、q（检索关键词）',
+    output:'记录确认、检索命中条目',
+    access:'POST /api/memory-add {text} · GET /api/memory-search?q= · POST /api/memory/optmem-note {text} · GET /api/memory/optmem-search?q=',
+    integration:'集成方式：温域记忆用 /api/memory-add|search，OptMem 全局记忆用 /api/memory/optmem-note|search；支持跨 Agent 共享与语义回溯。',
+    color:'teal' },
+  skill: { name:'技能', icon:'🎯', tag:'能力扩展',
+    usage:'①点「技能库」看已沉淀技能；②填「技能名/触发词/执行步骤」；③点「添加技能」入库；④后续任务命中触发词自动复用。',
+    input:'name（技能名）、trigger（触发词）、steps（步骤）',
+    output:'技能列表、新增技能确认',
+    access:'GET /api/skills · POST /api/skill-add {name, trigger[], steps[]}',
+    integration:'集成方式：前端 GET /api/skills 展示、POST /api/skill-add 添加可复用经验；技能库作为程序化记忆被后续任务/写作自动调用。',
+    color:'violet' },
+  delivery: { name:'交付辅助', icon:'📦', tag:'交付与任务',
+    usage:'①「＋ 选择数据文件」（问题集/词典/契约/审查队列）；②填「行业」联动列名中文映射；③点「📋 问题集 D0」「📖 词典初稿 D1」「🏭 工厂契约」「🔍 审查队列」；④填命中率/题数点「📄 起草报告 D4」。',
+    input:'数据文件、industry（行业）、hit/questions/hits/asset_versions',
+    output:'问题集、词典、工厂契约、审查队列、交付报告',
+    access:'POST /api/delivery {action:draft-questions|lexicon-draft|to-factory-lexicon|to-review-items|report-draft, csv, industry, ...} · GET /api/industry',
+    integration:'集成方式：POST /api/delivery 按 action 生成各类交付物；行业联动用 GET /api/industry 取当前行业，联动列名中文映射。',
+    color:'teal' },
+  clean: { name:'数据清洗', icon:'🧹', tag:'工厂数据',
+    usage:'①「选择数据文件」（可多选，Ctrl 多选多文件）；②点「🧹 开始清洗」；③看清洗报告（去重/剔异常/补缺失）+ 预览前5行。',
+    input:'csv 或 csvs（多文件）或 db::table',
+    output:'清洗报告（去重/剔异常/补缺失）、清洗后数据预览',
+    access:'POST /api/clean {csv|csvs} · GET /api/browse?dir=',
+    integration:'集成方式：POST /api/clean 传 csv 或 csvs 数组做清洗；数据库表用 db::table 源。支持多文件合并清洗。',
+    color:'teal' },
+  stats: { name:'数据分析', icon:'📊', tag:'工厂数据',
+    usage:'①选择数据文件；②自动检测数值列，选「分析列」（默认第一数值列）；③点「📊 开始分析」；④看指标卡（均值/中位数/标准差）+ SPC 控制图。',
+    input:'csv、col（数值列）',
+    output:'统计指标卡、异常点、SPC 控制图(UCL/LCL/失控点)',
+    access:'POST /api/stats {csv, col} · POST /api/datasource-columns',
+    integration:'集成方式：POST /api/stats 传 csv 与 col 做统计分析，返回 describe/control_chart/anomalies；前端用 ECharts/SVG 渲染控制图。',
+    color:'violet' },
+  ontology: { name:'本体建模', icon:'🕸️', tag:'工厂数据',
+    usage:'①添加数据文件（可多选=企业级多实体）；②点「🕸️ 建企业级本体」；③下方「本体问答/检索」区填问题点「💬 问答」「🔍 检索」「🧾 导出 NT」。',
+    input:'csv(s)、entity、id、question/term',
+    output:'实体/关系数、企业图谱(ECharts)、问答/检索结果、NT 导出',
+    access:'POST /api/ontology {csv} · POST /api/ontology-multi {csvs} · POST /api/onto/answer|search|nt',
+    integration:'集成方式：POST /api/ontology(-multi) 建模，返回 graph 供 ECharts 渲染；问答/检索/导出经 /api/onto/answer|search|nt。',
+    color:'teal' },
+  decisions: { name:'决策', icon:'🧭', tag:'工厂数据',
+    usage:'①「＋ 选择数据文件」；②点「生成决策建议」；③看确定性规则引擎产出的行动清单（告急/预警/建议）。',
+    input:'csvs',
+    output:'决策建议列表（级别/行动/理由）、total 条数',
+    access:'POST /api/decisions {csvs}',
+    integration:'集成方式：POST /api/decisions 跑确定性规则引擎，返回可解释决策建议；区别于问答——做确定性决策建议而非检索。',
+    color:'violet' },
+  code: { name:'代码', icon:'💻', tag:'核心能力',
+    usage:'①点「📁 项目概览」看代码库结构；②「代码生成」填描述点「生成代码」用 CodeAgent 生成；③「代码审查」填文件路径点「🛡 审查文件」得 0-100 评分。',
+    input:'dir、prompt、file 路径',
+    output:'代码库概览、生成代码、审查评分+问题清单',
+    access:'GET /api/code-overview?dir=solo · POST /api/gen {kind:code-agent} · POST /api/code-review-file {file}',
+    integration:'集成方式：GET /api/code-overview 理解库；POST /api/gen 生成；POST /api/code-review-file 静态分析评分。',
+    color:'violet' },
+  config: { name:'配置', icon:'⚙️', tag:'系统',
+    usage:'①看模型列表与当前生效模型；②点「＋ 新增模型」或编辑 base_url/model；③选「设为生效」radio；④点「💾 保存配置」持久化。',
+    input:'models 列表、active、embedding',
+    output:'模型配置保存确认、当前生效模型',
+    access:'GET /api/config · POST /api/config {models, active, embedding}',
+    integration:'集成方式：GET/POST /api/config 读写 config/model_config.json；api_key 仅输入新值更新；默认 ornith/qwen 可直连 Ollama。',
+    color:'teal' },
+  setup: { name:'部署', icon:'🚀', tag:'系统',
+    usage:'①点「🚀 开始部署」；②看检查结果（Python/Ollama/配置/记忆）；③部署完成看启动步骤与验证。',
+    input:'无（自动检查环境）',
+    output:'部署检查报告、启动步骤、验证结果',
+    access:'GET /api/setup · GET /api/deploy',
+    integration:'集成方式：GET /api/setup 检查环境、GET /api/deploy 执行真实部署（检查→启动Ollama→验证模型）。',
+    color:'violet' },
+  writing: { name:'写作', icon:'✍️', tag:'核心能力',
+    usage:'①主区写作画布填「主题/要点」或直接用模板；②点「✨ 生成方案」生成文档；③「🛡 六维自检」查错字/语病/数字；④「🤖 AI味自检」打分；⑤「🎨 按风格改写」。',
+    input:'topic、points、text、style',
+    output:'方案/报告/文档、自检结果、AI味分、改写文本',
+    access:'POST /api/gen {kind:guide, topic} · POST /api/writing {text, action:scan|rewrite|ai-taste}',
+    integration:'集成方式：POST /api/gen 生成文档；POST /api/writing 做六维自检/风格改写/AI味评分。',
+    color:'violet' },
+};
+const FEATURE_COLORS = { teal:'#0d9488', violet:'#7c3aed' };
+// 特殊：writing 用主区画布（中央本就展示功能），不进 feature-workspace
+const FEATURE_CENTER = Object.keys(FEATURE_INFO).filter(c=>c!=='writing');
+
+// 迁移功能面板到中央 + 接入面板保留右侧（writing 保留在主区画布右侧辅助）
+function migrateWorkspaces(){
+  const fp = document.getElementById('feature-panels');
+  if(!fp) return;
+  FEATURE_CENTER.forEach(cap=>{
+    const el = document.getElementById('ws-'+cap);
+    if(el && fp && el.parentNode && el.parentNode.id!=='feature-panels'){ fp.appendChild(el); }
+  });
+}
+
+// 渲染中央使用方法
+function renderUsage(cap){
+  const info = FEATURE_INFO[cap]; if(!info) return;
+  document.getElementById('fw-title').textContent = `${info.icon} ${info.name} · 使用方法`;
+  document.getElementById('fw-breadcrumb').innerHTML = `<span class="fw-chip" style="background:${FEATURE_COLORS[info.color]}">${info.tag}</span><span class="fw-crumb">左侧功能 → ${info.name}</span>`;
+  const c = FEATURE_COLORS[info.color];
+  document.getElementById('usage-panel').innerHTML = `
+    <div class="usage-grid">
+      <div class="usage-col">
+        <div class="usage-h">🗂 操作步骤</div>
+        <div class="usage-body">${esc(info.usage)}</div>
+      </div>
+      <div class="usage-col">
+        <div class="usage-h" style="color:${c}">📥 输入</div>
+        <div class="usage-body">${esc(info.input)}</div>
+        <div class="usage-h" style="color:${c};margin-top:12px">📤 产出</div>
+        <div class="usage-body">${esc(info.output)}</div>
+      </div>
+    </div>`;
+}
+
+// 渲染右侧功能接入
+function renderAccess(cap){
+  const info = FEATURE_INFO[cap]; if(!info) return;
+  document.getElementById('access-icon').textContent = info.icon;
+  document.getElementById('access-title').textContent = `${info.name} · 功能接入`;
+  document.getElementById('access-sub').textContent = `${info.tag} · API 端点 · 集成方式`;
+  const eps = info.access.split(' · ').map(x=>x.trim()).filter(Boolean);
+  document.getElementById('access-endpoints').innerHTML = eps.map(e=>{
+    const m = e.split(' ')[0] || '';
+    const path = e.slice(m.length).trim();
+    return `<div class="ep-row"><span class="ep-method ${m==='POST'?'post':m==='GET'?'get':''}">${m}</span><code class="ep-path">${esc(path)}</code></div>`;
+  }).join('');
+  document.getElementById('access-integration').innerHTML = `<p>${esc(info.integration)}</p>`;
+}
+
+// 切换视图：chat / writing / feature
+function setView(mode, cap){
+  const app = document.querySelector('.app');
+  const chat = document.querySelector('.chat-view');
+  const fw = document.getElementById('feature-workspace');
+  const writing = document.getElementById('writing-canvas');
+  const access = document.getElementById('access-panel');
+  const wsStatus = document.getElementById('ws-status');
+  const wsWriting = document.getElementById('ws-writing');
+  if(app) app.classList.remove('writing');
+  if(chat) chat.style.display = (mode==='chat')?'flex':'none';
+  if(writing) writing.style.display = (mode==='writing')?'flex':'none';
+  if(fw) fw.style.display = (mode==='feature')?'flex':'none';
+  // 右侧：功能接入面板 vs 默认状态/写作辅助
+  if(access){ access.style.display = (mode==='feature')?'block':'none'; }
+  if(wsStatus){ wsStatus.style.display = (mode==='chat')?'block':'none'; }
+  if(wsWriting){ wsWriting.style.display = (mode==='writing')?'block':'none'; }
+}
+
+// 聊天点击：恢复中央聊天 + 右侧状态
+(function(){
+  document.querySelectorAll('.ni').forEach(n=>n.addEventListener('click',()=>{
+    const cap = n.dataset.cap;
+    if(cap==='chat'){ setView('chat'); }
+  }));
+  // 迁移已存在的功能面板到中央
+  migrateWorkspaces();
+})();

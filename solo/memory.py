@@ -174,6 +174,68 @@ class Memory:
                 "reason": "新增事实" if added else "完全重复，跳过",
                 "text": text, "updated": added}
 
+    # ---- 记忆自动沉淀（用后自动存，非手动点）----
+    def _auto_state_path(self) -> str:
+        return os.path.join(self.dir, "auto.json")
+
+    def _load_auto_state(self) -> dict:
+        return self._load(self._auto_state_path(),
+                          {"count": 0, "updated": "", "events": []})
+
+    def _save_auto_state(self, st: dict) -> None:
+        self._save(self._auto_state_path(), st)
+
+    def auto_state(self) -> dict:
+        """自动沉淀统计（供前端展示「自动积累状态」）。"""
+        return self._load_auto_state()
+
+    @staticmethod
+    def _is_noise(text: str) -> bool:
+        """过滤无沉淀价值的噪音（占位/问候/过短），避免污染自动记忆。"""
+        t = (text or "").strip()
+        if len(t) < 6:
+            return True
+        low = t.lower()
+        if low in {"hello", "hi", "test", "测试", "你好", "您好", "你好吗",
+                   "我该如何使用", "web端验证记忆", "验证记忆"}:
+            return True
+        # 纯占位/临时标记且很短 → 视为噪音
+        if len(t) < 12 and any(k in low for k in ("测试", "临时", "验证", "placeholder")):
+            return True
+        return False
+
+    def auto_sediment(self, text: str, tags: list = None, source: str = "auto") -> dict:
+        """自动沉淀入口：agent 主流程（问答/审查/决策/任务完成后）用后自动写入。
+
+        与手动 add_fact 区别：
+          - 自动过滤噪音（_is_noise）
+          - 复用 write() 决策层（去重/同主题更新/新增），不产生重复堆积
+          - 打上 auto+source 标签、累计统计，供前端展示「自动积累」
+        失败静默返回，绝不打断主流程（agent 调用处 try 包裹）。返回 {action, auto, source,...}。
+        """
+        try:
+            if not text or not isinstance(text, str):
+                return {"action": "SKIP", "reason": "空文本", "auto": True, "source": source}
+            t = text.strip()
+            if self._is_noise(t):
+                return {"action": "SKIP", "reason": "噪音/过短", "auto": True, "source": source}
+            tags = list(dict.fromkeys((tags or []) + ["auto", source]))
+            r = self.write(t, tags=tags)
+            if r.get("updated"):
+                st = self._load_auto_state()
+                st["count"] = st.get("count", 0) + 1
+                st["updated"] = _now()
+                st.setdefault("events", []).append(
+                    {"text": t[:60], "action": r.get("action"),
+                     "source": source, "ts": _now()})
+                st["events"] = st["events"][-50:]
+                self._save_auto_state(st)
+            r.update({"auto": True, "source": source})
+            return r
+        except Exception as e:  # noqa: BLE001 静默兜底
+            return {"action": "SKIP", "reason": f"error:{e}",
+                    "auto": True, "source": source}
+
     def update_fact(self, target_text: str, new_text: str, tags: list = None) -> dict:
         """显式 UPDATE 一条记忆（对齐 Mem0 update 语义）。"""
         facts = self._load_facts()

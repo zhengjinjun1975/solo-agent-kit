@@ -35,11 +35,37 @@ class _GetRoutesMixin:
     def _get_memory(self, qs):
         m = memory_mod.Memory()
         facts = m._load(m._facts_path, [])
-        self._json({"facts": len(facts), "profile": m.profile_text()})
+        # 读追加日志合并，得到实时条数（P1 增量写）
+        m._maybe_consolidate()
+        auto = m.auto_state()
+        self._json({"facts": len(m._load_facts()), "profile": m.profile_text(),
+                    "auto": auto, "auto_count": auto.get("count", 0)})
 
     def _get_skills(self, qs):
         sk = skill_mod.Skill()
-        self._json({"skills": sk.all_details()})
+        details = sk.all_details()
+        auto_skills = [s for s in details if s.get("source") == "auto"]
+        self._json({"skills": details, "total": len(details),
+                    "auto_skills": len(auto_skills)})
+
+    def _post_memory_auto_sediment(self, body):
+        # 记忆自动沉淀（用后自动存）：agent/问答/任务结束后自动写入关键经验
+        m = memory_mod.Memory()
+        text = body.get("text", "")
+        if not text:
+            self._json({"error": "需 text"}, 400)
+            return
+        r = m.auto_sediment(text, tags=body.get("tags"), source=body.get("source", "auto"))
+        r["auto_state"] = m.auto_state()
+        self._json(r)
+
+    def _post_skill_auto_generate(self, body):
+        # 技能自动生成（从经验自动总结）：扫描自动沉淀记忆提炼高频技能
+        sk = skill_mod.Skill()
+        r = sk.auto_generate(min_cluster=int(body.get("min_cluster", 2)))
+        r["total"] = len(sk.all_details())
+        r["auto_skills"] = len([s for s in sk.all_details() if s.get("source") == "auto"])
+        self._json(r)
 
     def _get_memory_search(self, qs):
         m = memory_mod.Memory()
@@ -172,6 +198,35 @@ class _GetRoutesMixin:
             self._json({"devices": devs, "site": cur})
         except Exception as e:
             self._json({"error": str(e)}, 500)
+
+    def _post_site_device(self, body):
+        # 厂区设备台账：新增设备（UI 表单提交，web 可操作非纯 CLI）
+        from solo.factory.ops import Site
+        name = body.get("name", "")
+        if not name or not name.strip():
+            self._json({"error": "设备名必填"}, 400)
+            return
+        try:
+            s = Site()
+            r = s.add_device(
+                name=name,
+                site=body.get("site"),
+                host=body.get("host"),
+                port=body.get("port"),
+                user=body.get("user"),
+                device_type=body.get("device_type"),
+                status=body.get("status"),
+                power=body.get("power"),
+            )
+        except (TypeError, ValueError) as e:
+            self._json({"error": f"参数格式错误: {e}"}, 400)
+            return
+        if not r.get("ok"):
+            self._json({"error": r.get("error", "添加失败")}, 400)
+            return
+        self._json({"ok": True, "device": r["device"], "site": r["site"],
+                    "devices": s.devices(r["site"])})
+
 
     def _get_data_fetch(self, qs):
         # 从厂区设备远程拉数据（data_connector 设备数据源）
