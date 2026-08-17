@@ -83,6 +83,26 @@
       }
     },
     {
+      "id": "write_qa",
+      "capability": "write.qa",
+      "op": "scan",
+      "inputs": {
+        "text": "泵站振动预警已上线，振动值为8.6时自动告警并开工单，建议更换轴承并做动平衡。"
+      }
+    },
+    {
+      "id": "write_evidence",
+      "capability": "write.evidence",
+      "op": "fact_check",
+      "inputs": {
+        "text": "泵站振动预警已上线，振动值为8.6时自动告警并开工单，建议更换轴承并做动平衡。",
+        "source_rows": [
+          {"vibration": 8.6, "metric": "vibration", "device_id": "pump_01"},
+          {"vibration": 5.6, "metric": "vibration", "device_id": "pump_02"}
+        ]
+      }
+    },
+    {
       "id": "accept",
       "capability": "deliver.accept",
       "op": "package",
@@ -120,6 +140,8 @@
   "final": {
     "worst_level": {"$ref": "predict.risk.level"},
     "accept": {"$ref": "accept.accept.accept"},
-    "tickets_n": {"$ref": "ticket.tickets|len"}
+    "tickets_n": {"$ref": "ticket.tickets|len"},
+    "writing_qa_passed": {"$ref": "write_qa.passed"},
+    "writing_evidence_pass": {"$ref": "write_evidence.pass"}
   }
 }

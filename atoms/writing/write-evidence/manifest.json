@@ -1,0 +1,74 @@
+{
+ "schema_version": "agent.manifest/1.0",
+ "name": "write-evidence",
+ "agent": "write",
+ "version": "0.1.0",
+ "open_source": true,
+ "license": "Apache-2.0",
+ "entry": "main.py",
+ "provides": [
+  "write.evidence"
+ ],
+ "depends_on": [
+  {
+   "name": "solo.factory.evidence",
+   "reason": "证据账本+事实核查纯函数(legacy核心,加壳不改)"
+  }
+ ],
+ "conflicts": [],
+ "inputs": {
+  "op": {
+   "enum": [
+    "build_ledger",
+    "fact_check",
+    "report"
+   ]
+  },
+  "text": {
+   "type": "str",
+   "required": false,
+   "default": null
+  },
+  "source_rows": {
+   "type": "list",
+   "required": false,
+   "default": null
+  },
+  "col_map": {
+   "type": "dict",
+   "required": false,
+   "default": null
+  }
+ },
+ "outputs": {
+  "ledger": {
+   "type": "list",
+   "desc": "证据账本(可证伪声明)",
+   "final_hook": null
+  },
+  "report": {
+   "type": "dict",
+   "desc": "事实核查报告",
+   "final_hook": null
+  },
+  "summary": {
+   "type": "dict",
+   "desc": "核查汇总(supported/unsupported/contradicted)",
+   "final_hook": null
+  },
+  "pass": {
+   "type": "bool",
+   "desc": "全部可溯源且无矛盾",
+   "final_hook": null
+  },
+  "report_md": {
+   "type": "str",
+   "desc": "人类可读核查报告",
+   "final_hook": null
+  }
+ },
+ "degraded_on_missing": [],
+ "run_config": {
+  "local_only": true
+ }
+}

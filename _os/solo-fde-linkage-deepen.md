@@ -1,112 +1,83 @@
-# solo 三大开源联动 + FDE 深度补强（收尾实测）
+# solo FDE 深度补强（对齐 10 核心原子 + 写作原子）
 
-> 收尾：修复 diagnose-kb 扫描注册 + 跨开源组装链全绿 + 4 新原子实测 + pytest 全绿 + 推送。
-> 仓库：`E:/open-source/solo-agent-kit` ｜ 关联兄弟仓库：`factory-ontology-kit`、`sme-decision-ontology`
-
----
-
-## 1. 背景：三大开源联动 + FDE 深度补强
-
-`factory-ontology-kit`（本体/认知/RAG）、`sme-decision-ontology`（决策/阈值回灌）、`solo-agent-kit`
-（监测/工单/交付）三大开源仓库，经 `fde_runtime/linkage.py` 统一能力路由实现「算法开源联动、数据不出厂」的跨仓库协同。
-
-本轮补强把 FDE（工厂数据工程）认知/决策/监测/诊断深度补齐为 4 个新原子，并装配成一条跨开源组装链：
-
-```
-monitor → factory → sme → fde → diagnose → delivery
- 指标采集  本体认知   决策行动  工单诊断   故障知识库  交付验收
-```
-
-**边界铁律**：联动传「算法入参」（问题/路径），各库数据本地自持（data/），**数据不出厂**；
-开源原子禁依赖闭源原子（`loader.check_open_source_boundary`）。
+> 说明：本文档已随 `c06e168`（完全原子化重构，10 核心原子真下沉 + kernels 纯算法）与写作原子落盘对齐。
+> 早期「15 原子 + monitor-anomaly/factory-cognition/delivery.package 独立原子」架构已合并为 10 核心原子，并新增 write-qa / write-evidence 两个写作原子。
+> 仓库：`E:/open-source/solo-agent-kit`
 
 ---
 
-## 2. 4 个新原子
+## 1. 背景：原子化收敛 + 深度补强
 
-| 原子 | 能力 | 复用来源 | 说明 |
-|------|------|----------|------|
-| `monitor-anomaly` | `monitor.anomaly` | solo | 时序异常检测（趋势/突跳/多变量马氏距离）+ 预测性维护雏形（RUL/健康指数） |
-| `factory-cognition` | `factory.cognition` | factory-ontology-kit | 确定性本体问答优先 + 离线 RAG 降级（先查库再答防幻觉） |
-| `sme-decision` | `sme.decision` | sme-decision-ontology | 决策 / 阈值回灌（preview 不落盘）/ 告警→决策→行动一键链 |
-| `diagnose-kb` | `diagnose.kb` | solo | 故障知识库「learn→diagnose→根因分析」，未知症状诚实 miss（防幻觉） |
+`solo-agent-kit` 完成**完全原子化重构**：把早期散落的 15 个原子（含 `monitor-anomaly` / `factory-cognition` / `delivery-package` 独立原子）收敛为 **10 核心原子**，纯算法下沉到 `kernels/`（monitor_stats / forecast / spc / ontology_core / memory_score / rules / survey_core），原子只做 op 分发 + IO + 状态。
 
----
+**合并说明**：
+- `monitor.anomaly`（时序异常 + RUL）→ 并入 `monitor.device`（异常检测）+ `predict.maintain`（预测性维护 RUL）。
+- `factory.cognition`（本体问答 + 离线 RAG）→ 并入 `ontology.qa`（本体建模/聚合问答/知识检索）。
+- `delivery.package`（一键交付包）→ 并入 `deliver.accept`（需求→SRS→验收→勾稽→交付包→签收）。
 
-## 3. 本轮修复点
-
-### 3.1 diagnose-kb 扫描注册问题（核心修复）
-- **症状**：`diagnose-kb` 原子未出现在 `registry.json`，`registry loader`（`scan_atoms`）扫描不到。
-- **根因**：`atoms/fde/diagnose-kb/` 只有 `main.py`，缺 `manifest.json`；`scan_atoms` 按 `manifest.json`
-  发现原子，缺清单即容错跳过 → 不进 registry、`run_capability("diagnose.kb", ...)` 报「能力未提供」。
-- **修复**：补 `atoms/fde/diagnose-kb/manifest.json`（name/agent/version/entry/license/open_source/
-  provides/capabilities），并重跑 `scan → write_registry → load`，registry 原子数 **14 → 15**，
-  `diagnose.kb` 能力成功注册。
-
-### 3.2 跨仓库 `core` 模块名冲突（联动健壮性兜底）
-- **症状**：`sme.decision.decide` 在 factory 本体问答先执行后报
-  `No module named 'core.domain_model'`（单测隔离通过、整链跑失败）。
-- **根因**：`factory-ontology-kit/codes/core/` 是**常规包**（含 `__init__.py`），
-  `sme-decision-ontology/codes/core/` 是**命名空间包**（无 `__init__.py`）。
-  两份 codes 同时入 `sys.path` 时，`import core` 命中先导入的常规包（factory），
-  `from core.domain_model import ...` 便找不到模块。
-- **修复**：`linkage.py` 新增 `codes_isolation(repo_root)` 上下文管理器——把目标 codes 置 `sys.path`
-  首位、临时移除其它兄弟 codes、清掉 `core` 缓存使导入精确命中目标仓库，运行后恢复。
-  `sme-decision`（decide/action/feedback）与 `factory-cognition`（ontology_qa）均改用它。
-
-### 3.3 monitor-anomaly 两处缺陷
-- **平坦序列除零**：`detect_sudden` 对全等序列（MAD=0 且 stdev=0）时 scale=0 → 除零崩溃。
-  修复 `_mad`：MAD 为 0 回退 stdev，仍为 0 用 `1e-9` 兜底，平坦序列诚实返回 `anomaly=False`。
-- **trend 阈值误用**：原子 `detect` 统一默认 `k=3.0`（sudden 的 z-score 阈值），
-  trend 的归一化斜率阈值本应为 `0.8` → trend 永不触发。修复：未显式传 k 时按模式取各自默认。
+**写作原子落盘**：把 legacy `solo/writing.py`（六维 D1-D6 中文写作检查 + AI 味自检）与 `solo/factory/evidence.py`（证据账本 + 事实核查防幻觉）加壳为两个原子，接入交付链：
+- `write-qa`（能力 `write.qa`）：六维中文写作质量检查 + AI 味自检。
+- `write-evidence`（能力 `write.evidence`）：证据账本 + 事实核查（防幻觉、可溯源）。
 
 ---
 
-## 4. 实测结果
+## 2. 10 核心原子 + 2 写作原子
 
-### 4.1 组装链 run_flow 全绿（`assemblies/solo-linkage-workflow.json`）
-新增 `learn` 步骤（先沉淀故障知识），链路 12 步全部 `ok`，`loop_closed=True`，`accept=True`：
+| 原子 | 能力 | agent | 复用来源 | 说明 |
+|------|------|-------|----------|------|
+| data-cap | `data.cap` | data | kernels/spc | 清洗/SPC/CPK/描述统计/趋势/报告 |
+| memory | `memory.core` | memory | solo/memory | 三层两域记忆 |
+| diagnose-kb | `diagnose.kb` | diagnose | kernels/memory_score+rules | 故障知识库 add/search/suggest，诚实 miss |
+| fde-task | `fde.task` | fde | solo/task | 工单状态机/审计轨迹/诊断 |
+| monitor-device | `monitor.device` | monitor | kernels/monitor_stats+forecast | 采集/异常检测/动态阈值/告警/协议/问答 |
+| predictive-maintain | `predict.maintain` | monitor | kernels/forecast+spc | 趋势预测/风险等级/RUL/维修建议 |
+| ontology-qa | `ontology.qa` | ontology | kernels/ontology_core+memory_score | 本体建模/聚合问答/知识检索(RAG) |
+| sme-decision | `sme.decision` | decision | kernels/rules | SME 决策/阈值表 |
+| deliver-accept | `deliver.accept` | deliver | kernels/survey_core | 【唯一闭源】交付验收闭环（需求→SRS→验收→勾稽→交付包→签收） |
+| deliver-train | `deliver.train` | deliver | kernels/survey_core | 培训材料 |
+| **write-qa** | **`write.qa`** | write | solo/writing | 六维 D1-D6 中文写作质量检查 + AI 味自检 |
+| **write-evidence** | **`write.evidence`** | write | solo/factory/evidence | 证据账本 + 事实核查（防幻觉、可溯源） |
+
+**边界铁律**：联动传「算法入参」，各原子数据本地自持（data/），**数据不出厂**；开源原子禁依赖闭源原子（`loader.check_open_source_boundary`）；唯一闭源 `deliver-accept` 在开源组装链中为 `optional` 降级。
+
+---
+
+## 3. 组装链（fde-workflow.json，v2.0 端到端全绿含写作）
 
 ```
-  ingest     monitor.metric      -> ok
-  anomaly    monitor.anomaly     -> ok sudden_anomaly=True
-  predict    monitor.anomaly     -> ok rul=37.79
-  adaptive   monitor.alert       -> ok thr=8.72
-  set_rule   monitor.alert       -> ok
-  evaluate   monitor.alert       -> ok
-  cognition  factory.cognition   -> ok source=ontology ans=振动信息:...
-  decision   sme.decision        -> ok decision=维护告急 actions=[{type:'维护工单',...}]
-  ticket     fde.task            -> ok
-  learn      diagnose.kb         -> ok
-  diagnose   diagnose.kb         -> ok hit=True cause=轴承磨损/泵轴对中不良
-  package    delivery.package    -> ok
+monitor.device → data.cap → predict.maintain → sme.decision → fde.task → diagnose.kb
+ 采集             SPC       预测/风险          决策          工单         知识库
+→ predict.maintain → write.qa → write.evidence → deliver.accept → deliver.train
+   维修建议            六维写作     证据核查        交付验收(闭源可选)   培训
 ```
 
-跨开源协同：`cognition` 命中 factory 本体（`source=ontology`）；`decision` 产出真实维护行动；
-`diagnose` 命中故障库根因；交付包工单注入诊断根因（前一环输出=后一环输入）。
+`run_flow` 把上游 `{ok,data}` 注入下游端口，`$ref` 引用、`when` 条件、`optional` 降级。产出 `trace` 与 `final{worst_level, tickets_n, accept, writing_qa_fail, writing_evidence_pass}`。
 
-### 4.2 单测与回归
-- 新增 `tests/test_fde_linkage_deepen.py`：**23 用例**（4 新原子真实数据 + 跨仓库流 + 边界断言）。
-- 回归 `python -m pytest tests/`：**261 passed**（238 基线 + 23 新增），全绿。
+**实测**：`pytest tests/` **264 passed 全绿**；组装链端到端 `accept=True`、`loop_closed=True`，写作步骤（write-qa 六维扫描 + write-evidence 证据核查）真实执行。
 
-### 4.3 原子独立自测
-```
-monitor-anomaly 独立自测通过, 0 失败
-diagnose-kb     独立自测通过, 0 失败
-factory-cognition 独立自测通过, 0 失败  (ontology_qa: 一共有 37 条记录)
-sme-decision    独立自测通过, 0 失败  (feedback preview: 12.6)
-```
+---
+
+## 4. 写作原子落盘（write-qa / write-evidence）
+
+### write-qa（能力 `write.qa`）
+- `op=scan`：六维 D1-D6 中文写作质量检查（D1错字/D2标点/D3语病/D4数字/D5去AI味/D6活人感），返回 `report{passed, fail_count, layers}`。
+- `op=ai_taste`：AI 味自检（分 100=最像人 + 可执行改写建议）。
+- `op=styles`：可用写作风格清单（tweet/report/wechat/paper）。
+- 复用 `solo/writing.py` 核心，加壳不改核心。
+
+### write-evidence（能力 `write.evidence`）
+- `op=build_ledger`：从文本提取证据账本（数字/百分比/极值/日期声明）。
+- `op=fact_check`：声明 × 真实数据源比对 → supported / unsupported / contradicted，防幻觉可溯源。
+- `op=report`：渲染核查结果为人类可读报告。
+- 复用 `solo/factory/evidence.py` 核心，加壳不改核心。
 
 ---
 
 ## 5. 交付清单
 
-- 修复 `atoms/fde/diagnose-kb/manifest.json`（诊断原子注册）
-- 增强 `fde_runtime/linkage.py`（`codes_isolation` 跨仓库导入隔离）
-- 修复 `atoms/monitor/monitor-anomaly/main.py`（平坦除零 + trend 阈值）
-- 增强 `atoms/decision/sme-decision/main.py`、`atoms/cognition/factory-cognition/main.py`（隔离导入）
-- 新增 `assemblies/solo-linkage-workflow.json` `learn` 步骤（learn→diagnose→根因闭环）
-- 重生成 `registry.json`（15 原子）
-- 新增 `tests/test_fde_linkage_deepen.py`（23 用例）
-- 落盘本文档 `_os/solo-fde-linkage-deepen.md`
-- 推送 GitHub
+- `atoms/writing/write-qa/` + `atoms/writing/write-evidence/`（写作原子落盘）
+- `registry.json`：12 原子（10 核心 + write-qa + write-evidence）
+- `assemblies/fde-workflow.json`：写入写步骤（监测→诊断→写作→交付），final 含写作字段
+- `tests/test_fde_linkage_deepen.py`：对齐 10 核心原子 + 写作原子（26 用例）
+- 文档对齐：`_os/solo-fde-linkage-deepen.md` / `_os/solo-fde-atomic-architecture.md` 消除文档代码脱节
+- pytest 全绿（264 passed）

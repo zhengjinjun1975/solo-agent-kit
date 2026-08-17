@@ -2,7 +2,8 @@
   "schema": "fde.registry/1.0",
   "order": ["data.cap", "memory.core", "diagnose.kb", "fde.task",
             "monitor.device", "ontology.qa", "sme.decision",
-            "predict.maintain", "deliver.accept", "deliver.train"],
+            "predict.maintain", "deliver.accept", "deliver.train",
+            "write.qa", "write.evidence"],
   "agents": [
     {
       "name": "data-cap",
@@ -123,6 +124,30 @@
       "entry": "main.py",
       "capabilities": ["fde.task"],
       "depends_on": [{"name": "monitor.device", "reason": "可选：告警工单闭环(经run_flow $ref)"}],
+      "conflicts": []
+    },
+    {
+      "name": "write-qa",
+      "agent": "write",
+      "version": "0.1.0",
+      "open_source": true,
+      "license": "Apache-2.0",
+      "path": "atoms/writing/write-qa",
+      "entry": "main.py",
+      "capabilities": ["write.qa"],
+      "depends_on": [],
+      "conflicts": []
+    },
+    {
+      "name": "write-evidence",
+      "agent": "write",
+      "version": "0.1.0",
+      "open_source": true,
+      "license": "Apache-2.0",
+      "path": "atoms/writing/write-evidence",
+      "entry": "main.py",
+      "capabilities": ["write.evidence"],
+      "depends_on": [],
       "conflicts": []
     }
   ]

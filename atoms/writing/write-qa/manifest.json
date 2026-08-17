@@ -1,0 +1,71 @@
+{
+ "schema_version": "agent.manifest/1.0",
+ "name": "write-qa",
+ "agent": "write",
+ "version": "0.1.0",
+ "open_source": true,
+ "license": "Apache-2.0",
+ "entry": "main.py",
+ "provides": [
+  "write.qa"
+ ],
+ "depends_on": [
+  {
+   "name": "solo.writing",
+   "reason": "六维D1-D6检查+AI味自检纯函数(legacy核心,加壳不改)"
+  }
+ ],
+ "conflicts": [],
+ "inputs": {
+  "op": {
+   "enum": [
+    "scan",
+    "ai_taste",
+    "styles"
+   ]
+  },
+  "text": {
+   "type": "str",
+   "required": false,
+   "default": null
+  },
+  "filepath": {
+   "type": "str",
+   "required": false,
+   "default": null
+  },
+  "style": {
+   "type": "str",
+   "required": false,
+   "default": "report"
+  }
+ },
+ "outputs": {
+  "report": {
+   "type": "dict",
+   "desc": "六维/AI味检查报告",
+   "final_hook": null
+  },
+  "passed": {
+   "type": "bool",
+   "desc": "无L1必改是否通过",
+   "final_hook": null
+  },
+  "ai_score": {
+   "type": "number",
+   "desc": "AI味分(100=最像人)",
+   "final_hook": null
+  },
+  "styles": {
+   "type": "dict",
+   "desc": "写作风格清单",
+   "final_hook": null
+  }
+ },
+ "degraded_on_missing": [
+  "zh_writing_checker"
+ ],
+ "run_config": {
+  "local_only": true
+ }
+}
