@@ -198,8 +198,22 @@ class _GetRoutesMixin:
             if not values:
                 self._json({"error": "需要 values 参数(逗号分隔数值)"}, 400)
                 return
+            # 优雅降级：matplotlib 未装不 500，返回明确提示 + 数值统计（不误导为"已出图"）
+            if not getattr(viz, "_MPL", False):
+                import statistics
+                mean = statistics.mean(values)
+                self._json({
+                    "ok": False,
+                    "generated": False,
+                    "error": "matplotlib 未安装（可选依赖），无法生成 SPC 控制图。"
+                             "请 pip install matplotlib，或改用 /api/stats 获取数值统计。",
+                    "data": {"n": len(values), "mean": round(mean, 2),
+                             "min": round(min(values), 2), "max": round(max(values), 2)}})
+                return
             r = viz.spc_chart(values, title=title, filename="web_spc")
             self._json(r)
+        except ValueError:
+            self._json({"error": "values 需为逗号分隔的数字"}, 400)
         except Exception as e:
             self._json({"error": str(e)}, 500)
 

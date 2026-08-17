@@ -194,6 +194,9 @@ def run_decisions(data: dict, rules_path: str = None, model: dict = None,
            用于决策与本体打通（哪些实体参与决策）。
     返回: {"decisions": [...], "total": N, "entities": 参与决策的企业实体}
     """
+    # model 类型防护：仅接受 dict；非法类型（字符串/列表/None）→ None，避免 .get 崩溃 500
+    if not isinstance(model, dict):
+        model = None
     rules_path = rules_path or os.path.join(os.path.expanduser("~"), ".solo", "decisions.json")
     if not os.path.exists(rules_path):
         rules_path = _DEFAULT_RULES  # 回退内置默认规则

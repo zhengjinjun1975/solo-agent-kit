@@ -91,8 +91,16 @@ def test_connection(host: str, user: str = None, port: int = 22) -> dict:
         ok = r.returncode == 0
         return {"ok": ok, "host": host, "user": user or "当前用户",
                 "error": "" if ok else (r.stderr or r.stdout).strip()[:200]}
+    except FileNotFoundError:
+        # ssh 客户端缺失：环境断链 → 明确提示（需配置 SSH 目标/安装 OpenSSH 客户端）
+        return {"ok": False, "host": host, "user": user or "当前用户",
+                "error": "未检测到 ssh 命令：远程运维需配置 SSH 目标并安装 OpenSSH 客户端，"
+                         "且已配置 SSH key（本机 ~/.ssh）。当前环境未满足，无法连接。"}
     except subprocess.TimeoutExpired:
         return {"ok": False, "host": host, "error": "连接超时"}
+    except OSError as e:
+        return {"ok": False, "host": host, "user": user or "当前用户",
+                "error": f"SSH 调用失败（需配置 SSH 目标）：{e}"}
 
 
 def run_command(host: str, command: str, user: str = None, port: int = 22) -> dict:
@@ -106,8 +114,16 @@ def run_command(host: str, command: str, user: str = None, port: int = 22) -> di
                 "command": command, "exit_code": r.returncode,
                 "stdout": (r.stdout or "")[-2000:],
                 "stderr": (r.stderr or "")[-2000:]}
+    except FileNotFoundError:
+        # ssh 客户端缺失：环境断链 → 明确提示（需配置 SSH 目标/安装 OpenSSH 客户端）
+        return {"ok": False, "host": host, "command": command,
+                "error": "未检测到 ssh 命令：远程运维需配置 SSH 目标并安装 OpenSSH 客户端，"
+                         "且已配置 SSH key（本机 ~/.ssh）。当前环境未满足，无法执行。"}
     except subprocess.TimeoutExpired:
         return {"ok": False, "host": host, "command": command, "error": "执行超时"}
+    except OSError as e:
+        return {"ok": False, "host": host, "command": command,
+                "error": f"SSH 调用失败（需配置 SSH 目标）：{e}"}
 
 
 def remote_logs(host: str, user: str = None, port: int = 22,
