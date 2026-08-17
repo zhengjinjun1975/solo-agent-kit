@@ -1,0 +1,30 @@
+{
+  "schema_version": "agent.manifest/1.0",
+  "name": "deliver-train",
+  "agent": "deliver",
+  "version": "0.1.0",
+  "open_source": true,
+  "license": "Apache-2.0",
+  "entry": "main.py",
+  "provides": ["deliver.train"],
+  "depends_on": [
+    {"name": "kernels.survey_core", "reason": "操作手册/FAQ/知识转移清单纯函数"}
+  ],
+  "conflicts": [],
+  "inputs": {
+    "op": {"enum": ["manual", "faq", "transfer"]},
+    "capabilities": {"type": "dict", "required": false, "default": null},
+    "requirements": {"type": "list", "required": false, "default": null},
+    "questions": {"type": "list", "required": false, "default": null},
+    "title": {"type": "str", "required": false, "default": null},
+    "srs": {"type": "dict", "required": false, "default": null},
+    "dir": {"type": "str", "required": false, "default": null}
+  },
+  "outputs": {
+    "manual": {"type": "dict", "desc": "操作手册", "final_hook": "manual"},
+    "faq": {"type": "dict", "desc": "FAQ", "final_hook": "faq"},
+    "transfer_checklist": {"type": "list", "desc": "知识转移清单", "final_hook": "transfer_checklist"}
+  },
+  "degraded_on_missing": [],
+  "run_config": {"local_only": true}
+}

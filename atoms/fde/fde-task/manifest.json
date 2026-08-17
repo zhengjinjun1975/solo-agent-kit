@@ -3,14 +3,31 @@
   "name": "fde-task",
   "agent": "fde",
   "version": "0.1.0",
-  "entry": "main.py",
-  "license": "Apache-2.0",
   "open_source": true,
+  "license": "Apache-2.0",
+  "entry": "main.py",
   "provides": ["fde.task"],
-  "depends_on": [],
+  "depends_on": [
+    {"name": "kernels.rules", "reason": "严重度规则纯函数"},
+    {"name": "monitor.device", "reason": "可选：告警工单闭环(经run_flow $ref)"}
+  ],
   "conflicts": [],
-  "resources": [],
-  "run_config": {
-    "description": "FDE 工单状态机/诊断/验收（复用 solo/task.py，核心零改动）"
-  }
+  "inputs": {
+    "op": {"enum": ["issue", "diagnose", "resolve", "verify", "audit", "alarm_tickets", "site"]},
+    "problem": {"type": "str", "required": false, "default": null},
+    "severity": {"type": "str", "required": false, "default": "medium"},
+    "tid": {"type": "str", "required": false, "default": null},
+    "diagnosis": {"type": "str", "required": false, "default": null},
+    "resolution": {"type": "str", "required": false, "default": null},
+    "monitor": {"type": "dict", "required": false, "default": null},
+    "alerts": {"type": "list", "required": false, "default": null},
+    "dir": {"type": "str", "required": false, "default": null}
+  },
+  "outputs": {
+    "ticket": {"type": "dict", "desc": "工单", "final_hook": "tickets"},
+    "tickets": {"type": "list", "desc": "工单列表", "final_hook": "tickets"},
+    "audit_trail": {"type": "list", "desc": "审计轨迹", "final_hook": "audit_trail"}
+  },
+  "degraded_on_missing": ["ssh"],
+  "run_config": {"local_only": true}
 }

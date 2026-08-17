@@ -1,0 +1,34 @@
+{
+  "schema_version": "agent.manifest/1.0",
+  "name": "predictive-maintain",
+  "agent": "monitor",
+  "version": "0.1.0",
+  "open_source": true,
+  "license": "Apache-2.0",
+  "entry": "main.py",
+  "provides": ["predict.maintain"],
+  "depends_on": [
+    {"name": "kernels.forecast", "reason": "MAD/回归/RUL/故障映射纯函数"},
+    {"name": "kernels.spc", "reason": "趋势/描述统计"},
+    {"name": "diagnose.kb", "reason": "维修建议查知识库(经run_flow $ref注入)"}
+  ],
+  "conflicts": [],
+  "inputs": {
+    "op": {"enum": ["forecast", "risk", "maintain"]},
+    "series": {"type": "list", "required": false, "default": null},
+    "values": {"type": "list", "required": false, "default": null},
+    "device_id": {"type": "str", "required": false, "default": null},
+    "metric": {"type": "str", "required": false, "default": null},
+    "window": {"type": "number", "required": false, "default": 3},
+    "k": {"type": "number", "required": false, "default": 3.0},
+    "failure_mode": {"type": "str", "required": false, "default": null},
+    "dir": {"type": "str", "required": false, "default": null}
+  },
+  "outputs": {
+    "forecast": {"type": "dict", "desc": "趋势预测", "final_hook": "forecast"},
+    "risk": {"type": "dict", "desc": "风险等级", "final_hook": "risk"},
+    "advice": {"type": "dict", "desc": "维修建议", "final_hook": "advice"}
+  },
+  "degraded_on_missing": [],
+  "run_config": {"local_only": true}
+}

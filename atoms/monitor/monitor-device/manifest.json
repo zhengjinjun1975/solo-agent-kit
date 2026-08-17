@@ -1,0 +1,39 @@
+{
+  "schema_version": "agent.manifest/1.0",
+  "name": "monitor-device",
+  "agent": "monitor",
+  "version": "0.1.0",
+  "open_source": true,
+  "license": "Apache-2.0",
+  "entry": "main.py",
+  "provides": ["monitor.device"],
+  "depends_on": [
+    {"name": "kernels.monitor_stats", "reason": "MAD/描述统计/判则纯函数"},
+    {"name": "kernels.forecast", "reason": "趋势/MAD 基线纯函数"}
+  ],
+  "conflicts": [],
+  "inputs": {
+    "op": {"enum": ["ingest", "set_rule", "evaluate", "adaptive", "anomaly", "protocols", "snapshot", "ask"]},
+    "points": {"type": "list", "required": false, "default": null},
+    "device_id": {"type": "str", "required": false, "default": null},
+    "metric": {"type": "str", "required": false, "default": null},
+    "value": {"type": "number", "required": false, "default": null},
+    "rule": {"type": "dict", "required": false, "default": null},
+    "values": {"type": "list", "required": false, "default": null},
+    "config": {"type": "dict", "required": false, "default": null},
+    "k": {"type": "number", "required": false, "default": 3.0},
+    "dir": {"type": "str", "required": false, "default": null}
+  },
+  "outputs": {
+    "ingested": {"type": "dict", "desc": "采集结果", "final_hook": "ingested"},
+    "rules": {"type": "list", "desc": "规则表", "final_hook": null},
+    "alerts": {"type": "list", "desc": "告警", "final_hook": "alerts"},
+    "threshold": {"type": "dict", "desc": "动态阈值", "final_hook": null},
+    "anomalies": {"type": "list", "desc": "异常点", "final_hook": null},
+    "protocols": {"type": "list", "desc": "协议可用性", "final_hook": null},
+    "snapshot": {"type": "dict", "desc": "监测快照", "final_hook": null},
+    "answer": {"type": "dict", "desc": "规则问答", "final_hook": null}
+  },
+  "degraded_on_missing": ["opcua", "mqtt", "modbus", "matplotlib"],
+  "run_config": {"local_only": true}
+}

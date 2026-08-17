@@ -3,16 +3,32 @@
   "name": "ontology-qa",
   "agent": "ontology",
   "version": "0.1.0",
-  "entry": "main.py",
-  "license": "Apache-2.0",
   "open_source": true,
-  "provides": [
-    "ontology.qa"
+  "license": "Apache-2.0",
+  "entry": "main.py",
+  "provides": ["ontology.qa"],
+  "depends_on": [
+    {"name": "kernels.ontology_core", "reason": "本体建模/语义/聚合问答纯函数"},
+    {"name": "kernels.memory_score", "reason": "检索排序纯函数"}
   ],
-  "depends_on": [],
   "conflicts": [],
-  "resources": [],
-  "run_config": {
-    "description": "本体建模/问答(Ontology)"
-  }
+  "inputs": {
+    "op": {"enum": ["build", "semantic", "ask", "retrieve", "link"]},
+    "rows": {"type": "list", "required": false, "default": null},
+    "data": {"type": "list", "required": false, "default": null},
+    "question": {"type": "str", "required": false, "default": null},
+    "top_k": {"type": "number", "required": false, "default": 5},
+    "industry": {"type": "str", "required": false, "default": null},
+    "kb_dir": {"type": "str", "required": false, "default": null},
+    "dir": {"type": "str", "required": false, "default": null}
+  },
+  "outputs": {
+    "ontology": {"type": "dict", "desc": "本体模型", "final_hook": "ontology"},
+    "semantic": {"type": "dict", "desc": "语义一致性", "final_hook": null},
+    "answer": {"type": "dict", "desc": "聚合问答答案", "final_hook": "answer"},
+    "retrieved": {"type": "list", "desc": "检索结果", "final_hook": "retrieved"},
+    "links": {"type": "list", "desc": "实体链接", "final_hook": null}
+  },
+  "degraded_on_missing": ["llm"],
+  "run_config": {"local_only": true}
 }

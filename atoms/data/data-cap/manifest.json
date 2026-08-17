@@ -1,0 +1,33 @@
+{
+  "schema_version": "agent.manifest/1.0",
+  "name": "data-cap",
+  "agent": "data",
+  "version": "0.1.0",
+  "open_source": true,
+  "license": "Apache-2.0",
+  "entry": "main.py",
+  "provides": ["data.cap"],
+  "depends_on": [
+    {"name": "kernels.spc", "reason": "SPC/CPK/清洗/描述统计纯函数"}
+  ],
+  "conflicts": [],
+  "inputs": {
+    "op": {"enum": ["clean", "spc", "cpk", "describe", "trend", "report"]},
+    "rows": {"type": "list", "required": false, "default": null},
+    "values": {"type": "list", "required": false, "default": null},
+    "col": {"type": "str", "required": false, "default": null},
+    "usl": {"type": "number", "required": false, "default": null},
+    "lsl": {"type": "number", "required": false, "default": null},
+    "dir": {"type": "str", "required": false, "default": null}
+  },
+  "outputs": {
+    "cleaned_rows": {"type": "list", "desc": "清洗后行", "final_hook": null},
+    "spc": {"type": "dict", "desc": "控制图结果", "final_hook": "spc"},
+    "cpk": {"type": "dict", "desc": "过程能力", "final_hook": null},
+    "describe": {"type": "dict", "desc": "描述统计", "final_hook": null},
+    "anomalies": {"type": "list", "desc": "异常点", "final_hook": null},
+    "report": {"type": "dict", "desc": "数据审视报告", "final_hook": "report"}
+  },
+  "degraded_on_missing": [],
+  "run_config": {"local_only": true}
+}

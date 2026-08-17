@@ -1,0 +1,33 @@
+{
+  "schema_version": "agent.manifest/1.0",
+  "name": "memory",
+  "agent": "memory",
+  "version": "0.1.0",
+  "open_source": true,
+  "license": "Apache-2.0",
+  "entry": "main.py",
+  "provides": ["memory.core"],
+  "depends_on": [
+    {"name": "kernels.memory_score", "reason": "检索打分纯函数"}
+  ],
+  "conflicts": [],
+  "inputs": {
+    "op": {"enum": ["add", "search", "profile", "sediment", "optmem"]},
+    "text": {"type": "str", "required": false, "default": null},
+    "query": {"type": "str", "required": false, "default": null},
+    "tags": {"type": "list", "required": false, "default": null},
+    "source": {"type": "str", "required": false, "default": null},
+    "top_k": {"type": "number", "required": false, "default": 5},
+    "facts": {"type": "list", "required": false, "default": null},
+    "dir": {"type": "str", "required": false, "default": null}
+  },
+  "outputs": {
+    "stored": {"type": "dict", "desc": "写入结果", "final_hook": "stored"},
+    "facts_n": {"type": "number", "desc": "事实数", "final_hook": null},
+    "hits": {"type": "list", "desc": "检索命中", "final_hook": "hits"},
+    "profile": {"type": "dict", "desc": "画像", "final_hook": null},
+    "auto_state": {"type": "dict", "desc": "自动沉淀状态", "final_hook": null}
+  },
+  "degraded_on_missing": ["embedding"],
+  "run_config": {"local_only": true}
+}

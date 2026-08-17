@@ -17,6 +17,7 @@ _SCHEMA_VERSION = "agent.manifest/1.0"
 VALID_AGENT_TYPES = {
     "fde", "monitor", "memory", "write", "ontology", "deliver",
     "cognition", "rag", "decision", "event", "learning", "codereview",
+    "data", "diagnose",
 }
 
 _VERSION_RE = re.compile(r"^\d+\.\d+\.\d+$")

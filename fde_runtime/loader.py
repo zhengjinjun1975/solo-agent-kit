@@ -292,10 +292,15 @@ class AgentRuntime:
     def run_flow(self, assembly: dict, workdir: str = None) -> dict:
         """装配链 run_flow：按 steps 顺序逐原子 run，上游 {ok,data} 注入下游端口。
 
-        assembly: {"name","steps":[{"id","capability","op","inputs":{...},"store"}],...}
-        - inputs 里的 '$dir' 指共享工作目录（跨原子共享 MetricStore/Task 数据，实现真实协同）。
-        - '$ref: step_id.path' 引用前一环输出。
-        - 输出 {ok, data:{steps:[trace], final}, loop_closed}，final 汇总 worst_level/tickets/report/accept。
+        assembly: {"name","steps":[{"id","capability","op","inputs":{...},
+                   "when":{...},"optional":bool}], "final":{...}}
+        - inputs 里的 '$dir' 指共享工作目录；'$ref: step_id.path' 引用前一环输出。
+        - 'when': 条件步骤（schema 2.0），仅当条件满足才执行，否则标记 skipped。
+            形如 {"$ref":"predict.risk.level","in":["high","critical"]} 或
+            {"$ref":"...","equals":val} 或真值（truthy）。
+        - 'optional': 可选步骤，能力未提供/步骤失败时降级跳过，链不崩溃（如闭源 deliver.accept）。
+        - 'final': 由装配 final 的 $ref 聚合（优先），否则 _flow_final 按能力聚合。
+        输出 {ok, data:{steps:[trace], final}, loop_closed}。
         """
         import tempfile
         if workdir is None:
@@ -303,27 +308,75 @@ class AgentRuntime:
         ctx = {"dir": workdir}
         trace = []
         for step in assembly.get("steps", []):
+            sid = step.get("id", step.get("capability"))
             cap = step.get("capability")
             op = step.get("op")
+            # ---- when 条件步骤判定 ----
+            if step.get("when") is not None:
+                skip_reason = self._when_skip(step["when"], ctx)
+                if skip_reason:
+                    trace.append({"id": sid, "capability": cap, "op": op,
+                                  "ok": False, "skipped": True,
+                                  "error": skip_reason, "data": None})
+                    continue
             raw = step.get("inputs") or {}
             kwargs = {k: self._resolve_value(v, ctx, workdir)
                       for k, v in raw.items()}
             kwargs.setdefault("op", op)
             env = self.run_capability(cap, **kwargs)
-            sid = step.get("id", cap)
             rec = {"id": sid, "capability": cap, "op": op,
                    "ok": env.get("ok", False), "error": env.get("error"),
                    "data": env.get("data")}
+            # ---- optional 步骤降级：失败/缺能力 → 标记 skipped，不崩链 ----
+            if not env.get("ok") and step.get("optional"):
+                rec["skipped"] = True
+                rec["degraded"] = True
+                rec["error"] = (rec.get("error") or "可选步骤降级跳过")
+                trace.append(rec)
+                continue
             trace.append(rec)
             if env.get("ok"):
                 ctx[sid] = env.get("data")
-        final = self._flow_final(assembly, trace)
-        loop_closed = final.get("accept", False) and all(t["ok"] for t in trace)
-        return base.ok({"steps": trace, "final": final}, ) | {"loop_closed": loop_closed}
+        final = self._flow_final(assembly, trace, ctx)
+        closed = all(t.get("ok") for t in trace)
+        loop_closed = bool(final.get("accept")) and closed
+        return base.ok({"steps": trace, "final": final}) | {"loop_closed": loop_closed}
 
     @staticmethod
-    def _flow_final(assembly, trace):
-        """汇总 final：worst_level / tickets / report / accept（验收=交付包验收清单全过）。"""
+    def _when_skip(cond, ctx) -> str:
+        """when 条件判定：返回跳过原因(str)或 None(满足，执行)。"""
+        if not isinstance(cond, dict):
+            return None if cond else "when 条件为假"
+        val = cond.get("$ref")
+        if val is not None:
+            resolved = AgentRuntime._ref_path(val, ctx)
+        else:
+            resolved = cond.get("value")
+        in_list = cond.get("in")
+        if in_list is not None:
+            return None if resolved in in_list else \
+                f"when 不满足: {val}={resolved} ∉ {in_list}"
+        equals = cond.get("equals")
+        if equals is not None:
+            return None if resolved == equals else \
+                f"when 不满足: {val}={resolved} != {equals}"
+        return None if resolved else f"when 不满足: {val}={resolved}"
+
+    @staticmethod
+    def _flow_final(assembly, trace, ctx=None):
+        """汇总 final。优先取装配 'final' 的 $ref 聚合；否则按能力启发式聚合。"""
+        ctx = ctx or {}
+        asm_final = assembly.get("final")
+        if isinstance(asm_final, dict) and asm_final:
+            out = {}
+            for k, v in asm_final.items():
+                out[k] = AgentRuntime._resolve_ref(v, ctx)
+            # 未显式声明的标准字段兜底
+            out.setdefault("worst_level", "ok")
+            out.setdefault("tickets", [])
+            out.setdefault("accept", False)
+            return out
+        # 启发式聚合（无 final 字段时）
         worst = "ok"
         tickets = []
         report = None
@@ -332,23 +385,53 @@ class AgentRuntime:
             if not t["ok"]:
                 worst = "error"
             d = t.get("data") or {}
-            if t["capability"] == "monitor.alert":
+            if t["capability"] == "monitor.device":
                 al = d.get("alerts")
                 if al:
-                    worst = "warn"
+                    worst = "critical" if any(a.get("level") == "critical"
+                                              for a in al) else "warn"
             if t["capability"] == "fde.task":
                 tk = d.get("ticket")
                 if isinstance(tk, dict):
-                    # 同一工单多状态步骤（issue/diagnose/resolve）按 id 去重，保留最后(最终)状态
                     tid = tk.get("id")
                     if tid is not None:
                         tickets = [x for x in tickets if x.get("id") != tid]
                     tickets.append(tk)
-            if t["capability"] == "delivery.package":
+            if t["capability"] == "deliver.accept":
                 pkg = d.get("package") or {}
                 report = pkg.get("report")
-                acc = pkg.get("acceptance") or {}
+                acc = pkg.get("acceptance") or d.get("accept") or {}
                 lst = acc.get("acceptance_list") or []
-                accept = bool(lst) and all(x.get("pass") for x in lst)
+                accept = bool(lst) and all(x.get("pass") or x.get("result") == "通过"
+                                           for x in lst)
         return {"worst_level": worst, "tickets": tickets, "report": report,
                 "accept": accept}
+
+    @staticmethod
+    def _resolve_ref(v, ctx):
+        """解析 final 里的值：dict{'$ref':...} → 取上游；'${...}'/'|len' 模板。"""
+        if isinstance(v, dict) and "$ref" in v:
+            ref = v["$ref"]
+            if isinstance(ref, str) and ref.endswith("|len"):
+                base = AgentRuntime._ref_path(ref[:-4], ctx)
+                return len(base) if isinstance(base, (list, dict)) else 0
+            return AgentRuntime._ref_path(ref, ctx)
+        if isinstance(v, str):
+            import re
+            if v.endswith("|len"):
+                base = AgentRuntime._ref_path(v[:-4], ctx)
+                return len(base) if isinstance(base, (list, dict)) else 0
+            if "${" in v:
+                def _repl(m):
+                    val = AgentRuntime._ref_path(m.group(1), ctx)
+                    return "" if val is None else str(val)
+                return re.sub(r"\$\{([^}]+)\}", _repl, v)
+            if v == "$dir":
+                return ctx.get("dir")
+            return v
+        if isinstance(v, list):
+            return [AgentRuntime._resolve_ref(x, ctx) for x in v]
+        if isinstance(v, dict):
+            return {k: AgentRuntime._resolve_ref(x, ctx) for k, x in v.items()}
+        return v
+

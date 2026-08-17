@@ -39,6 +39,19 @@ PORT = 8743
 CAPABILITIES = app_mod.CAPABILITIES
 
 
+def _atom_runtime():
+    """懒加载 fde_runtime：统一能力路由 /api/atom/<capability>。"""
+    from fde_runtime.loader import AgentRuntime
+    rt = AgentRuntime(atoms_root=os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "atoms"),
+        registry_path=os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "registry.json"))
+    rt.scan(tolerate=True)
+    rt.load(tolerate=True)
+    return rt
+
+
 class SoloHandler(_GetRoutesMixin, _PostRoutesMixin, BaseHTTPRequestHandler):
     """HTTP 后端：继承端点 mixin + 标准库 BaseHTTPRequestHandler。
 
@@ -199,15 +212,76 @@ class SoloHandler(_GetRoutesMixin, _PostRoutesMixin, BaseHTTPRequestHandler):
             self._handle_error(e)
 
     def _dispatch(self, routes, path, payload):
-        """查表分发：routes[path] → 处理方法；未命中 → 404。
+        """查表分发：routes[path] → 处理方法；未命中 → 动态路由或 404。
 
         payload 语义因路由而异：GET 传 qs lambda（懒取 query），POST 传已解析的 body dict。
         """
         handler_name = routes.get(path)
         if handler_name is None:
+            # ---- 动态原子路由：POST /api/atom/<capability> ----
+            if path.startswith("/api/atom/"):
+                cap = path[len("/api/atom/"):]
+                self._run_capability_route(cap, payload())
+                return
+            if path.startswith("/api/flow/"):
+                asm = path[len("/api/flow/"):]
+                self._run_flow_route(asm, payload())
+                return
+            if path == "/api/atoms/status":
+                self._atoms_status()
+                return
             self._json({"error": "unknown api"}, 404)
             return
         getattr(self, handler_name)(payload)
+
+    # ---- 原子化统一路由（/api/atom/<capability> + /api/flow/<assembly>）----
+    def _run_capability_route(self, capability, body):
+        """POST /api/atom/<capability>  body:{op, ...inputs} → run_capability。"""
+        try:
+            rt = _atom_runtime()
+            op = (body or {}).get("op", "describe")
+            inputs = dict(body or {})
+            inputs.pop("op", None)
+            env = rt.run_capability(capability, op=op, **inputs)
+            self._json(env)
+        except Exception as e:  # noqa: BLE001
+            self._json({"ok": False, "error": f"atom 路由异常: {e}"}, 500)
+
+    def _run_flow_route(self, assembly_name, body):
+        """POST /api/flow/<assembly>  body:{workdir, overrides} → run_flow。"""
+        try:
+            root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            asm_path = os.path.join(root, "assemblies", assembly_name
+                                    if assembly_name.endswith(".json")
+                                    else assembly_name + ".json")
+            if not os.path.exists(asm_path):
+                self._json({"ok": False, "error": f"装配不存在: {assembly_name}"}, 404)
+                return
+            rt = _atom_runtime()
+            with open(asm_path, encoding="utf-8") as f:
+                import json as _json
+                asm = _json.load(f)
+            body = body or {}
+            workdir = body.get("workdir")
+            if body.get("overrides"):
+                import copy
+                asm = copy.deepcopy(asm)
+                asm.update(body["overrides"])
+            flow = rt.run_flow(asm, workdir=workdir)
+            self._json(flow)
+        except Exception as e:  # noqa: BLE001
+            self._json({"ok": False, "error": f"flow 路由异常: {e}"}, 500)
+
+    def _atoms_status(self):
+        """GET /api/atoms/status → 运行时生命周期/降级状态。"""
+        try:
+            rt = _atom_runtime()
+            caps = rt.capabilities()
+            self._json({"ok": True, "atoms": rt.status().get("atoms", []),
+                        "order": rt.status().get("order", []),
+                        "capabilities": caps})
+        except Exception as e:  # noqa: BLE001
+            self._json({"ok": False, "error": f"status 异常: {e}"}, 500)
 
     def _handle_error(self, e: Exception):
         """P0-3: 统一错误契约——ApiError 返回其 code/msg，其他记日志返回通用 500。"""

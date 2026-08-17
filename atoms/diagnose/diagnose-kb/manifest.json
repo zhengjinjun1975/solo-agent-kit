@@ -1,0 +1,35 @@
+{
+  "schema_version": "agent.manifest/1.0",
+  "name": "diagnose-kb",
+  "agent": "diagnose",
+  "version": "0.1.0",
+  "open_source": true,
+  "license": "Apache-2.0",
+  "entry": "main.py",
+  "provides": ["diagnose.kb"],
+  "depends_on": [
+    {"name": "kernels.memory_score", "reason": "相似检索纯函数"},
+    {"name": "kernels.rules", "reason": "故障模式映射"}
+  ],
+  "conflicts": [],
+  "inputs": {
+    "op": {"enum": ["add", "query", "search", "train", "suggest"]},
+    "problem": {"type": "str", "required": false, "default": null},
+    "fault": {"type": "str", "required": false, "default": null},
+    "kb": {"type": "str", "required": false, "default": null},
+    "industry": {"type": "str", "required": false, "default": null},
+    "rows": {"type": "list", "required": false, "default": null},
+    "solution": {"type": "str", "required": false, "default": null},
+    "top_k": {"type": "number", "required": false, "default": 3},
+    "dir": {"type": "str", "required": false, "default": null}
+  },
+  "outputs": {
+    "hit": {"type": "dict", "desc": "知识命中", "final_hook": "hit"},
+    "answer": {"type": "dict", "desc": "答案", "final_hook": "answer"},
+    "matches": {"type": "list", "desc": "相似匹配", "final_hook": null},
+    "actions": {"type": "list", "desc": "维修建议", "final_hook": null},
+    "suggestions": {"type": "list", "desc": "建议", "final_hook": "suggestions"}
+  },
+  "degraded_on_missing": [],
+  "run_config": {"local_only": true}
+}

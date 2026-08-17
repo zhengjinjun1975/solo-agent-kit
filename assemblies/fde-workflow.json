@@ -1,61 +1,56 @@
 {
   "name": "fde-workflow",
-  "schema": "fde.assembly/1.0",
-  "version": "0.1.0",
-  "description": "FDE 组装链：监测(指标采集) → 诊断(动态阈值+告警+工单) → 交付(交付包) → 验收(验收清单)。真实数据协同，前一环输出注入后一环输入。",
+  "schema": "fde.assembly/2.0",
+  "version": "0.2.0",
+  "description": "FDE 工作流 2.0：接入(monitor.device)→SPC(data.cap)→预测(predict.maintain)→决策(sme.decision)→工单(fde.task, when 条件)→知识库(diagnose.kb)→维护建议(predict.maintain)→交付验收(deliver.accept, optional 闭源)→培训(deliver.train)。真下沉原子，$ref 注入，条件/可选步骤。",
   "dir": null,
   "steps": [
     {
       "id": "ingest",
-      "capability": "monitor.metric",
+      "capability": "monitor.device",
       "op": "ingest",
       "inputs": {
         "dir": "$dir",
         "points": [
           {"device_id": "pump_01", "metric": "vibration", "value": 4.9, "ts": "2026-08-16T10:00:00"},
           {"device_id": "pump_01", "metric": "vibration", "value": 5.1, "ts": "2026-08-16T10:01:00"},
-          {"device_id": "pump_01", "metric": "vibration", "value": 4.8, "ts": "2026-08-16T10:02:00"},
-          {"device_id": "pump_01", "metric": "vibration", "value": 5.2, "ts": "2026-08-16T10:03:00"},
-          {"device_id": "pump_01", "metric": "vibration", "value": 5.0, "ts": "2026-08-16T10:04:00"},
-          {"device_id": "pump_01", "metric": "vibration", "value": 5.3, "ts": "2026-08-16T10:05:00"},
-          {"device_id": "pump_01", "metric": "vibration", "value": 5.4, "ts": "2026-08-16T10:06:00"},
-          {"device_id": "pump_01", "metric": "vibration", "value": 5.6, "ts": "2026-08-16T10:07:00"},
-          {"device_id": "pump_01", "metric": "vibration", "value": 5.7, "ts": "2026-08-16T10:08:00"},
+          {"device_id": "pump_01", "metric": "vibration", "value": 5.0, "ts": "2026-08-16T10:02:00"},
+          {"device_id": "pump_01", "metric": "vibration", "value": 5.3, "ts": "2026-08-16T10:03:00"},
+          {"device_id": "pump_01", "metric": "vibration", "value": 5.2, "ts": "2026-08-16T10:04:00"},
+          {"device_id": "pump_01", "metric": "vibration", "value": 5.6, "ts": "2026-08-16T10:05:00"},
+          {"device_id": "pump_01", "metric": "vibration", "value": 5.7, "ts": "2026-08-16T10:06:00"},
           {"device_id": "pump_01", "metric": "vibration", "value": 8.6, "ts": "2026-08-16T10:09:00"}
         ]
       }
     },
     {
-      "id": "adaptive",
-      "capability": "monitor.alert",
-      "op": "adaptive",
+      "id": "spc",
+      "capability": "data.cap",
+      "op": "spc",
       "inputs": {
         "dir": "$dir",
-        "values": {"$ref": "ingest.ingested.value"},
+        "values": {"$ref": "ingest.ingested.ingested.value"},
+        "usl": 7.0,
+        "lsl": 3.0
+      }
+    },
+    {
+      "id": "predict",
+      "capability": "predict.maintain",
+      "op": "risk",
+      "inputs": {
+        "series": {"$ref": "ingest.ingested.ingested.value"},
+        "device_id": "pump_01",
         "k": 3.0
       }
     },
     {
-      "id": "set_rule",
-      "capability": "monitor.alert",
-      "op": "set_rule",
+      "id": "decision",
+      "capability": "sme.decision",
+      "op": "decide",
       "inputs": {
-        "dir": "$dir",
-        "device_id": "pump_01",
-        "metric": "vibration",
-        "cmp_op": ">",
-        "threshold": {"$ref": "adaptive.threshold.upper"}
-      }
-    },
-    {
-      "id": "evaluate",
-      "capability": "monitor.alert",
-      "op": "evaluate",
-      "inputs": {
-        "dir": "$dir",
-        "device_id": "pump_01",
-        "metric": "vibration",
-        "value": 8.6
+        "data": {"$ref": "spc.spc"},
+        "industry": "factory"
       }
     },
     {
@@ -64,48 +59,67 @@
       "op": "issue",
       "inputs": {
         "dir": "$dir",
-        "problem": "水泵 pump_01 振动值 8.6 超过动态阈值 ${adaptive.threshold.upper}，需诊断",
+        "problem": "泵 pump_01 振动越限(8.6>上限)，SPC 判异需处理",
         "severity": "high"
-      }
+      },
+      "when": {"$ref": "predict.risk.level", "in": ["high", "critical"]}
     },
     {
-      "id": "diagnose",
-      "capability": "fde.task",
-      "op": "diagnose",
+      "id": "kb",
+      "capability": "diagnose.kb",
+      "op": "suggest",
       "inputs": {
         "dir": "$dir",
-        "tid": {"$ref": "ticket.ticket.id"},
-        "diagnosis": "振动越限疑似轴承磨损，建议检查泵轴对中与轴承间隙"
+        "problem": "振动越限"
       }
     },
     {
-      "id": "resolve",
-      "capability": "fde.task",
-      "op": "resolve",
+      "id": "maintain",
+      "capability": "predict.maintain",
+      "op": "maintain",
       "inputs": {
-        "dir": "$dir",
-        "tid": {"$ref": "ticket.ticket.id"},
-        "resolution": "更换轴承并做动平衡，振动恢复至 5.0 以内，工单闭环"
+        "hit": {"$ref": "kb.hit"},
+        "device_id": "pump_01"
       }
     },
     {
-      "id": "package",
-      "capability": "delivery.package",
+      "id": "accept",
+      "capability": "deliver.accept",
       "op": "package",
       "inputs": {
+        "dir": "$dir",
         "monitor_snapshot": {"$ref": "ingest.ingested"},
-        "tickets": [
-          {"id": {"$ref": "ticket.ticket.id"},
-           "state": {"$ref": "resolve.ticket.state"},
-           "diagnosis": {"$ref": "diagnose.ticket.diagnosis"},
-           "resolution": {"$ref": "resolve.ticket.resolution"}}
+        "tickets": [{"id": {"$ref": "ticket.ticket.id"}}],
+        "requirements": [
+          {"id": "R-001", "title": "SPC判异", "category": "质量", "story": "SPC判异上线", "priority": "P0", "acceptance": ["SPC判异可观测"]},
+          {"id": "R-002", "title": "振动预警", "category": "设备", "story": "振动越限自动预警", "priority": "P1", "acceptance": ["振动预警可观测"]}
+        ],
+        "acceptance": [
+          {"aid": "A-001", "rid": "R-001", "title": "SPC判异", "clause": "SPC判异可观测", "result": "通过", "evidence": "看板SPC图判异正确"},
+          {"aid": "A-002", "rid": "R-002", "title": "振动预警", "clause": "振动预警可观测", "result": "通过", "evidence": "越限触发告警与工单"}
         ],
         "kb": "factory",
-        "industry": "factory",
-        "hit": 0.9,
-        "questions_n": 10,
-        "hits": 9
+        "industry": "factory"
+      },
+      "optional": true
+    },
+    {
+      "id": "train",
+      "capability": "deliver.train",
+      "op": "manual",
+      "inputs": {
+        "dir": "$dir",
+        "requirements": [
+          {"id": "R-001", "title": "SPC判异", "category": "质量", "story": "SPC判异上线", "priority": "P0", "acceptance": ["SPC判异可观测"]},
+          {"id": "R-002", "title": "振动预警", "category": "设备", "story": "振动越限自动预警", "priority": "P1", "acceptance": ["振动预警可观测"]}
+        ],
+        "title": "泵站运维培训"
       }
     }
-  ]
+  ],
+  "final": {
+    "worst_level": {"$ref": "predict.risk.level"},
+    "accept": {"$ref": "accept.accept.accept"},
+    "tickets_n": {"$ref": "ticket.tickets|len"}
+  }
 }

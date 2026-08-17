@@ -1,17 +1,54 @@
 {
   "schema": "fde.registry/1.0",
+  "order": ["data.cap", "memory.core", "diagnose.kb", "fde.task",
+            "monitor.device", "ontology.qa", "sme.decision",
+            "predict.maintain", "deliver.accept", "deliver.train"],
   "agents": [
     {
-      "name": "factory-cognition",
-      "agent": "cognition",
+      "name": "data-cap",
+      "agent": "data",
       "version": "0.1.0",
       "open_source": true,
       "license": "Apache-2.0",
-      "path": "atoms/cognition/factory-cognition",
+      "path": "atoms/data/data-cap",
       "entry": "main.py",
-      "capabilities": [
-        "factory.cognition"
-      ],
+      "capabilities": ["data.cap"],
+      "depends_on": [],
+      "conflicts": []
+    },
+    {
+      "name": "monitor-device",
+      "agent": "monitor",
+      "version": "0.1.0",
+      "open_source": true,
+      "license": "Apache-2.0",
+      "path": "atoms/monitor/monitor-device",
+      "entry": "main.py",
+      "capabilities": ["monitor.device"],
+      "depends_on": [],
+      "conflicts": []
+    },
+    {
+      "name": "predictive-maintain",
+      "agent": "monitor",
+      "version": "0.1.0",
+      "open_source": true,
+      "license": "Apache-2.0",
+      "path": "atoms/monitor/predictive-maintain",
+      "entry": "main.py",
+      "capabilities": ["predict.maintain"],
+      "depends_on": [{"name": "diagnose.kb", "reason": "维修建议查知识库(经run_flow $ref注入)"}],
+      "conflicts": []
+    },
+    {
+      "name": "ontology-qa",
+      "agent": "ontology",
+      "version": "0.1.0",
+      "open_source": true,
+      "license": "Apache-2.0",
+      "path": "atoms/ontology/ontology-qa",
+      "entry": "main.py",
+      "capabilities": ["ontology.qa"],
       "depends_on": [],
       "conflicts": []
     },
@@ -23,37 +60,56 @@
       "license": "Apache-2.0",
       "path": "atoms/decision/sme-decision",
       "entry": "main.py",
-      "capabilities": [
-        "sme.decision"
-      ],
-      "depends_on": [],
-      "conflicts": []
-    },
-    {
-      "name": "delivery-package",
-      "agent": "deliver",
-      "version": "0.1.0",
-      "open_source": true,
-      "license": "Apache-2.0",
-      "path": "atoms/delivery/delivery-package",
-      "entry": "main.py",
-      "capabilities": [
-        "delivery.package"
-      ],
-      "depends_on": [],
+      "capabilities": ["sme.decision"],
+      "depends_on": [{"name": "data.cap", "reason": "可选：质量决策吃SPC结果"}],
       "conflicts": []
     },
     {
       "name": "diagnose-kb",
-      "agent": "fde",
+      "agent": "diagnose",
       "version": "0.1.0",
       "open_source": true,
       "license": "Apache-2.0",
-      "path": "atoms/fde/diagnose-kb",
+      "path": "atoms/diagnose/diagnose-kb",
       "entry": "main.py",
-      "capabilities": [
-        "diagnose.kb"
-      ],
+      "capabilities": ["diagnose.kb"],
+      "depends_on": [],
+      "conflicts": []
+    },
+    {
+      "name": "deliver-accept",
+      "agent": "deliver",
+      "version": "0.1.0",
+      "open_source": false,
+      "license": "closed",
+      "path": "atoms/delivery/deliver-accept",
+      "entry": "main.py",
+      "capabilities": ["deliver.accept"],
+      "depends_on": [],
+      "conflicts": [],
+      "degraded": {"reason": "闭源原子；开源工作流删此原子自动降级为交付前自闭环"}
+    },
+    {
+      "name": "deliver-train",
+      "agent": "deliver",
+      "version": "0.1.0",
+      "open_source": true,
+      "license": "Apache-2.0",
+      "path": "atoms/delivery/deliver-train",
+      "entry": "main.py",
+      "capabilities": ["deliver.train"],
+      "depends_on": [{"name": "deliver.accept", "reason": "可选：吃SRS输出(经run_flow $ref)"}],
+      "conflicts": []
+    },
+    {
+      "name": "memory",
+      "agent": "memory",
+      "version": "0.1.0",
+      "open_source": true,
+      "license": "Apache-2.0",
+      "path": "atoms/memory/memory",
+      "entry": "main.py",
+      "capabilities": ["memory.core"],
       "depends_on": [],
       "conflicts": []
     },
@@ -65,150 +121,8 @@
       "license": "Apache-2.0",
       "path": "atoms/fde/fde-task",
       "entry": "main.py",
-      "capabilities": [
-        "fde.task"
-      ],
-      "depends_on": [],
-      "conflicts": []
-    },
-    {
-      "name": "memory-fact",
-      "agent": "memory",
-      "version": "0.1.0",
-      "open_source": true,
-      "license": "Apache-2.0",
-      "path": "atoms/memory/memory-fact",
-      "entry": "main.py",
-      "capabilities": [
-        "memory.fact"
-      ],
-      "depends_on": [],
-      "conflicts": []
-    },
-    {
-      "name": "memory-optmem",
-      "agent": "memory",
-      "version": "0.1.0",
-      "open_source": true,
-      "license": "Apache-2.0",
-      "path": "atoms/memory/memory-optmem",
-      "entry": "main.py",
-      "capabilities": [
-        "memory.optmem"
-      ],
-      "depends_on": [],
-      "conflicts": []
-    },
-    {
-      "name": "monitor-alert",
-      "agent": "monitor",
-      "version": "0.1.0",
-      "open_source": true,
-      "license": "Apache-2.0",
-      "path": "atoms/monitor/monitor-alert",
-      "entry": "main.py",
-      "capabilities": [
-        "monitor.alert"
-      ],
-      "depends_on": [],
-      "conflicts": []
-    },
-    {
-      "name": "monitor-anomaly",
-      "agent": "monitor",
-      "version": "0.1.0",
-      "open_source": true,
-      "license": "Apache-2.0",
-      "path": "atoms/monitor/monitor-anomaly",
-      "entry": "main.py",
-      "capabilities": [
-        "monitor.anomaly"
-      ],
-      "depends_on": [],
-      "conflicts": []
-    },
-    {
-      "name": "monitor-ask",
-      "agent": "monitor",
-      "version": "0.1.0",
-      "open_source": true,
-      "license": "Apache-2.0",
-      "path": "atoms/monitor/monitor-ask",
-      "entry": "main.py",
-      "capabilities": [
-        "monitor.ask"
-      ],
-      "depends_on": [],
-      "conflicts": []
-    },
-    {
-      "name": "monitor-metric",
-      "agent": "monitor",
-      "version": "0.1.0",
-      "open_source": true,
-      "license": "Apache-2.0",
-      "path": "atoms/monitor/monitor-metric",
-      "entry": "main.py",
-      "capabilities": [
-        "monitor.metric"
-      ],
-      "depends_on": [],
-      "conflicts": []
-    },
-    {
-      "name": "monitor-protocol",
-      "agent": "monitor",
-      "version": "0.1.0",
-      "open_source": true,
-      "license": "Apache-2.0",
-      "path": "atoms/monitor/monitor-protocol",
-      "entry": "main.py",
-      "capabilities": [
-        "monitor.protocol"
-      ],
-      "depends_on": [],
-      "conflicts": []
-    },
-    {
-      "name": "ontology-qa",
-      "agent": "ontology",
-      "version": "0.1.0",
-      "open_source": true,
-      "license": "Apache-2.0",
-      "path": "atoms/ontology/ontology-qa",
-      "entry": "main.py",
-      "capabilities": [
-        "ontology.qa"
-      ],
-      "depends_on": [],
-      "conflicts": []
-    },
-    {
-      "name": "write-evidence",
-      "agent": "write",
-      "version": "0.1.0",
-      "open_source": true,
-      "license": "Apache-2.0",
-      "path": "atoms/write/write-evidence",
-      "entry": "main.py",
-      "capabilities": [
-        "write.evidence"
-      ],
-      "depends_on": [],
-      "conflicts": []
-    },
-    {
-      "name": "write-qa",
-      "agent": "write",
-      "version": "0.1.0",
-      "open_source": true,
-      "license": "Apache-2.0",
-      "path": "atoms/write/write-qa",
-      "entry": "main.py",
-      "capabilities": [
-        "write.qa"
-      ],
-      "depends_on": [],
+      "capabilities": ["fde.task"],
+      "depends_on": [{"name": "monitor.device", "reason": "可选：告警工单闭环(经run_flow $ref)"}],
       "conflicts": []
     }
   ]

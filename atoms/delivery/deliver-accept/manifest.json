@@ -1,0 +1,33 @@
+{
+  "schema_version": "agent.manifest/1.0",
+  "name": "deliver-accept",
+  "agent": "deliver",
+  "version": "0.1.0",
+  "open_source": false,
+  "license": "closed",
+  "entry": "main.py",
+  "provides": ["deliver.accept"],
+  "depends_on": [
+    {"name": "kernels.survey_core", "reason": "访谈提纲/需求结构化/生成SRS/验收清单/勾稽纯函数"}
+  ],
+  "conflicts": [],
+  "inputs": {
+    "op": {"enum": ["outline", "requirement", "srs", "acceptance", "reconcile", "package", "verify"]},
+    "story": {"type": "str", "required": false, "default": null},
+    "requirements": {"type": "list", "required": false, "default": null},
+    "title": {"type": "str", "required": false, "default": null},
+    "monitor_snapshot": {"type": "dict", "required": false, "default": null},
+    "tickets": {"type": "list", "required": false, "default": null},
+    "acceptance": {"type": "list", "required": false, "default": null},
+    "dir": {"type": "str", "required": false, "default": null}
+  },
+  "outputs": {
+    "srs": {"type": "dict", "desc": "需求规格说明书", "final_hook": "srs"},
+    "acceptance_list": {"type": "list", "desc": "验收清单", "final_hook": "acceptance"},
+    "reconcile": {"type": "dict", "desc": "需求↔验收勾稽", "final_hook": null},
+    "package": {"type": "dict", "desc": "交付包", "final_hook": "package"},
+    "accept": {"type": "dict", "desc": "验收结论", "final_hook": "accept"}
+  },
+  "degraded_on_missing": ["quote"],
+  "run_config": {"local_only": true}
+}

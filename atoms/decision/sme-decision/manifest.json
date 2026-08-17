@@ -3,16 +3,27 @@
   "name": "sme-decision",
   "agent": "decision",
   "version": "0.1.0",
-  "entry": "main.py",
-  "license": "Apache-2.0",
   "open_source": true,
-  "description": "复用 sme-decision-ontology 决策能力：确定性决策 + 行动清单 + 阈值回灌（算法开源，数据不出厂）",
+  "license": "Apache-2.0",
+  "entry": "main.py",
   "provides": ["sme.decision"],
-  "capabilities": ["sme.decision"],
-  "depends_on": [],
+  "depends_on": [
+    {"name": "kernels.rules", "reason": "决策规则引擎纯函数"},
+    {"name": "data.cap", "reason": "可选：质量决策吃SPC结果"}
+  ],
   "conflicts": [],
-  "resources": [],
-  "run_config": {
-    "ops": ["linkage", "decide", "action", "feedback", "decide_alert"]
-  }
+  "inputs": {
+    "op": {"enum": ["decide", "set_thresholds", "industry"]},
+    "data": {"type": "list", "required": false, "default": null},
+    "rules_path": {"type": "str", "required": false, "default": null},
+    "model": {"type": "dict", "required": false, "default": null},
+    "industry": {"type": "str", "required": false, "default": null},
+    "dir": {"type": "str", "required": false, "default": null}
+  },
+  "outputs": {
+    "decisions": {"type": "list", "desc": "决策清单", "final_hook": "decisions"},
+    "thresholds": {"type": "dict", "desc": "阈值表", "final_hook": "thresholds"}
+  },
+  "degraded_on_missing": [],
+  "run_config": {"local_only": true}
 }
