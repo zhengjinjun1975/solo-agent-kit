@@ -111,6 +111,34 @@ class OntologyQaAtom(AtomicAgent):
                         return {"hit": True,
                                 "answer": f"{c}={v} 共 {len(filtered)} 条",
                                 "value": len(filtered), "kind": "filter"}
+        # ---- 事件驱动 0 结果兜底：过滤值在当前数据无匹配 → 诚实返回 0 条，
+        #      不残留旧值、不把已消失的状态当"无法解析"（数据变了相关都变）。
+        #      仅当问题命中 status/type 列的列关键词且不含聚合关键词时触发，避免误伤聚合问句。
+        if not any(k in q for k in ("平均", "均值", "合计", "求和", "总和",
+                                    "最大", "最小", "多少", "几", "共有",
+                                    "一共", "总共有", "数量", "几台")):
+            _COL_CN = {"status": "状态", "type": "类型", "mode": "模式",
+                       "state": "状态", "kind": "类型", "status_cn": "状态"}
+            for c in rows[0].keys():
+                if oc.semantic_role(c) not in ("status", "type"):
+                    continue
+                colkw = _COL_CN.get(c) or oc.local_name(c)
+                if not colkw or colkw not in q:
+                    continue
+                cur = {str(r.get(c)) for r in rows if str(r.get(c))}
+                # 提取候选值: <colkw>[为是:：]?<value>的?  或  <value>的<colkw>
+                m = re.search(rf"{re.escape(colkw)}[为是:：]?\s*([^\s，。、的]+)的?", q)
+                if not m:
+                    m = re.search(rf"([^\s，。、的]+)的{re.escape(colkw)}", q)
+                if m:
+                    val = m.group(1).strip()
+                    if (val and val not in cur and val != colkw
+                            and not val.replace(".", "").isdigit()
+                            and not any(x in val for x in ("平均", "均值", "合计",
+                                                           "最大", "最小"))):
+                        return {"hit": True,
+                                "answer": f"{c}={val} 共 0 条",
+                                "value": 0, "kind": "filter"}
         return {"hit": False, "answer": "未能解析问题，请使用数据类询问（数量/均值/状态）"}
 
 

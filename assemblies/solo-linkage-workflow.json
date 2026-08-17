@@ -138,8 +138,22 @@
            "problem": {"$ref": "ticket.ticket.problem"},
            "diagnosis": {"$ref": "diagnose.hit.solution"}}
         ],
-        "kb": "factory",
-        "industry": "factory",
+        "requirements": [
+          {"id": "R-001", "title": "振动预警", "category": "设备",
+           "story": "水泵振动越限自动预警", "priority": "P0",
+           "acceptance": ["越限告警与工单可观测"]},
+          {"id": "R-002", "title": "故障诊断", "category": "设备",
+           "story": "知识库根因诊断", "priority": "P1",
+           "acceptance": ["根因命中"]}
+        ],
+        "acceptance": [
+          {"aid": "A-001", "rid": "R-001", "title": "振动预警",
+           "clause": "越限告警与工单可观测", "result": "通过", "evidence": "越限触发告警与工单"},
+          {"aid": "A-002", "rid": "R-002", "title": "故障诊断",
+           "clause": "根因命中", "result": "通过", "evidence": "知识库命中轴承磨损"}
+        ],
+        "kb": "valve",
+        "industry": "阀门制造",
         "hit": 0.9,
         "questions_n": 10,
         "hits": 9

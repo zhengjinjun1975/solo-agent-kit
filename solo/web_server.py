@@ -218,14 +218,14 @@ class SoloHandler(_GetRoutesMixin, _PostRoutesMixin, BaseHTTPRequestHandler):
         """
         handler_name = routes.get(path)
         if handler_name is None:
-            # ---- 动态原子路由：POST /api/atom/<capability> ----
+            # ---- 动态原子路由：POST /api/atom/<capability> / /api/flow/<assembly> ----
             if path.startswith("/api/atom/"):
                 cap = path[len("/api/atom/"):]
-                self._run_capability_route(cap, payload())
+                self._run_capability_route(cap, self._payload_value(payload))
                 return
             if path.startswith("/api/flow/"):
                 asm = path[len("/api/flow/"):]
-                self._run_flow_route(asm, payload())
+                self._run_flow_route(asm, self._payload_value(payload))
                 return
             if path == "/api/atoms/status":
                 self._atoms_status()
@@ -233,6 +233,13 @@ class SoloHandler(_GetRoutesMixin, _PostRoutesMixin, BaseHTTPRequestHandler):
             self._json({"error": "unknown api"}, 404)
             return
         getattr(self, handler_name)(payload)
+
+    @staticmethod
+    def _payload_value(payload):
+        """GET 传 callable(lambda 懒取 query) / POST 传已解析 body dict → 统一为 dict。"""
+        if callable(payload):
+            return payload()
+        return payload or {}
 
     # ---- 原子化统一路由（/api/atom/<capability> + /api/flow/<assembly>）----
     def _run_capability_route(self, capability, body):
