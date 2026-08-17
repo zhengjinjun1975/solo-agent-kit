@@ -437,13 +437,20 @@
     <!-- 代码工作区 -->
     <div id="ws-code" style="display:none">
       <div class="lbl">代码工作区 — 库理解/生成/审查</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0 6px">
+        <span class="fw-chip" style="background:#7c3aed;font-size:11px;padding:3px 10px;border-radius:12px;color:#fff">🤖 与 CodeAgent 完全集成</span>
+        <span class="fw-chip" style="background:#0d9488;font-size:11px;padding:3px 10px;border-radius:12px;color:#fff">codeagent-minimal · 同一套审查方法论</span>
+      </div>
+      <div style="font-size:11px;color:var(--mute);line-height:1.7;background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:10px">
+        审查与生成由 <b style="color:#7c3aed">CodeAgent (codeagent-minimal)</b> 提供，逐字复用其代码审查原子：<b>静态分析</b>（语法/未用 import/圈复杂度/命名规范）、<b>软件 BUG</b>（裸 except/可变默认参数/==None）、<b>架构</b>（文件过大/函数过长/import 过多）、<b>安全</b>（SQL 注入/命令注入/eval-exec/硬编码密钥/反序列化）、<b>网络</b>（SSRF/明文 HTTP/URL 凭证）。评分口径与 codeagent 完全一致（0-100，critical=20/major=10/minor=3/info=1），同一文件两边得分相同。
+      </div>
       <div class="stat" style="cursor:pointer" onclick="runCodeOverview()">📁 项目概览</div>
       <div id="code-result" style="font-size:11px;max-height:200px;overflow:auto;white-space:pre-wrap;background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:8px;margin-top:6px"></div>
       <div class="lbl" style="margin-top:14px">代码生成</div>
       <textarea id="code-prompt" rows="3" style="width:100%;background:#fff;border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12px;padding:8px;outline:none" placeholder="描述要生成的代码…"></textarea>
       <button class="btn pri" style="margin-top:6px;width:100%" onclick="runCodeGen()">生成代码</button>
       <div id="gen-result" style="font-size:11px;margin-top:8px;max-height:150px;overflow:auto;white-space:pre-wrap;background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:8px"></div>
-      <div class="lbl" style="margin-top:14px">代码审查（静态分析 + 0-100 评分）</div>
+      <div class="lbl" style="margin-top:14px">代码审查（CodeAgent 静态分析 + 0-100 评分）</div>
       <input id="cr-file" placeholder="待审 Python 文件（如 solo/web_routes.py）" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;margin-top:8px;background:#fff;color:var(--text)">
       <button class="btn pri" style="margin-top:6px;width:100%" onclick="runCodeReview()">🛡 审查文件</button>
       <div id="cr-result" style="font-size:11px;margin-top:8px;max-height:200px;overflow:auto;white-space:pre-wrap;background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:8px"></div>

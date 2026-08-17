@@ -1362,15 +1362,29 @@ async function runOntoNt(){
   out.innerHTML=`🧾 ${res.entities.length} 实体，${res.triples} 三元组。<pre style="font-size:10px;white-space:pre-wrap;max-height:180px;overflow:auto;margin-top:6px">${esc((res.nt||'').slice(0,800))}${(res.nt||'').length>800?'\n…':''}</pre>`;
 }
 
-// ===== CLI→web 回归：代码审查（code_review.review_file 口径）=====
+// ===== CLI→web 回归：代码审查（CodeAgent / code_review.review_file 口径）=====
 async function runCodeReview(){
   const out=document.getElementById('cr-result');
   const file=document.getElementById('cr-file').value.trim();
   if(!file){out.innerHTML='⚠️ 请输入待审文件路径';return;}
-  out.innerHTML='⏳ 审查中…';
+  out.innerHTML='⏳ CodeAgent 审查中（静态分析 + 0-100 评分）…';
   const res=await api('/api/code-review-file',{method:'POST',body:JSON.stringify({file,max_complexity:20})});
   if(res.error){out.innerHTML='❌ '+res.error;return;}
-  out.innerHTML=`${res.score>=85?'✅':res.score>=60?'⚠️':'🔴'} 静态评分 <b>${res.score}</b>/100，${(res.issues||[]).length} 项问题\n`+(res.issues||[]).map(i=>`[${i.severity}] ${i.title}${i.line?` (L${i.line})`:''}`).join('\n')+'';
+  const issues=res.issues||[];
+  const w={critical:20,major:10,minor:3,info:1};
+  const bySeverity=Object.keys(w).map(s=>[s,issues.filter(i=>i.severity===s).length]).filter(([,n])=>n>0);
+  const sevLabel={critical:'critical(扣20/条)',major:'major(扣10/条)',minor:'minor(扣3/条)',info:'info(扣1/条)'};
+  const mark=res.score>=85?'✅':res.score>=60?'⚠️':'🔴';
+  const dims=['syntax','imports','complexity','naming','bugs','architecture','security','network','reuse'];
+  const dimCount=Object.create(null);
+  issues.forEach(i=>{ dimCount[i.dim||'issues']=(dimCount[i.dim||'issues']||0)+1; });
+  out.innerHTML=
+    `<div style="margin-bottom:6px">🤖 <b style="color:#7c3aed">CodeAgent (codeagent-minimal)</b> 审查结果 — 与 codeagent 完全集成，同一套方法论与评分口径</div>
+     <div style="margin-bottom:6px">${mark} 静态评分 <b>${res.score}</b>/100，${issues.length} 项问题</div>
+     ${bySeverity.length?`<div style="font-size:11px;margin-bottom:6px">${bySeverity.map(([s,n])=>`<span style="display:inline-block;padding:1px 8px;border-radius:10px;margin:1px 4px 1px 0;background:${s==='critical'?'rgba(220,38,38,.12)':s==='major'?'rgba(217,119,6,.12)':s==='minor'?'rgba(13,148,136,.12)':'rgba(124,58,237,.12)'};color:${s==='critical'?'#dc2626':s==='major'?'#d97706':s==='minor'?'#0d9488':'#7c3aed'}">${s} ${n} 项 · ${sevLabel[s]}</span>`).join('')}</div>`:''}
+     <div style="font-size:10px;color:var(--mute);margin-bottom:6px">评分口径与 codeagent 一致：score = 100 − Σ严重度权重，同一文件两边得分相同。</div>`
+    +issues.map(i=>`[${i.severity}] ${i.title}${i.line?` (L${i.line})`:''}`).join('\n')
+    + (issues.length? '' : '\n🎉 未发现问题');
 }
 
 // ===== 写作：AI 味自检（writing-ai-taste，评分+建议+自洽结论）=====
@@ -1489,11 +1503,11 @@ const FEATURE_INFO = {
     integration:'集成方式：POST /api/decisions 跑确定性规则引擎，返回可解释决策建议；区别于问答——做确定性决策建议而非检索。',
     color:'violet' },
   code: { name:'代码', icon:'💻', tag:'核心能力',
-    usage:'①点「📁 项目概览」看代码库结构；②「代码生成」填描述点「生成代码」用 CodeAgent 生成；③「代码审查」填文件路径点「🛡 审查文件」得 0-100 评分。',
+    usage:'①点「📁 项目概览」看代码库结构；②「代码生成」填描述点「生成代码」用 CodeAgent 生成；③「代码审查」填文件路径点「🛡 审查文件」，由 CodeAgent (codeagent-minimal) 静态分析（语法/圈复杂度/BUG/架构/安全/网络）并给 0-100 评分与问题清单。与 codeagent 完全集成、同一套审查方法论与评分口径。',
     input:'dir、prompt、file 路径',
-    output:'代码库概览、生成代码、审查评分+问题清单',
+    output:'代码库概览、CodeAgent 生成代码、CodeAgent 审查评分(0-100)+问题清单',
     access:'GET /api/code-overview?dir=solo · POST /api/gen {kind:code-agent} · POST /api/code-review-file {file}',
-    integration:'集成方式：GET /api/code-overview 理解库；POST /api/gen 生成；POST /api/code-review-file 静态分析评分。',
+    integration:'集成方式：与 CodeAgent 完全集成。GET /api/code-overview 理解库；POST /api/gen 生成；POST /api/code-review-file 由 codeagent-minimal 的审查原子（静态分析/圈复杂度/安全/架构/网络）输出 0-100 评分 + issues，评分口径与 codeagent 逐字一致，同一文件两边得分相同。',
     color:'violet' },
   config: { name:'配置', icon:'⚙️', tag:'系统',
     usage:'①看模型列表与当前生效模型；②点「＋ 新增模型」或编辑 base_url/model；③选「设为生效」radio；④点「💾 保存配置」持久化。',
