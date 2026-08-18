@@ -1,5 +1,8 @@
 # solo-agent-kit
 
+> ⭐ **觉得有用就给我们一个 Star** —— 你的 Star 让这个项目被更多人看见，支持我们持续迭代。
+> [![GitHub stars](https://img.shields.io/github/stars/zhengjinjun1975/solo-agent-kit?style=social)](https://github.com/zhengjinjun1975/solo-agent-kit)
+
 > **给 FDE（工厂/前置部署工程师）与一人公司的 AI 原生全栈工具；也是甲方/乙方工程师共用的开源算法底座。**
 > 方法论决定一切：不是工具堆砌，是同一套方法论在不同层的落地。
 > 零依赖，能打；单文件，能审；独立主体，不绑定平台；开源原子，可独立运行、可被上层组装。
