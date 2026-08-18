@@ -266,7 +266,10 @@ def to_factory_lexicon(draft, table_name="数据", entity_cn=None, industry: str
     ctx = _industry_ctx(industry)
     ent_cn = entity_cn or ctx["entity_cn"]
     entity_cn2en = {ent_cn: table_name}
-    return {
+    # 公共工业词典协同合并：若兄弟仓库 factory-ontology-kit 可达（linkage 已加 sys.path），
+    # 把公共词典(00基础/行业词典)合并进本初稿，让 solo 起草的词典自动带跨行业通用概念。
+    # 合并失败/不可达时纯本地初稿（不破坏 solo 独立可用）。
+    lexicon = {
         "description": f"由 solo lexicon_draft 起草 ({table_name}, 实体={ent_cn}, 对齐工厂本体契约, 行业kb={ctx['kb']})",
         "attr_cn2en": attr_cn2en,
         "attr_en2cn": attr_en2cn,
@@ -279,6 +282,24 @@ def to_factory_lexicon(draft, table_name="数据", entity_cn=None, industry: str
         "value_fields": value_fields,
         "value_en_suggest": value_en_suggest,
     }
+    # 公共工业词典协同合并（尝试兄弟仓库 factory-ontology-kit 的 loader）
+    # 行业 → 公共词典文件映射（与 factory-ontology industrial_dict 一致）
+    _INDUSTRY_DICT_FILE = {
+        "阀门": "01_valve_pump.json", "泵阀": "01_valve_pump.json",
+        "化工": "02_fine_chem.json", "精细化工": "02_fine_chem.json",
+        "地质": "03_geophysics.json", "地球物理": "03_geophysics.json",
+    }
+    try:
+        import industrial_dict_loader as _idl
+        _ind_dict = _INDUSTRY_DICT_FILE.get(industry, "00_basis.json")
+        _files = ["00_basis.json"]
+        if _ind_dict != "00_basis.json":
+            _files.append(_ind_dict)
+        lexicon = _idl.merge_industrial_dict(lexicon, _files)
+        lexicon["_public_dict_merged"] = True
+    except Exception:
+        pass  # factory-ontology 不可达时纯本地初稿
+    return lexicon
 
 
 def to_review_items(draft):
