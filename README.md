@@ -20,7 +20,15 @@
   <a href="https://github.com/zhengjinjun1975/solo-agent-kit">
     <img src="https://img.shields.io/badge/deps-zero%20third--party-green.svg" alt="Zero third-party deps">
   </a>
+  <a href="https://github.com/zhengjinjun1975/solo-agent-kit">
+    <img src="https://img.shields.io/github/stars/zhengjinjun1975/solo-agent-kit" alt="Stars">
+  </a>
+  <a href="https://github.com/zhengjinjun1975/solo-agent-kit">
+    <img src="https://img.shields.io/github/forks/zhengjinjun1975/solo-agent-kit" alt="Forks">
+  </a>
 </p>
+
+> **它能帮你**：写公众号推文、查知识库、代码审查、开源发布合规检查、工厂级本体建模——一个人干完整团队的活，零第三方依赖。
 
 ## 目录
 
@@ -336,3 +344,18 @@ solo-agent-kit 借鉴了多个项目的方法论，非代码复制。详见 [NOT
 ## License
 
 [Apache-2.0](LICENSE)。
+
+---
+
+## ⭐ 支持这个项目
+
+如果你觉得 solo-agent-kit 有用，请花 3 秒给我们一个 **Star**：
+
+[![GitHub stars](https://img.shields.io/github/stars/zhengjinjun1975/solo-agent-kit?style=social)](https://github.com/zhengjinjun1975/solo-agent-kit) ⬅️ 点这里
+
+**Star 的意义**：
+- 让更多"一人公司 / FDE 落地 AI"的人找到这个项目
+- 激励我们持续迭代（新原子能力、方法论沉淀）
+- 开源维护者最需要的正向反馈
+
+**反馈与贡献**：有问题提 [Issue](https://github.com/zhengjinjun1975/solo-agent-kit/issues)，有想法提交 PR。
