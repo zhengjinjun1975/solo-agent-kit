@@ -166,7 +166,9 @@ class Provider:
         try:
             req = urllib.request.Request(url, data=json.dumps(payload).encode(),
                                          headers={"Content-Type": "application/json"})
-            with urllib.request.urlopen(req, timeout=120) as r:
+            # 本地模型连接用短超时：无 Ollama 环境快速降级，不长时间挂起
+            # （曾 120s 超时导致 CI/无本地模型时 rewrite 卡住被 40s 测试超时打断）
+            with urllib.request.urlopen(req, timeout=8) as r:
                 return json.load(r).get("response", "")
         except (urllib.error.URLError, ConnectionError, OSError) as e:
             reason = getattr(e, "reason", e)

@@ -66,7 +66,8 @@ for _up in range(4):
     _CANDIDATES.append(os.path.normpath(_p))
 _CANDIDATES = [p for p in _CANDIDATES if p]
 
-_LOADED = None  # 模块对象 or None（未加载）
+_LOADED = None  # 模块对象 or None（未加载）；失败不缓存，避免返回 False
+_LOAD_TRIED = False
 
 
 def _locate() -> str:
@@ -77,13 +78,20 @@ def _locate() -> str:
 
 
 def _load():
-    """动态加载 zh-writing-checker 模块（单文件，无第三方依赖）。找不到返回 None。"""
-    global _LOADED
+    """动态加载 zh-writing-checker 模块（单文件，无第三方依赖）。找不到返回 None。
+
+    始终返回「模块对象 或 None」，绝不返回 bool —— 曾因缓存 False 导致
+    第二次调用拿到 False、`mod.human_gate` 报 "'bool' object has no attribute"。
+    """
+    global _LOADED, _LOAD_TRIED
     if _LOADED is not None:
         return _LOADED
+    if _LOAD_TRIED:
+        # 已尝试过且失败，直接 None（不重复加载，但返回类型恒为模块/None）
+        return None
+    _LOAD_TRIED = True
     path = _locate()
     if not path:
-        _LOADED = False
         return None
     try:
         spec = importlib.util.spec_from_file_location("_zh_writing_checker_rt", path)
@@ -91,7 +99,6 @@ def _load():
         spec.loader.exec_module(mod)
         _LOADED = mod
     except Exception:
-        _LOADED = False
         return None
     return _LOADED
 
@@ -226,23 +233,25 @@ def write_natural(text: str, style: str = "tweet", provider=None) -> dict:
     不强制改写——检测到自然文本或未接入检查器时，如实说明。
     """
     report = ai_taste(text, style)
-    if not report.get("ok"):
-        return {"ai_taste": report, "note": report.get("note", "未接入检查器")}
+    # 即使未接入检查器，也执行改写（无 provider 返回原文+风格指导），
+    # 保证 write_natural 始终产出 rewrite（对 CLI 场景 rewritten 非空）
     r = rewrite(text, style, provider)  # 风格改写（本地模板/LLM）
     rewritten = r.get("rewritten") or ""
     if not rewritten and provider is None:
-        # 无 provider：本地模式，直接返回原文 + 风格指导（对齐 web，避免 CLI 改写恒空）
+        # 无 provider：本地模式，直接返回原文 + 风格指导
         r = dict(r, rewritten=text, rewritten_len=len(text),
                  note="未配置 provider，返回原文+风格指导；配置 provider 后可自动改写")
         rewritten = text
     recheck = ai_taste(rewritten, style) if rewritten else None
+    before_score = report.get("ai_score") if report.get("ok") else None
+    after_score = recheck.get("ai_score") if (recheck and recheck.get("ok")) else None
     return {
         "style": style,
         "ai_taste_before": report,
         "rewrite": r,
         "ai_taste_after": recheck,
-        "improvement": None if (recheck is None or report["ai_score"] is None)
-                       else round(recheck["ai_score"] - report["ai_score"], 1),
+        "improvement": None if (before_score is None or after_score is None)
+                       else round(after_score - before_score, 1),
         "note": "建议已给出（提示不强制）；若 AI 味分高，可用 provider 自动改写或按建议手动打磨。",
     }
 

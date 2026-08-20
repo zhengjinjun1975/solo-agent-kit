@@ -216,7 +216,14 @@ class TestRagSemanticHit:
 
 
 # ═══════════════════════ 4. linkage 跨开源健壮 ═══════════════════════
+# 兄弟仓库是否在位的检测（独立优先：仓库不在时跳过集成断言，不连锁依赖）
+_HAS_FACTORY = linkage.find_factory() is not None
+_HAS_SME = linkage.find_sme() is not None
+
+
 class TestLinkageRobust:
+    @pytest.mark.skipif(not (_HAS_FACTORY and _HAS_SME),
+                        reason="兄弟仓库未在位，跳过跨仓库集成断言（独立可跑）")
     def test_verify_linkage_healthy(self):
         """真实兄弟仓库：双库 present + 依赖全在 + available=True。"""
         st = linkage.verify_linkage()
@@ -250,6 +257,8 @@ class TestLinkageRobust:
         assert ck["ok"] is False
         assert "环境变量" in ck["error"], f"应提示环境变量指定: {ck['error']}"
 
+    @pytest.mark.skipif(not _HAS_SME,
+                        reason="兄弟仓库 sme 未在位，跳过该集成断言（独立可跑）")
     def test_verify_linkage_single_repo_missing_dep_fallback(self, monkeypatch, tmp_path):
         """单库缺依赖 → deps_ok=False + missing 列出；另一库正常 → available 仍 True（回退不崩溃）。"""
         fake = tmp_path / "factory-ontology-kit"

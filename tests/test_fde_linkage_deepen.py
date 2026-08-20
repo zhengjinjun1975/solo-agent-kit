@@ -28,6 +28,13 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from fde_runtime import linkage  # noqa: E402
 from fde_runtime.loader import AgentRuntime  # noqa: E402
 
+# AI味检查器是否在位（独立优先：未接入 zh-writing-checker 时跳过 AI味评分断言）
+try:
+    from solo import writing as _writing
+    _HAS_CHECKER = _writing._load() is not None
+except Exception:
+    _HAS_CHECKER = False
+
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
@@ -225,6 +232,8 @@ class TestWriteQa:
         assert r["ok"]
         assert r["data"]["passed"] is True, "干净文本不应有必改问题"
 
+    @pytest.mark.skipif(not _HAS_CHECKER,
+                        reason="AI味检查器未接入（独立可跑），跳过 AI味评分断言")
     def test_ai_taste_report(self, rt):
         """AI味自检：应返回 ai_score 与 verdict。"""
         r = rt.run_capability("write.qa", op="ai_taste",
