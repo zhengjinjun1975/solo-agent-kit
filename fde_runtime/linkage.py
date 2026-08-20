@@ -24,7 +24,7 @@ import os
 import sys
 
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # solo-agent-kit/
-_OS_ROOT = os.path.dirname(_REPO_ROOT)  # E:/open-source/
+_OS_ROOT = os.path.dirname(_REPO_ROOT)  # 上级目录
 
 
 def _norm(p: str) -> str:

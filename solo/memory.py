@@ -385,14 +385,14 @@ class Memory:
 
     # ---- OptMem 互通(可选增强): 把经验/方法论沉淀进 OptMem 全局记忆 ----
     def optmem_note(self, text: str):
-        """调 E:\\optmem\\memo note 沉淀一条全局记忆(经验/方法论)。
+        """调外置记忆目录 memo note 沉淀一条全局记忆(经验/方法论)。
 
         用于 FDE 工具箱经验/方法论跨项目、跨会话复用。失败静默返回, 不打断主流程。
         """
         return optmem_note(text)
 
     def optmem_search(self, query: str, top_k: int = 5):
-        """调 E:\\optmem\\memo_search.py 语义检索 OptMem 记忆。返回匹配文本列表。"""
+        """调外置记忆目录 memo_search.py 语义检索 OptMem 记忆。返回匹配文本列表。"""
         return optmem_search(query, top_k)
 
     # ---- 内部 ----
@@ -453,7 +453,7 @@ _OPTMEM_ENABLED = os.environ.get("OPTMEM_NOTE", "1").lower() not in ("0", "false
 
 
 def optmem_note(text: str):
-    """调 E:\optmem\memo note 沉淀一条全局记忆。返回 (ok, 消息)。"""
+    """调外置记忆目录 memo note 沉淀一条全局记忆。返回 (ok, 消息)。"""
     if not _OPTMEM_ENABLED:
         return False, "disabled(OPTMEM_NOTE=0)"
     import subprocess
@@ -474,7 +474,7 @@ def optmem_note(text: str):
 
 
 def optmem_search(query: str, top_k: int = 5):
-    """调 E:\optmem\memo_search.py 语义检索 OptMem 记忆。失败返回 []。"""
+    """调外置记忆目录 memo_search.py 语义检索 OptMem 记忆。失败返回 []。"""
     if not _OPTMEM_ENABLED:
         return []
     import subprocess

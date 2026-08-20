@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """solo 压力 + 边界 + 路径注入实测脚本(真实数据, 非空壳)"""
 import sys, os, json, time, tempfile, threading, hashlib, random
-sys.path.insert(0, "E:/open-source/solo-agent-kit")
+sys.path.insert(0, "本仓库根目录")
 import tempfile
 
 RESULTS = {"stress": {}, "boundary": {}, "path_injection": {}}

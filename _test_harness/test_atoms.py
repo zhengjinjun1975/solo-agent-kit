@@ -3,7 +3,7 @@
 镜像前端/装配真实参数，逐一断言真实数据。"""
 from __future__ import annotations
 import os, sys, json, tempfile
-ROOT = r"E:\open-source\solo-agent-kit"
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, ROOT)
 from fde_runtime.loader import AgentRuntime
 

@@ -1,6 +1,6 @@
 # solo-agent-kit — 针对性评估（FDE 综合能力 / 竞品对比 / 能力到达率 / 商业化）
 
-> 评估对象：`E:/open-source/solo-agent-kit`（当前 HEAD `c06e168`，10 核心原子）
+> 评估对象：`本仓库根目录`（当前 HEAD `c06e168`，10 核心原子）
 > 参考文档：`_os/solo-fde-atomic-architecture.md`、`_os/solo-fde-linkage-deepen.md`、`_os/fde-latest-tech-deepdive.md`
 > 评估方式：**实测代码而非读文档**（跑 `pytest tests/` 全量 + 逐能力 `run_capability` 真实数据验证 + 组装链 `run_flow` 端到端）
 > 结论先行：能力分 **6.8/10**；竞品定位「一人公司 FDE 开源底座」差异化成立；能力到达率 **约 70%**（核心闭环真实可用，但存在 21 条红测 = 文档/测试与最新 10 原子代码脱节，写作原子缺失，协议/RUL/RAG 为雏形）。

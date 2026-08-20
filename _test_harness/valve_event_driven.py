@@ -5,7 +5,7 @@
 场景: 华泰阀门制造厂, 阀门制造行业。
 """
 import csv, json, os, sys, tempfile
-ROOT = "E:/open-source/solo-agent-kit"
+ROOT = "本仓库根目录"
 sys.path.insert(0, ROOT)
 BASE = os.path.join(ROOT, "_test_harness", "valve_factory")
 EQUIP = os.path.join(BASE, "valve_equipment.csv")

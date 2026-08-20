@@ -1,6 +1,6 @@
 # solo-agent-kit — FDE 原子化架构（对齐 10 核心原子 + 写作原子）
 
-> 项目：`E:/open-source/solo-agent-kit`
+> 项目：`本仓库根目录`
 > 版本：当前 HEAD `c06e168`（完全原子化重构，10 核心原子真下沉 + kernels 纯算法）+ 写作原子落盘
 > 参考：`_os/solo-fde-linkage-deepen.md`（深度补强）、`_os/fde-latest-tech-deepdive.md`（最新技术）
 > 目标：描述当前 **10 核心原子 + 2 写作原子** 的真实架构，消除「文档宣称 15 原子 vs 代码 10 原子」脱节。

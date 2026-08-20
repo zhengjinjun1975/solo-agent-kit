@@ -2,7 +2,7 @@
 """kernels 独立性 + 开源子图自洽 + 多租户/离线检查。"""
 from __future__ import annotations
 import os, sys, json, tempfile, importlib
-ROOT = r"E:\open-source\solo-agent-kit"
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, ROOT)
 
 # ============ 1. kernels 零第三方依赖 / 无 solo.factory 引用 ============

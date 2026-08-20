@@ -7,7 +7,7 @@
 3. 跨仓库 codes 加入 import 路径 (codes_isolation)。
 """
 import os, sys
-ROOT = "E:/open-source/solo-agent-kit"
+ROOT = "本仓库根目录"
 sys.path.insert(0, ROOT)
 from fde_runtime import linkage
 

@@ -2,7 +2,7 @@
 """组装链 2.0 实测：fde-workflow 全链跑通 + when/optional 条件 + final 聚合。"""
 from __future__ import annotations
 import os, sys, json, tempfile
-ROOT = r"E:\open-source\solo-agent-kit"
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, ROOT)
 from fde_runtime.loader import AgentRuntime
 

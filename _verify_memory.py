@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import sys, os, time, tempfile
-sys.path.insert(0, r"E:/open-source/solo-agent-kit")
+sys.path.insert(0, r"本仓库根目录")
 from solo.memory import Memory
 
 # 1) 性能: 3000 条 add_fact (原实现 ~73.5s)

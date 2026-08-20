@@ -2,7 +2,7 @@
 
 > 说明：本文档已随 `c06e168`（完全原子化重构，10 核心原子真下沉 + kernels 纯算法）与写作原子落盘对齐。
 > 早期「15 原子 + monitor-anomaly/factory-cognition/delivery.package 独立原子」架构已合并为 10 核心原子，并新增 write-qa / write-evidence 两个写作原子。
-> 仓库：`E:/open-source/solo-agent-kit`
+> 仓库：`本仓库根目录`
 
 ---
 

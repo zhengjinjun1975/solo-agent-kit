@@ -8,7 +8,7 @@
 """
 import csv, json, os, sys, tempfile, shutil
 
-ROOT = "E:/open-source/solo-agent-kit"
+ROOT = "本仓库根目录"
 sys.path.insert(0, ROOT)
 DATA = os.path.join(ROOT, "_test_harness", "valve_factory")
 EQUIP = os.path.join(DATA, "valve_equipment.csv")

@@ -1,5 +1,5 @@
 import json, sys, os, tempfile
-sys.path.insert(0, "E:/open-source/solo-agent-kit")
+sys.path.insert(0, "本仓库根目录")
 from fde_runtime.loader import AgentRuntime
 
 rt = AgentRuntime()
@@ -13,7 +13,7 @@ print("LOADED:", len(rt.agents))
 print("CAPS:", sorted(rt.capabilities().keys()))
 
 # 主交付链（含写作步骤）
-asm_path = "E:/open-source/solo-agent-kit/assemblies/fde-workflow.json"
+asm_path = "本仓库根目录/assemblies/fde-workflow.json"
 with open(asm_path, encoding="utf-8") as f:
     asm = json.load(f)
 wd = tempfile.mkdtemp(prefix="fde_link_")
