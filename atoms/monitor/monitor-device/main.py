@@ -84,11 +84,10 @@ class MonitorDeviceAtom(AtomicAgent):
                         skipped.append(kind)
                         protos.append({"kind": kind, "available": False,
                                        "error": f"{kind} 缺库不可用"})
-                degraded = bool(skipped)
-                env = {"protocols": protos, "skipped": skipped,
+                # 始终 ok 返回（列出全部协议可用状态），缺库用 skipped/degraded 标注，
+                # 不让部分协议缺库导致整个 protocols 接口 fail（modbus/opcua 仍可用）
+                env = {"protocols": protos, "skipped": skipped, "degraded": bool(skipped),
                        "detail": "modbus/opcua 纯标准库真实直采可用(可连真设备或本地模拟器)"}
-                if degraded:
-                    return fail("部分协议缺库降级", degraded=True, **env)
                 return ok(env)
             if op == "protocol_read":
                 # 真实连接直采：config 指定 {protocol, ...}，连本地模拟器或真设备读数据
